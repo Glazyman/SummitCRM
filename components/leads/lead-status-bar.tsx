@@ -1,0 +1,88 @@
+'use client'
+
+import { cn } from '@/lib/utils'
+import { STATUS_CONFIG, ALL_STATUSES } from './status-config'
+import type { LeadStatus, StatusCount } from './types'
+
+interface LeadStatusBarProps {
+  counts:         StatusCount[]
+  totalCount:     number
+  activeStatuses: LeadStatus[]
+  onStatusClick:  (status: LeadStatus) => void
+}
+
+/**
+ * Horizontal scrollable bar showing lead counts grouped by status.
+ * Clicking a chip toggles that status in the active filter.
+ */
+export function LeadStatusBar({
+  counts,
+  totalCount,
+  activeStatuses,
+  onStatusClick,
+}: LeadStatusBarProps) {
+  const countMap = new Map(counts.map((c) => [c.status, c.count]))
+
+  return (
+    <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+      {/* All */}
+      <button
+        type="button"
+        onClick={() => {
+          // Clicking "All" clears all status filters
+          activeStatuses.forEach((s) => onStatusClick(s))
+        }}
+        className={cn(
+          'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
+          'border transition-all duration-150',
+          activeStatuses.length === 0
+            ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+            : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+        )}
+      >
+        <span>All</span>
+        <span className={cn(
+          'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
+          activeStatuses.length === 0 ? 'bg-primary-foreground/20' : 'bg-border'
+        )}>
+          {totalCount.toLocaleString()}
+        </span>
+      </button>
+
+      {/* Status chips */}
+      {ALL_STATUSES.map((status) => {
+        const count  = countMap.get(status) ?? 0
+        const meta   = STATUS_CONFIG[status]
+        const active = activeStatuses.includes(status)
+
+        if (count === 0) return null
+
+        return (
+          <button
+            key={status}
+            type="button"
+            onClick={() => onStatusClick(status)}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
+              'border transition-all duration-150',
+              active
+                ? cn(meta.pill, 'border-current shadow-sm ring-1 ring-current/30')
+                : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+            )}
+          >
+            <span
+              className={cn('h-1.5 w-1.5 rounded-full', active ? meta.dot : 'bg-current opacity-40')}
+            />
+            <span>{meta.label}</span>
+            <span className={cn(
+              'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
+              active ? 'bg-current/20' : 'bg-border'
+            )}>
+              {count.toLocaleString()}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
