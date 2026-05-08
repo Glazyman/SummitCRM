@@ -60,104 +60,184 @@ export default function LeadDetailClient({
   const [aiDraftOpen,      setAiDraftOpen]      = React.useState(false)
   const [pendingAiDraft,   setPendingAiDraft]   = React.useState<{ subject: string; body_html: string; body_text: string } | null>(null)
 
-  // ── Lead mutations (optimistic, swap real calls in once backend ready) ─
+  // ── Lead mutations ───────────────────────────────────────────────────
   async function handleSaveProfile(patch: Partial<LeadDetail>) {
+    const previous = lead
     setLead((prev) => ({ ...prev, ...patch }))
-    // TODO: await fetch(`/api/leads/${lead.id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+    try {
+      const data = await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      })
+      setLead((prev) => ({ ...prev, ...data.lead, batch_name: prev.batch_name, assigned_name: prev.assigned_name }))
+    } catch (err) {
+      setLead(previous)
+      throw err
+    }
   }
 
-  function handleStatusChange(status: LeadStatus) {
+  async function handleStatusChange(status: LeadStatus) {
     const prev = lead.status
+    if (prev === status) return
     setLead((l) => ({ ...l, status }))
-    addActivity({
-      type:     'lead_status_changed',
-      metadata: { from: prev, to: status },
-    })
-    // TODO: PATCH /api/leads/[id]
+    try {
+      await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      })
+      addActivity({
+        type:     'lead_status_changed',
+        metadata: { from: prev, to: status },
+      })
+    } catch (err) {
+      setLead((l) => ({ ...l, status: prev }))
+      console.error(err)
+    }
   }
 
-  function handleAssign(userId: string) {
+  async function handleAssign(userId: string) {
+    const previous = lead
     const member = teamMembers.find((m) => m.id === userId)
     setLead((l) => ({
       ...l,
       assigned_to:   userId || null,
       assigned_name: member?.name ?? null,
     }))
-    // TODO: PATCH /api/leads/[id]
+    try {
+      await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ assigned_to: userId || null }),
+      })
+    } catch (err) {
+      setLead(previous)
+      console.error(err)
+    }
   }
 
   // ── Note mutations ─────────────────────────────────────────────────────
   async function handleAddNote(content: string) {
+    const data = await requestJson<{ note: { id: string; author_id: string; content: string; created_at: string } }>(
+      `/api/leads/${lead.id}/notes`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }
+    )
     const newEntry: ActivityEntry = {
-      id:           `note-${Date.now()}`,
+      id:           `note-${data.note.id}`,
       source:       'note',
       type:         'note_added',
-      user_id:      currentUserId,
-      user_name:    teamMembers.find((m) => m.id === currentUserId)?.name ?? 'You',
-      user_initials:initials(teamMembers.find((m) => m.id === currentUserId)?.name ?? ''),
-      created_at:   new Date().toISOString(),
+      user_id:      data.note.author_id,
+      user_name:    teamMembers.find((m) => m.id === data.note.author_id)?.name ?? 'You',
+      user_initials:initials(teamMembers.find((m) => m.id === data.note.author_id)?.name ?? ''),
+      created_at:   data.note.created_at,
       metadata:     {},
-      note_id:      `note-${Date.now()}`,
-      note_content: content,
+      note_id:      data.note.id,
+      note_content: data.note.content,
       note_editable:true,
     }
     setActivity((prev) => [newEntry, ...prev])
     setActiveTab('activity')
-    // TODO: POST /api/leads/[id]/notes
   }
 
-  function handleEditNote(noteId: string, content: string) {
+  async function handleEditNote(noteId: string, content: string) {
+    const previous = activity
     setActivity((prev) =>
       prev.map((e) => e.note_id === noteId ? { ...e, note_content: content } : e)
     )
-    // TODO: PATCH /api/leads/[id]/notes/[noteId]
+    try {
+      const data = await requestJson<{ note: { content: string } }>(`/api/leads/${lead.id}/notes/${noteId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content }),
+      })
+      setActivity((prev) =>
+        prev.map((e) => e.note_id === noteId ? { ...e, note_content: data.note.content } : e)
+      )
+    } catch (err) {
+      setActivity(previous)
+      console.error(err)
+    }
   }
 
-  function handleDeleteNote(noteId: string) {
+  async function handleDeleteNote(noteId: string) {
+    const previous = activity
     setActivity((prev) => prev.filter((e) => e.note_id !== noteId))
-    // TODO: DELETE /api/leads/[id]/notes/[noteId]
+    try {
+      await requestJson<{ success: boolean }>(`/api/leads/${lead.id}/notes/${noteId}`, {
+        method: 'DELETE',
+      })
+    } catch (err) {
+      setActivity(previous)
+      console.error(err)
+    }
   }
 
   // ── Follow-up mutations ────────────────────────────────────────────────
   async function handleAddFollowUp(data: NewFollowUp) {
-    const member = teamMembers.find((m) => m.id === data.assigned_to)
+    const result = await requestJson<{ follow_up: Omit<FollowUp, 'is_completed' | 'assigned_name'> }>(
+      `/api/leads/${lead.id}/follow-ups`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    )
+    const member = teamMembers.find((m) => m.id === result.follow_up.assigned_to)
     const newFU: FollowUp = {
-      id:            `fu-${Date.now()}`,
-      title:         data.title,
-      notes:         data.notes || null,
-      due_at:        data.due_at,
-      is_completed:  false,
-      completed_at:  null,
-      assigned_to:   data.assigned_to || null,
+      ...result.follow_up,
+      is_completed:  Boolean(result.follow_up.completed_at),
       assigned_name: member?.name ?? null,
     }
     setFollowUps((prev) => [newFU, ...prev])
     addActivity({
       type:     'follow_up_scheduled',
-      metadata: { title: data.title, due_at: data.due_at },
+      metadata: { title: newFU.title, due_at: newFU.due_at },
     })
-    // TODO: POST /api/leads/[id]/follow-ups
   }
 
-  function handleCompleteFollowUp(id: string) {
-    // Use functional update to avoid stale closure — read current list inside setter
+  async function handleCompleteFollowUp(id: string) {
+    const previous = followUps
+    const completedAt = new Date().toISOString()
+    const followUp = followUps.find((f) => f.id === id)
     setFollowUps((prev) => {
-      const fu = prev.find((f) => f.id === id)
-      if (fu) {
-        addActivity({ type: 'follow_up_completed', metadata: { title: fu.title } })
-      }
       return prev.map((f) =>
         f.id === id
-          ? { ...f, is_completed: true, completed_at: new Date().toISOString() }
+          ? { ...f, is_completed: true, completed_at: completedAt }
           : f
       )
     })
-    // TODO: PATCH /api/leads/[id]/follow-ups/[id]
+    try {
+      const data = await requestJson<{ follow_up: Omit<FollowUp, 'is_completed' | 'assigned_name'> }>(
+        `/api/leads/${lead.id}/follow-ups/${id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ completed_at: completedAt }),
+        }
+      )
+      setFollowUps((prev) =>
+        prev.map((f) =>
+          f.id === id
+            ? { ...f, ...data.follow_up, is_completed: Boolean(data.follow_up.completed_at) }
+            : f
+        )
+      )
+      if (followUp) addActivity({ type: 'follow_up_completed', metadata: { title: followUp.title } })
+    } catch (err) {
+      setFollowUps(previous)
+      console.error(err)
+    }
   }
 
-  function handleDeleteFollowUp(id: string) {
+  async function handleDeleteFollowUp(id: string) {
+    const previous = followUps
     setFollowUps((prev) => prev.filter((f) => f.id !== id))
-    // TODO: DELETE /api/leads/[id]/follow-ups/[id]
+    try {
+      await requestJson<{ success: boolean }>(`/api/leads/${lead.id}/follow-ups/${id}`, {
+        method: 'DELETE',
+      })
+    } catch (err) {
+      setFollowUps(previous)
+      console.error(err)
+    }
   }
 
   // ── Utility ───────────────────────────────────────────────────────────
@@ -399,4 +479,19 @@ function Section({
 // ── Helper ────────────────────────────────────────────────────────────────
 function initials(name: string): string {
   return name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+}
+
+async function requestJson<T>(url: string, init: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...init.headers,
+    },
+  })
+  const payload = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new Error(payload?.error ?? 'Request failed')
+  }
+  return payload as T
 }

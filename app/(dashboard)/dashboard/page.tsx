@@ -24,6 +24,11 @@ export default async function DashboardPage() {
     .single() as { data: { role: WorkspaceRole; workspace_id: string } | null; error: unknown }
 
   const role = member?.role
+  const metrics = member && user
+    ? await getDashboardMetrics(supabase, member.workspace_id, user.id, role)
+    : emptyDashboardMetrics()
+  const totalLeadsDescription =
+    role === 'rep' || role === 'viewer' ? 'assigned to you' : 'in workspace'
 
   return (
     <div className="space-y-5">
@@ -43,28 +48,28 @@ export default async function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Leads"
-          value="—"
-          description="in workspace"
+          value={formatNumber(metrics.totalLeads)}
+          description={totalLeadsDescription}
           icon={Users}
           color="blue"
         />
         <StatCard
           title="Emails Sent"
-          value="—"
+          value={formatNumber(metrics.emailsSentThisWeek)}
           description="this week"
           icon={Send}
           color="green"
         />
         <StatCard
           title="Open Rate"
-          value="—"
+          value={formatPercent(metrics.openRateLast30Days)}
           description="last 30 days"
           icon={BarChart2}
           color="purple"
         />
         <StatCard
           title="Unread"
-          value="—"
+          value={formatNumber(metrics.unreadNotifications)}
           description="notifications"
           icon={Bell}
           color="amber"
@@ -87,28 +92,28 @@ export default async function DashboardPage() {
                 title="Add a sending account"
                 description="Connect a Resend API key or SMTP account to start sending emails."
                 href="/settings/sending-accounts"
-                done={false}
+                done={metrics.setup.hasSendingAccount}
               />
               <SetupStep
                 number={2}
                 title="Import your first leads"
                 description="Upload a CSV file to bring your prospects into the CRM."
                 href="/leads"
-                done={false}
+                done={metrics.setup.hasLeads}
               />
               <SetupStep
                 number={3}
                 title="Invite your team"
                 description="Add reps and managers to your workspace."
                 href="/settings/team"
-                done={false}
+                done={metrics.setup.hasTeamMembers}
               />
               <SetupStep
                 number={4}
                 title="Create your first campaign"
                 description="Set up a multi-step email sequence for your leads."
                 href="/campaigns"
-                done={false}
+                done={metrics.setup.hasCampaign}
               />
             </ol>
           </CardContent>
@@ -188,6 +193,125 @@ function getGreeting() {
   return 'Good evening'
 }
 
+type DashboardMetrics = {
+  totalLeads: number
+  emailsSentThisWeek: number
+  openRateLast30Days: number
+  unreadNotifications: number
+  setup: {
+    hasSendingAccount: boolean
+    hasLeads: boolean
+    hasTeamMembers: boolean
+    hasCampaign: boolean
+  }
+}
+
+function emptyDashboardMetrics(): DashboardMetrics {
+  return {
+    totalLeads: 0,
+    emailsSentThisWeek: 0,
+    openRateLast30Days: 0,
+    unreadNotifications: 0,
+    setup: {
+      hasSendingAccount: false,
+      hasLeads: false,
+      hasTeamMembers: false,
+      hasCampaign: false,
+    },
+  }
+}
+
+async function getDashboardMetrics(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+  userId: string,
+  role: WorkspaceRole | undefined
+): Promise<DashboardMetrics> {
+  const now = new Date()
+  const startOfWeek = new Date(now)
+  startOfWeek.setDate(now.getDate() - 7)
+  const startOf30Days = new Date(now)
+  startOf30Days.setDate(now.getDate() - 30)
+
+  const [
+    leadsResult,
+    emailsThisWeekResult,
+    sentLast30Result,
+    openedLast30Result,
+    unreadResult,
+    sendingAccountsResult,
+    membersResult,
+    campaignsResult,
+  ] = await Promise.all([
+    supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null),
+    supabase
+      .from('emails')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .gte('sent_at', startOfWeek.toISOString()),
+    supabase
+      .from('emails')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .gte('sent_at', startOf30Days.toISOString()),
+    supabase
+      .from('emails')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .gte('sent_at', startOf30Days.toISOString())
+      .not('opened_at', 'is', null),
+    supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .eq('is_read', false),
+    supabase
+      .from('sending_accounts')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('is_active', true),
+    supabase
+      .from('workspace_members')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('is_active', true),
+    supabase
+      .from('campaigns')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId),
+  ])
+
+  const sentLast30 = sentLast30Result.count ?? 0
+  const openedLast30 = openedLast30Result.count ?? 0
+  const canManageSetup = role === 'admin' || role === 'super_admin'
+
+  return {
+    totalLeads: leadsResult.count ?? 0,
+    emailsSentThisWeek: emailsThisWeekResult.count ?? 0,
+    openRateLast30Days: sentLast30 > 0 ? Math.round((openedLast30 / sentLast30) * 100) : 0,
+    unreadNotifications: unreadResult.count ?? 0,
+    setup: {
+      hasSendingAccount: canManageSetup && (sendingAccountsResult.count ?? 0) > 0,
+      hasLeads: (leadsResult.count ?? 0) > 0,
+      hasTeamMembers: canManageSetup && (membersResult.count ?? 0) > 1,
+      hasCampaign: canManageSetup && (campaignsResult.count ?? 0) > 0,
+    },
+  }
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('en-US').format(value)
+}
+
+function formatPercent(value: number) {
+  return `${value}%`
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────
 
 function StatCard({
@@ -234,7 +358,7 @@ function SetupStep({
   done: boolean
 }) {
   return (
-    <li className="flex items-start gap-4">
+    <li className="flex items-start gap-4" aria-label={`Step ${number}: ${title}`}>
       <div className="mt-0.5 shrink-0">
         {done
           ? <CheckCircle2 className="h-5 w-5 text-foreground" />
