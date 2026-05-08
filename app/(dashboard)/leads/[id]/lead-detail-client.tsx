@@ -87,10 +87,11 @@ export default function LeadDetailClient({
     if (prev === status) return
     setLead((l) => ({ ...l, status }))
     try {
-      await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
+      const data = await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       })
+      setLead((l) => ({ ...l, ...data.lead, batch_name: l.batch_name, assigned_name: l.assigned_name }))
       addActivity({
         type:     'lead_status_changed',
         metadata: { from: prev, to: status },
@@ -106,10 +107,12 @@ export default function LeadDetailClient({
     if (prev === interest_status) return
     setLead((l) => ({ ...l, interest_status }))
     try {
-      await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
+      // The API auto-moves the lead to the matching pipeline stage
+      const data = await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ interest_status }),
       })
+      setLead((l) => ({ ...l, ...data.lead, batch_name: l.batch_name, assigned_name: l.assigned_name }))
     } catch (err) {
       setLead((l) => ({ ...l, interest_status: prev }))
       console.error(err)
@@ -125,10 +128,11 @@ export default function LeadDetailClient({
       assigned_name: member?.name ?? null,
     }))
     try {
-      await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
+      const data = await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ assigned_to: userId || null }),
       })
+      setLead((l) => ({ ...l, ...data.lead, batch_name: l.batch_name, assigned_name: l.assigned_name }))
     } catch (err) {
       setLead(previous)
       console.error(err)

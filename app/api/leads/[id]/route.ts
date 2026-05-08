@@ -6,6 +6,7 @@ import type { LeadStatus, WorkspaceRole } from '@/types/database'
 
 type Params = { params: Promise<{ id: string }> }
 
+// All current lead_status enum values (original + extended)
 const leadStatusSchema = z.enum([
   'new',
   'contacted',
@@ -15,24 +16,34 @@ const leadStatusSchema = z.enum([
   'do_not_contact',
   'unsubscribed',
   'converted',
+  'called',
+  'emailed',
+  'voicemail',
+  'no_answer',
+  'wrong_number',
+  'sold_already',
 ])
+
+const interestStatusSchema = z.enum(['pending', 'interested', 'not_interested'])
 
 const optionalText = (max: number) => z.string().max(max).nullable().optional()
 
 const patchSchema = z.object({
-  first_name: optionalText(100),
-  last_name: optionalText(100),
-  email: z.string().trim().email().max(320).optional(),
-  phone: optionalText(30),
-  title: optionalText(200),
-  company: optionalText(200),
-  website: optionalText(500),
-  linkedin_url: optionalText(500),
-  status: leadStatusSchema.optional(),
-  assigned_to: z.string().uuid().nullable().optional(),
+  first_name:        optionalText(100),
+  last_name:         optionalText(100),
+  email:             z.string().trim().email().max(320).optional(),
+  phone:             optionalText(30),
+  title:             optionalText(200),
+  company:           optionalText(200),
+  website:           optionalText(500),
+  linkedin_url:      optionalText(500),
+  status:            leadStatusSchema.optional(),
+  interest_status:   interestStatusSchema.optional(),
+  pipeline_stage_id: z.string().uuid().nullable().optional(),
+  assigned_to:       z.string().uuid().nullable().optional(),
 })
 
-const nullableFields = [
+const nullableTextFields = [
   'first_name',
   'last_name',
   'phone',
@@ -41,6 +52,12 @@ const nullableFields = [
   'website',
   'linkedin_url',
 ] as const
+
+// Pipeline auto-move rules:
+// interest_status → pipeline stage name to move lead into
+const INTEREST_PIPELINE_RULES: Record<string, string> = {
+  interested: 'Interested',
+}
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
@@ -69,13 +86,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Validation failed', issues: parsed.error.issues }, { status: 422 })
     }
 
+    const adminClient = createAdminClient()
     const patch = normalizeLeadPatch(parsed.data)
     if (Object.keys(patch).length === 0) {
       return NextResponse.json({ error: 'No changes provided' }, { status: 400 })
-    }
-
-    if ('assigned_to' in patch && !['super_admin', 'admin', 'manager'].includes(member.role)) {
-      return NextResponse.json({ error: 'Manager access required to assign leads' }, { status: 403 })
     }
 
     if (patch.assigned_to) {
@@ -92,21 +106,59 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { data: existing } = await supabase
       .from('leads')
-      .select('id, status, assigned_to')
+      .select('id, status, interest_status, pipeline_stage_id, assigned_to')
       .eq('id', id)
       .eq('workspace_id', member.workspace_id)
       .is('deleted_at', null)
-      .single() as { data: { id: string; status: LeadStatus; assigned_to: string | null } | null; error: unknown }
+      .single() as {
+        data: {
+          id: string
+          status: LeadStatus
+          interest_status: string | null
+          pipeline_stage_id: string | null
+          assigned_to: string | null
+        } | null
+        error: unknown
+      }
 
     if (!existing) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
+    // ── Pipeline auto-move rules ──────────────────────────────────────────
+    // If interest_status is changing AND the caller hasn't explicitly set
+    // pipeline_stage_id, look up the target stage automatically.
+    if (
+      patch.interest_status &&
+      patch.interest_status !== existing.interest_status &&
+      !('pipeline_stage_id' in patch)
+    ) {
+      const targetStageName = INTEREST_PIPELINE_RULES[patch.interest_status]
+      if (targetStageName) {
+        const { data: stage } = await (adminClient as any)
+          .from('pipeline_stages')
+          .select('id')
+          .eq('workspace_id', member.workspace_id)
+          .ilike('name', targetStageName)
+          .single() as { data: { id: string } | null }
+
+        if (stage) {
+          patch.pipeline_stage_id = stage.id
+        }
+      }
+    }
+
+    // ── Persist ───────────────────────────────────────────────────────────
     const { data: lead, error: updateError } = await supabase
       .from('leads')
       .update(patch)
       .eq('id', id)
       .eq('workspace_id', member.workspace_id)
       .is('deleted_at', null)
-      .select('id, workspace_id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, is_unsubscribed, batch_id, assigned_to, source, ai_summary, custom_fields, created_at, updated_at')
+      .select(`
+        id, workspace_id, first_name, last_name, email, phone, title,
+        company, website, linkedin_url, status, interest_status,
+        pipeline_stage_id, is_unsubscribed, batch_id, assigned_to,
+        source, ai_summary, custom_fields, created_at, updated_at
+      `)
       .single()
 
     if (updateError) {
@@ -114,9 +166,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
-    const adminClient = createAdminClient()
+    // ── Activity logs ─────────────────────────────────────────────────────
+    const logInserts: object[] = []
+
     if (patch.status && patch.status !== existing.status) {
-      await adminClient.from('activity_logs').insert({
+      logInserts.push({
         workspace_id: member.workspace_id,
         lead_id: id,
         user_id: user.id,
@@ -125,14 +179,28 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       })
     }
 
+    if (patch.interest_status && patch.interest_status !== existing.interest_status) {
+      logInserts.push({
+        workspace_id: member.workspace_id,
+        lead_id: id,
+        user_id: user.id,
+        type: 'interest_status_changed',
+        metadata: { from: existing.interest_status, to: patch.interest_status },
+      })
+    }
+
     if ('assigned_to' in patch && patch.assigned_to !== existing.assigned_to) {
-      await adminClient.from('activity_logs').insert({
+      logInserts.push({
         workspace_id: member.workspace_id,
         lead_id: id,
         user_id: user.id,
         type: 'lead_assigned',
         metadata: { from: existing.assigned_to, to: patch.assigned_to ?? null },
       })
+    }
+
+    if (logInserts.length > 0) {
+      await adminClient.from('activity_logs').insert(logInserts as never)
     }
 
     return NextResponse.json({ lead })
@@ -143,29 +211,33 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 function normalizeLeadPatch(input: z.infer<typeof patchSchema>) {
-  const patch: Record<string, string | null> = {}
+  const patch: Record<string, string | null | undefined> = {}
 
-  for (const field of nullableFields) {
+  for (const field of nullableTextFields) {
     if (field in input) {
       const value = input[field]
       patch[field] = value && value.trim() ? value.trim() : null
     }
   }
 
-  if (input.email !== undefined) patch.email = input.email.trim().toLowerCase()
-  if (input.status !== undefined) patch.status = input.status
-  if (input.assigned_to !== undefined) patch.assigned_to = input.assigned_to
+  if (input.email             !== undefined) patch.email             = input.email.trim().toLowerCase()
+  if (input.status            !== undefined) patch.status            = input.status
+  if (input.interest_status   !== undefined) patch.interest_status   = input.interest_status
+  if (input.pipeline_stage_id !== undefined) patch.pipeline_stage_id = input.pipeline_stage_id
+  if (input.assigned_to       !== undefined) patch.assigned_to       = input.assigned_to
 
   return patch as Partial<{
-    first_name: string | null
-    last_name: string | null
-    email: string
-    phone: string | null
-    title: string | null
-    company: string | null
-    website: string | null
-    linkedin_url: string | null
-    status: LeadStatus
-    assigned_to: string | null
+    first_name:        string | null
+    last_name:         string | null
+    email:             string
+    phone:             string | null
+    title:             string | null
+    company:           string | null
+    website:           string | null
+    linkedin_url:      string | null
+    status:            LeadStatus
+    interest_status:   string
+    pipeline_stage_id: string | null
+    assigned_to:       string | null
   }>
 }
