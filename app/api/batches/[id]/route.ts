@@ -29,6 +29,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       .single() as { data: { workspace_id: string; role: string } | null }
 
     if (!member) return apiUnauthorized()
+    if (!['admin', 'super_admin'].includes(member.role)) {
+      return apiError('Only admins can rename batches', 403)
+    }
 
     let body: unknown
     try {

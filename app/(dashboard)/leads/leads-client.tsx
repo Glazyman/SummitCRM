@@ -667,7 +667,7 @@ export function LeadsClient({
             teamMembers={teamMembers}
             isAdmin={isAdmin}
             currentUserId={currentUserId}
-            canEditBatch={true}
+            canEditBatch={isAdmin}
             onClose={() => setSelectedLeadId(null)}
             onLeadChange={(patch) => {
               if (patch.status)          handleStatusChange(selectedLeadId, patch.status)
