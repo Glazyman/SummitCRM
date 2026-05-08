@@ -394,7 +394,7 @@ function StatusDropdown({
           <ArrowUpDown className="h-3 w-3 opacity-50" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" minWidth="170px">
+      <DropdownMenuContent align="start" minWidth="170px" side="top">
         {ALL_STATUSES.map((status) => {
           const m       = STATUS_CONFIG[status]
           const current = status === value

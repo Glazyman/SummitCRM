@@ -1,17 +1,23 @@
 'use client'
 
 import * as React from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 
 // ── Context ────────────────────────────────────────────────────────────────
 interface DropdownContextValue {
-  open: boolean
-  setOpen: (v: boolean) => void
+  open:       boolean
+  setOpen:    (v: boolean) => void
+  anchorRef:  React.RefObject<HTMLDivElement | null>
+  contentRef: React.RefObject<HTMLDivElement | null>
 }
-const DropdownContext = React.createContext<DropdownContextValue>({
-  open:    false,
-  setOpen: () => {},
-})
+const DropdownContext = React.createContext<DropdownContextValue | null>(null)
+
+function useDropdownContext() {
+  const ctx = React.useContext(DropdownContext)
+  if (!ctx) throw new Error('Dropdown components must be used inside DropdownMenu')
+  return ctx
+}
 
 // ── Root ───────────────────────────────────────────────────────────────────
 interface DropdownMenuProps {
@@ -26,21 +32,26 @@ function DropdownMenu({ children, open: controlledOpen, onOpenChange }: Dropdown
   const isControlled = controlledOpen !== undefined
   const open         = isControlled ? controlledOpen : internalOpen
 
-  function setOpen(v: boolean) {
+  const setOpen = React.useCallback((v: boolean) => {
     if (!isControlled) setInternalOpen(v)
     onOpenChange?.(v)
-  }
+  }, [isControlled, onOpenChange])
 
-  // Close on outside click
   const containerRef = React.useRef<HTMLDivElement>(null)
+  const contentRef   = React.useRef<HTMLDivElement>(null)
+
+  // Close on outside click (anchor + portaled menu are both "inside")
   React.useEffect(() => {
     if (!open) return
     function handler(e: MouseEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (containerRef.current?.contains(t)) return
+      if (contentRef.current?.contains(t)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, setOpen])
 
   // Close on Escape
   React.useEffect(() => {
@@ -50,10 +61,15 @@ function DropdownMenu({ children, open: controlledOpen, onOpenChange }: Dropdown
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, setOpen])
+
+  const ctx = React.useMemo(
+    () => ({ open, setOpen, anchorRef: containerRef, contentRef }),
+    [open, setOpen]
+  )
 
   return (
-    <DropdownContext.Provider value={{ open, setOpen }}>
+    <DropdownContext.Provider value={ctx}>
       <div ref={containerRef} className="relative inline-block">
         {children}
       </div>
@@ -69,7 +85,7 @@ function DropdownMenuTrigger({
   children: React.ReactElement
   asChild?: boolean
 }) {
-  const { open, setOpen } = React.useContext(DropdownContext)
+  const { open, setOpen } = useDropdownContext()
 
   if (asChild) {
     return React.cloneElement(children, {
@@ -98,7 +114,7 @@ function DropdownMenuTrigger({
   )
 }
 
-// ── Content ────────────────────────────────────────────────────────────────
+// ── Content (portaled + fixed: escapes overflow-hidden ancestors) ─────────
 interface DropdownMenuContentProps {
   children: React.ReactNode
   className?: string
@@ -114,32 +130,94 @@ function DropdownMenuContent({
   side = 'bottom',
   minWidth = '160px',
 }: DropdownMenuContentProps) {
-  const { open } = React.useContext(DropdownContext)
-  if (!open) return null
+  const { open, anchorRef, contentRef } = useDropdownContext()
+  const [mounted, setMounted] = React.useState(false)
 
-  const alignClass = {
-    start:  'left-0',
-    end:    'right-0',
-    center: 'left-1/2 -translate-x-1/2',
-  }[align]
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
-  const sideClass = side === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+  const updatePosition = React.useCallback(() => {
+    const anchor = anchorRef.current
+    const menu   = contentRef.current
+    if (!anchor || !menu) return
 
-  return (
+    const anchorRect = anchor.getBoundingClientRect()
+    const menuRect   = menu.getBoundingClientRect()
+    const mw         = menuRect.width
+    const mh         = menuRect.height
+    const pad        = 8
+    const gap        = 4
+
+    let top: number
+    if (side === 'top') {
+      top = anchorRect.top - mh - gap
+      if (top < pad) top = anchorRect.bottom + gap
+    } else {
+      top = anchorRect.bottom + gap
+      if (top + mh > window.innerHeight - pad) {
+        const above = anchorRect.top - mh - gap
+        if (above >= pad) top = above
+      }
+    }
+
+    let left: number
+    if (align === 'end') {
+      left = anchorRect.right - mw
+    } else if (align === 'center') {
+      left = anchorRect.left + anchorRect.width / 2 - mw / 2
+    } else {
+      left = anchorRect.left
+    }
+    left = Math.max(pad, Math.min(left, window.innerWidth - mw - pad))
+
+    menu.style.top  = `${Math.round(top)}px`
+    menu.style.left = `${Math.round(left)}px`
+  }, [align, side, anchorRef, contentRef])
+
+  React.useLayoutEffect(() => {
+    if (!open || !mounted) return
+    updatePosition()
+    const menu = contentRef.current
+    if (!menu) return
+
+    const ro = new ResizeObserver(updatePosition)
+    ro.observe(menu)
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open, mounted, updatePosition, contentRef])
+
+  if (!open || !mounted) return null
+
+  const menu = (
     <div
+      ref={contentRef}
       role="menu"
-      style={{ minWidth }}
+      style={{
+        position: 'fixed',
+        top:      0,
+        left:     0,
+        minWidth,
+        zIndex:   100,
+      }}
       className={cn(
-        'absolute z-50 rounded-xl border border-border bg-popover p-1 shadow-card',
+        'flex flex-col rounded-xl border border-border bg-popover shadow-card',
         'animate-in fade-in-0 zoom-in-95 duration-100',
-        sideClass,
-        alignClass,
         className
       )}
     >
-      {children}
+      <div className="max-h-[min(24rem,calc(100dvh-1rem))] overflow-y-auto overscroll-contain p-1">
+        {children}
+      </div>
     </div>
   )
+
+  return createPortal(menu, document.body)
 }
 
 // ── Item ───────────────────────────────────────────────────────────────────
@@ -160,7 +238,7 @@ function DropdownMenuItem({
   onClick,
   ...props
 }: DropdownMenuItemProps) {
-  const { setOpen } = React.useContext(DropdownContext)
+  const { setOpen } = useDropdownContext()
 
   return (
     <button
