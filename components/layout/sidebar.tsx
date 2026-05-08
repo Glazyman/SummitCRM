@@ -17,6 +17,7 @@ import {
   Search,
   HelpCircle,
   Kanban,
+  ListChecks,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WorkspaceRole } from '@/types/database'
@@ -32,8 +33,9 @@ interface NavItem {
 const mainNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Leads',     href: '/leads',     icon: Users },
-  { label: 'Pipeline',  href: '/pipeline',  icon: Kanban },
-  { label: 'Campaigns', href: '/campaigns', icon: Send, minRole: 'manager' },
+  { label: 'Pipeline',   href: '/pipeline',   icon: Kanban },
+  { label: 'Activities', href: '/activities', icon: ListChecks },
+  { label: 'Campaigns',  href: '/campaigns',  icon: Send, minRole: 'manager' },
   { label: 'Analytics', href: '/analytics', icon: BarChart2 },
   { label: 'Admin',     href: '/admin',     icon: Shield, minRole: 'manager' },
 ]
