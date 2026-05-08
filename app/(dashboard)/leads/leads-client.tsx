@@ -135,23 +135,28 @@ export function LeadsClient({
   const [selectedIds, setSelectedIds]   = React.useState<Set<string>>(new Set())
   const [createOpen, setCreateOpen]     = React.useState(false)
   const [visibleColumns, setVisibleCols] = React.useState<Set<ColumnId>>(() => {
+    try {
+      const saved = localStorage.getItem('leads_column_config')
+      if (saved) {
+        const { visible } = JSON.parse(saved) as { visible: ColumnId[] }
+        if (Array.isArray(visible)) return new Set(visible as ColumnId[])
+      }
+    } catch { /* ignore */ }
     const defaults = new Set(COLUMNS.filter((c) => c.defaultOn).map((c) => c.id))
-    if (isRep) {
-      defaults.add('phone')
-      defaults.delete('assigned')
-    }
+    if (isRep) { defaults.add('phone'); defaults.delete('assigned') }
     return defaults
   })
   const [columnOrder, setColumnOrder] = React.useState<ColumnId[]>(() => {
     try {
-      const saved = localStorage.getItem('leads_column_order')
+      const saved = localStorage.getItem('leads_column_config')
       if (saved) {
-        const parsed: ColumnId[] = JSON.parse(saved)
-        // Validate: must contain all current column IDs (in case new columns were added)
-        const allIds = new Set(DEFAULT_COLUMN_ORDER)
-        const savedIds = new Set(parsed)
-        if (DEFAULT_COLUMN_ORDER.every(id => savedIds.has(id)) && parsed.every(id => allIds.has(id))) {
-          return parsed
+        const { order } = JSON.parse(saved) as { order: ColumnId[] }
+        if (Array.isArray(order)) {
+          const allIds = new Set(DEFAULT_COLUMN_ORDER)
+          const savedIds = new Set(order)
+          if (DEFAULT_COLUMN_ORDER.every(id => savedIds.has(id)) && order.every(id => allIds.has(id))) {
+            return order
+          }
         }
       }
     } catch { /* ignore */ }
@@ -418,8 +423,18 @@ export function LeadsClient({
   }
 
   function handleReorderColumns(order: ColumnId[]) {
+    setColumnOrder(order) // preview only — not saved until Save is clicked
+  }
+
+  function handleSaveColumns(order: ColumnId[], visible: Set<ColumnId>) {
     setColumnOrder(order)
-    try { localStorage.setItem('leads_column_order', JSON.stringify(order)) } catch { /* ignore */ }
+    setVisibleCols(new Set(visible))
+    try {
+      localStorage.setItem('leads_column_config', JSON.stringify({
+        order,
+        visible: [...visible],
+      }))
+    } catch { /* ignore */ }
   }
 
   function handleExport() {
@@ -515,6 +530,7 @@ export function LeadsClient({
             columnOrder={columnOrder}
             onToggle={handleToggleColumn}
             onReorder={handleReorderColumns}
+            onSave={handleSaveColumns}
           />
         </div>
       </div>
