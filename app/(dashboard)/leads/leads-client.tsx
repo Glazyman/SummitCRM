@@ -190,8 +190,9 @@ export function LeadsClient({
     [filtered, filters.sortBy, filters.sortDir]
   )
   const totalCount  = sorted.length
-  const pageLeads   = sorted.slice((filters.page - 1) * PER_PAGE, filters.page * PER_PAGE)
-  const totalPages  = Math.max(1, Math.ceil(totalCount / PER_PAGE))
+  const perPage     = filters.perPage === 0 ? totalCount : filters.perPage // 0 = show all
+  const pageLeads   = perPage === totalCount ? sorted : sorted.slice((filters.page - 1) * perPage, filters.page * perPage)
+  const totalPages  = Math.max(1, perPage > 0 ? Math.ceil(totalCount / perPage) : 1)
 
   // ── Status counts (for status bar) ───────────────────────────────────
   const statusCounts: StatusCount[] = React.useMemo(() => {
@@ -253,18 +254,28 @@ export function LeadsClient({
 
   function handleSelectAll() {
     if (pageLeads.every((l) => selectedIds.has(l.id))) {
+      // Deselect page
       setSelectedIds((s) => {
         const next = new Set(s)
         pageLeads.forEach((l) => next.delete(l.id))
         return next
       })
     } else {
+      // Select page
       setSelectedIds((s) => {
         const next = new Set(s)
         pageLeads.forEach((l) => next.add(l.id))
         return next
       })
     }
+  }
+
+  function handleSelectAllFiltered() {
+    setSelectedIds(new Set(sorted.map((l) => l.id)))
+  }
+
+  function handleClearSelection() {
+    setSelectedIds(new Set())
   }
 
   function handleSelectRow(id: string) {
@@ -511,28 +522,86 @@ export function LeadsClient({
         onClear={clearFilters}
       />
 
-      {/* ── Toolbar: results count + column visibility ── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          {selectedIds.size > 0 ? (
-            <span className="font-medium text-foreground">
-              {selectedIds.size} selected
-            </span>
-          ) : (
-            <span>
-              Showing {pageLeads.length.toLocaleString()} of {totalCount.toLocaleString()}
-            </span>
-          )}
+      {/* ── Toolbar: results count + per-page + columns ── */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {selectedIds.size > 0 ? (
+              <span className="font-medium text-foreground">{selectedIds.size.toLocaleString()} selected</span>
+            ) : (
+              <span>
+                Showing {pageLeads.length.toLocaleString()} of {totalCount.toLocaleString()}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Per-page selector */}
+            <div className="flex items-center gap-1.5 text-sm">
+              <span className="text-muted-foreground hidden sm:inline">Per page:</span>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                {[25, 50, 100, 0].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => updateFilters({ perPage: n, page: 1 })}
+                    className={cn(
+                      'px-2.5 py-1 text-xs font-medium transition-colors',
+                      (filters.perPage === n)
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    )}
+                  >
+                    {n === 0 ? 'All' : n}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <ColumnVisibilityMenu
+              visibleColumns={visibleColumns}
+              columnOrder={columnOrder}
+              onToggle={handleToggleColumn}
+              onReorder={handleReorderColumns}
+              onSave={handleSaveColumns}
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <ColumnVisibilityMenu
-            visibleColumns={visibleColumns}
-            columnOrder={columnOrder}
-            onToggle={handleToggleColumn}
-            onReorder={handleReorderColumns}
-            onSave={handleSaveColumns}
-          />
-        </div>
+
+        {/* "Select all X leads" banner — shown when page is fully selected but not all */}
+        {selectedIds.size > 0 && selectedIds.size < totalCount && pageLeads.every(l => selectedIds.has(l.id)) && (
+          <div className="flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
+            <span className="text-foreground">
+              {selectedIds.size.toLocaleString()} leads on this page selected.
+            </span>
+            <button
+              type="button"
+              onClick={handleSelectAllFiltered}
+              className="font-medium text-primary hover:underline"
+            >
+              Select all {totalCount.toLocaleString()} leads
+            </button>
+            <button
+              type="button"
+              onClick={handleClearSelection}
+              className="ml-auto text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
+        {/* "All X selected" confirmation */}
+        {selectedIds.size === totalCount && totalCount > 0 && (
+          <div className="flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
+            <span className="text-foreground font-medium">All {totalCount.toLocaleString()} leads selected.</span>
+            <button
+              type="button"
+              onClick={handleClearSelection}
+              className="ml-auto text-muted-foreground hover:text-foreground"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Lead table ── */}
@@ -555,12 +624,12 @@ export function LeadsClient({
       />
 
       {/* ── Pagination ── */}
-      {totalPages > 1 && (
+      {totalPages > 1 && filters.perPage !== 0 && (
         <Pagination
           page={filters.page}
           totalPages={totalPages}
           totalCount={totalCount}
-          perPage={PER_PAGE}
+          perPage={perPage}
           onChange={(p) => updateFilters({ page: p })}
         />
       )}
