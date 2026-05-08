@@ -134,6 +134,20 @@ export function LeadsClient({
     new Set(COLUMNS.filter((c) => c.defaultOn).map((c) => c.id))
   )
 
+  // ── Keep in sync with server ───────────────────────────────────────────
+  // When router.refresh() re-runs the server component, initialLeads gets a
+  // new reference → sync local state so changes from the detail page show up.
+  React.useEffect(() => {
+    setLeads(initialLeads)
+  }, [initialLeads])
+
+  // On every mount (including after navigating back from lead detail),
+  // ask Next.js to re-run the server component so we always get fresh data.
+  React.useEffect(() => {
+    router.refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ── Derive displayed leads ────────────────────────────────────────────
   const filtered = React.useMemo(
     () => applyFilters(leads, filters, currentUserId),

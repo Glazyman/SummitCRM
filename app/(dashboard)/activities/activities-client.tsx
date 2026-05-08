@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Phone, ArrowUpRight, CheckCircle2, Circle, Clock,
@@ -76,7 +77,19 @@ interface Props {
 }
 
 export function ActivitiesClient({ initialActivities, teamMembers, currentUserId }: Props) {
+  const router = useRouter()
   const [activities, setActivities] = useState<Activity[]>(initialActivities)
+
+  // Sync when server re-renders (after router.refresh())
+  useEffect(() => {
+    setActivities(initialActivities)
+  }, [initialActivities])
+
+  // Always fetch fresh on mount
+  useEffect(() => {
+    router.refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [search, setSearch]         = useState('')
   const [filterType, setFilterType] = useState<string>('')
   const [filterPriority, setFilterPriority] = useState<string>('')

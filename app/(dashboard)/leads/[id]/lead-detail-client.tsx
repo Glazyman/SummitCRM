@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useRouter } from 'next/navigation'
 import { Mail, Activity, Clock, Phone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LeadActionBar }    from '@/components/leads/detail/lead-action-bar'
@@ -55,6 +56,8 @@ export default function LeadDetailClient({
   currentUserId,
   isAdmin,
 }: LeadDetailClientProps) {
+  const router = useRouter()
+
   // ── State ──────────────────────────────────────────────────────────────
   const [lead,          setLead]         = React.useState(initialLead)
   const [activity,      setActivity]     = React.useState(initialActivity)
@@ -76,6 +79,7 @@ export default function LeadDetailClient({
         body: JSON.stringify(patch),
       })
       setLead((prev) => ({ ...prev, ...data.lead, batch_name: prev.batch_name, assigned_name: prev.assigned_name }))
+      router.refresh()
     } catch (err) {
       setLead(previous)
       throw err
@@ -92,10 +96,8 @@ export default function LeadDetailClient({
         body: JSON.stringify({ status }),
       })
       setLead((l) => ({ ...l, ...data.lead, batch_name: l.batch_name, assigned_name: l.assigned_name }))
-      addActivity({
-        type:     'lead_status_changed',
-        metadata: { from: prev, to: status },
-      })
+      addActivity({ type: 'lead_status_changed', metadata: { from: prev, to: status } })
+      router.refresh() // bust leads + pipeline page caches
     } catch (err) {
       setLead((l) => ({ ...l, status: prev }))
       console.error(err)
@@ -107,12 +109,12 @@ export default function LeadDetailClient({
     if (prev === interest_status) return
     setLead((l) => ({ ...l, interest_status }))
     try {
-      // The API auto-moves the lead to the matching pipeline stage
       const data = await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ interest_status }),
       })
       setLead((l) => ({ ...l, ...data.lead, batch_name: l.batch_name, assigned_name: l.assigned_name }))
+      router.refresh() // auto-move to pipeline stage is now live
     } catch (err) {
       setLead((l) => ({ ...l, interest_status: prev }))
       console.error(err)
@@ -133,6 +135,7 @@ export default function LeadDetailClient({
         body: JSON.stringify({ assigned_to: userId || null }),
       })
       setLead((l) => ({ ...l, ...data.lead, batch_name: l.batch_name, assigned_name: l.assigned_name }))
+      router.refresh() // bust leads page cache so assigned_to shows correctly
     } catch (err) {
       setLead(previous)
       console.error(err)

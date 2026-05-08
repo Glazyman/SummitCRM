@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Plus, Settings, MoreHorizontal, GripVertical, User, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -48,10 +49,22 @@ interface Props {
 
 // ── Component ─────────────────────────────────────────────────────────────
 export default function PipelineClient({ stages, initialLeads, isAdmin }: Props) {
+  const router = useRouter()
   const [leads, setLeads] = React.useState<PipelineLead[]>(initialLeads)
   const [draggingId, setDraggingId] = React.useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = React.useState<string | null>(null)
   const [search, setSearch] = React.useState('')
+
+  // Sync with server component data after router.refresh()
+  React.useEffect(() => {
+    setLeads(initialLeads)
+  }, [initialLeads])
+
+  // Refresh server data on every mount (navigating to this page always gets fresh leads)
+  React.useEffect(() => {
+    router.refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Group leads by stage — unassigned go into first stage
   const leadsByStage = React.useMemo(() => {
@@ -126,9 +139,9 @@ export default function PipelineClient({ stages, initialLeads, isAdmin }: Props)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pipeline_stage_id: stageId }),
       })
+      router.refresh() // bust leads page cache so pipeline_stage_id syncs
     } catch (err) {
       console.error('Failed to update pipeline stage:', err)
-      // Revert
       setLeads((prev) =>
         prev.map((l) =>
           l.id === draggingId ? { ...l, pipeline_stage_id: lead.pipeline_stage_id } : l

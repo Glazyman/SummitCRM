@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Mail, Sparkles, MoreHorizontal,
   Trash2, BellOff, UserRound, ChevronDown,
@@ -41,6 +42,7 @@ export function LeadActionBar({
   onDelete,
   onDoNotContact,
 }: LeadActionBarProps) {
+  const router       = useRouter()
   const name         = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
   const meta         = STATUS_CONFIG[lead.status]
   const interestMeta = lead.interest_status ? INTEREST_CONFIG[lead.interest_status as InterestStatus] : null
@@ -51,13 +53,19 @@ export function LeadActionBar({
 
         {/* ← Back + breadcrumb */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Link
-            href="/leads"
+          <button
+            type="button"
+            onClick={() => {
+              // router.refresh() busts the router cache so the leads page
+              // re-runs its server component and shows updated data.
+              router.refresh()
+              router.back()
+            }}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             aria-label="Back to leads"
           >
             <ArrowLeft className="h-4 w-4" />
-          </Link>
+          </button>
 
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold sm:text-base">{name}</h1>
