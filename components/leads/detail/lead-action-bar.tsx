@@ -85,29 +85,6 @@ export function LeadActionBar({
 
         {/* Action buttons */}
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* Send Email */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1.5 text-xs"
-            onClick={onSendEmail}
-            disabled={lead.is_unsubscribed || lead.status === 'do_not_contact'}
-          >
-            <Mail className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Send Email</span>
-          </Button>
-
-          {/* AI Draft */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1.5 text-xs border-border text-foreground hover:bg-secondary"
-            onClick={onAIDraft}
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">AI Draft</span>
-          </Button>
-
           {/* Change Status */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

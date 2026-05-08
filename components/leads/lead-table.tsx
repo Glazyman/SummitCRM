@@ -170,11 +170,6 @@ function LeadTableRow({
       {/* Actions */}
       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Tooltip content="Send email">
-            <button type="button" onClick={onSendEmail} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-              <Mail className="h-3.5 w-3.5" />
-            </button>
-          </Tooltip>
           <Tooltip content="View lead">
             <Link href={`/leads/${lead.id}`} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
               <ExternalLink className="h-3.5 w-3.5" />
@@ -188,7 +183,6 @@ function LeadTableRow({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" minWidth="160px">
               <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)} icon={<ExternalLink className="h-3.5 w-3.5" />}>View Lead</DropdownMenuItem>
-              <DropdownMenuItem onClick={onSendEmail} icon={<Mail className="h-3.5 w-3.5" />}>Send Email</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem destructive onClick={onDelete}>Delete Lead</DropdownMenuItem>
             </DropdownMenuContent>

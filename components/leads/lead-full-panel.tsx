@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Activity, Mail, Clock, Phone, X, ExternalLink, ChevronDown } from 'lucide-react'
+import { Activity, Clock, Phone, X, ExternalLink, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -12,11 +12,10 @@ import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } f
 import { LeadProfileCard }  from '@/components/leads/detail/lead-profile-card'
 import { ActivityTimeline } from '@/components/leads/detail/activity-timeline'
 import { NoteEditor }       from '@/components/leads/detail/note-editor'
-import { EmailHistory }     from '@/components/leads/detail/email-history'
 import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
 import { CallHistory }      from '@/components/leads/detail/call-history'
 import type {
-  LeadDetail, ActivityEntry, EmailHistoryItem,
+  LeadDetail, ActivityEntry,
   FollowUp, NewFollowUp, TeamMember, LeadStatus,
 } from '@/components/leads/detail/types'
 import type { CallLogItem, NewCall } from '@/components/leads/detail/call-history'
@@ -25,7 +24,6 @@ import type { InterestStatus } from '@/types/database'
 // ── Tabs ──────────────────────────────────────────────────────────────────
 const TABS = [
   { id: 'activity',  label: 'Activity',   Icon: Activity },
-  { id: 'emails',    label: 'Emails',     Icon: Mail     },
   { id: 'followups', label: 'Follow-ups', Icon: Clock    },
   { id: 'calls',     label: 'Calls',      Icon: Phone    },
 ] as const
@@ -47,7 +45,6 @@ export interface LeadFullPanelProps {
 interface PanelData {
   lead:      LeadDetail
   activity:  ActivityEntry[]
-  emails:    EmailHistoryItem[]
   followUps: FollowUp[]
   calls:     CallLogItem[]
 }
@@ -187,11 +184,21 @@ export function LeadFullPanel({
     await fetch(`/api/leads/${leadId}/follow-ups/${id}`, { method: 'DELETE' }).catch(console.error)
   }
 
-  // ── Call mutations ────────────────────────────────────────────────────
+  // ── Call mutations — auto-syncs lead status to call outcome ──────────
   async function handleLogCall(call: NewCall) {
     const res  = await fetch(`/api/leads/${leadId}/calls`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(call) })
     const json = await res.json()
     setData((d) => d ? { ...d, calls: [{ ...json.call, logger_name: 'You' }, ...d.calls] } : d)
+
+    const outcomeToStatus: Partial<Record<typeof call.outcome, LeadStatus>> = {
+      answered:           'called',
+      voicemail:          'voicemail',
+      no_answer:          'no_answer',
+      wrong_number:       'wrong_number',
+      callback_requested: 'called',
+    }
+    const newStatus = outcomeToStatus[call.outcome]
+    if (newStatus) await handleStatusChange(newStatus)
   }
 
   // ── Derived ───────────────────────────────────────────────────────────
@@ -360,9 +367,6 @@ export function LeadFullPanel({
                     onDeleteActivity={handleDeleteActivity}
                   />
                 </div>
-              )}
-              {activeTab === 'emails' && (
-                <EmailHistory emails={data.emails} />
               )}
               {activeTab === 'followups' && (
                 <FollowUpSection

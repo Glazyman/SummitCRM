@@ -2,17 +2,14 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Mail, Activity, Clock, Phone } from 'lucide-react'
+import { Activity, Clock, Phone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LeadActionBar }    from '@/components/leads/detail/lead-action-bar'
 import { LeadProfileCard }  from '@/components/leads/detail/lead-profile-card'
 import { ActivityTimeline } from '@/components/leads/detail/activity-timeline'
 import { NoteEditor }       from '@/components/leads/detail/note-editor'
-import { EmailHistory }     from '@/components/leads/detail/email-history'
 import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
 import { CallHistory }      from '@/components/leads/detail/call-history'
-import { EmailPanel }       from '@/components/email/email-panel'
-import { AIDraftModal }     from '@/components/ai'
 import type {
   LeadDetail, ActivityEntry, EmailHistoryItem,
   FollowUp, NewFollowUp, TeamMember, LeadStatus,
@@ -22,10 +19,9 @@ import type { CallLogItem, NewCall } from '@/components/leads/detail/call-histor
 
 // ── Tab config ────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'activity',  label: 'Activity',   Icon: Activity    },
-  { id: 'emails',    label: 'Emails',     Icon: Mail        },
-  { id: 'followups', label: 'Follow-ups', Icon: Clock       },
-  { id: 'calls',     label: 'Calls',      Icon: Phone       },
+  { id: 'activity',  label: 'Activity',   Icon: Activity },
+  { id: 'followups', label: 'Follow-ups', Icon: Clock    },
+  { id: 'calls',     label: 'Calls',      Icon: Phone    },
 ] as const
 
 type TabId = typeof TABS[number]['id']
@@ -48,7 +44,6 @@ interface LeadDetailClientProps {
 export default function LeadDetailClient({
   lead:         initialLead,
   activity:     initialActivity,
-  emails:       initialEmails,
   followUps:    initialFollowUps,
   calls:        initialCalls,
   teamMembers,
@@ -61,15 +56,11 @@ export default function LeadDetailClient({
   const router = useRouter()
 
   // ── State ──────────────────────────────────────────────────────────────
-  const [lead,          setLead]         = React.useState(initialLead)
-  const [activity,      setActivity]     = React.useState(initialActivity)
-  const [emails,        setEmails]       = React.useState(initialEmails)
-  const [followUps,     setFollowUps]    = React.useState(initialFollowUps)
-  const [calls,         setCalls]        = React.useState<CallLogItem[]>(initialCalls)
-  const [activeTab,     setActiveTab]    = React.useState<TabId>('activity')
-  const [emailPanelOpen,   setEmailPanelOpen]   = React.useState(false)
-  const [aiDraftOpen,      setAiDraftOpen]      = React.useState(false)
-  const [pendingAiDraft,   setPendingAiDraft]   = React.useState<{ subject: string; body_html: string; body_text: string } | null>(null)
+  const [lead,      setLead]     = React.useState(initialLead)
+  const [activity,  setActivity] = React.useState(initialActivity)
+  const [followUps, setFollowUps]= React.useState(initialFollowUps)
+  const [calls,     setCalls]    = React.useState<CallLogItem[]>(initialCalls)
+  const [activeTab, setActiveTab]= React.useState<TabId>('activity')
 
   // ── Lead mutations ───────────────────────────────────────────────────
   async function handleSaveProfile(patch: Partial<LeadDetail>) {
@@ -333,7 +324,7 @@ export default function LeadDetailClient({
     setActivity((prev) => [entry, ...prev])
   }
 
-  // ── Call log handler ──────────────────────────────────────────────────
+  // ── Call log handler — auto-syncs lead status to call outcome ────────
   async function handleLogCall(data: NewCall) {
     const res = await fetch(`/api/leads/${lead.id}/calls`, {
       method:  'POST',
@@ -344,78 +335,25 @@ export default function LeadDetailClient({
     if (!res.ok) throw new Error(json.error ?? 'Failed to log call')
 
     setCalls((prev) => [{ ...json.call, logger_name: 'You' }, ...prev])
-    addActivity({ type: 'lead_status_changed', metadata: { call_outcome: data.outcome } })
+    addActivity({ type: 'call_logged', metadata: { call_outcome: data.outcome } })
+
+    // Sync lead status to match the call outcome
+    const outcomeToStatus: Partial<Record<typeof data.outcome, LeadStatus>> = {
+      answered:           'called',
+      voicemail:          'voicemail',
+      no_answer:          'no_answer',
+      wrong_number:       'wrong_number',
+      callback_requested: 'called',
+    }
+    const newStatus = outcomeToStatus[data.outcome]
+    if (newStatus) await handleStatusChange(newStatus)
   }
 
   // ── Pending count badges ──────────────────────────────────────────────
   const pendingFollowUps = followUps.filter((f) => !f.is_completed).length
 
-  // ── Apply AI draft to email panel when it opens ───────────────────────
-  React.useEffect(() => {
-    if (emailPanelOpen && pendingAiDraft) {
-      // pendingAiDraft will be read by EmailPanel via initialDraft prop
-      // Clear it after a tick so it's consumed once
-      const id = setTimeout(() => setPendingAiDraft(null), 100)
-      return () => clearTimeout(id)
-    }
-  }, [emailPanelOpen, pendingAiDraft])
-
-  // ── Email sent handler ────────────────────────────────────────────────
-  function handleEmailSent(emailId: string) {
-    // Optimistic: add a stub to the email list so history refreshes
-    const newItem: EmailHistoryItem = {
-      id:          emailId,
-      subject:     '(sending…)',
-      sent_at:     new Date().toISOString(),
-      status:      'sending',
-      sender_name: accounts[0]?.from_name ?? null,
-      body_html:   null,
-      opened_at:   null,
-      clicked_at:  null,
-      replied_at:  null,
-      bounced_at:  null,
-    }
-    setEmails((prev) => [newItem, ...prev])
-    addActivity({ type: 'email_sent', metadata: { subject: '(sending…)' } })
-    setActiveTab('emails')
-  }
-
   return (
     <div className="flex min-h-screen flex-col">
-
-      {/* AI Draft Modal */}
-      <AIDraftModal
-        open={aiDraftOpen}
-        onClose={() => setAiDraftOpen(false)}
-        leadId={lead.id}
-        sendingAccountId={accounts[0]?.id ?? ''}
-        leadName={[lead.first_name, lead.last_name].filter(Boolean).join(' ')}
-        onUse={(draft) => {
-          setPendingAiDraft(draft)
-          setAiDraftOpen(false)
-          setEmailPanelOpen(true)
-        }}
-      />
-
-      {/* Right-side email panel (slide-in) */}
-      <EmailPanel
-        open={emailPanelOpen}
-        onClose={() => setEmailPanelOpen(false)}
-        lead={{
-          id:         lead.id,
-          email:      lead.email,
-          first_name: lead.first_name,
-          last_name:  lead.last_name,
-          company:    lead.company,
-          title:      lead.title,
-        }}
-        accounts={accounts}
-        quotas={quotas}
-        emails={emails}
-        onSent={handleEmailSent}
-        initialSubject={pendingAiDraft?.subject}
-        initialBody={pendingAiDraft?.body_html}
-      />
 
       {/* Sticky top action bar */}
       <LeadActionBar
@@ -425,8 +363,8 @@ export default function LeadDetailClient({
         onStatusChange={handleStatusChange}
         onInterestChange={handleInterestChange}
         onAssign={handleAssign}
-        onSendEmail={() => setEmailPanelOpen(true)}
-        onAIDraft={() => setAiDraftOpen(true)}
+        onSendEmail={() => {}}
+        onAIDraft={() => {}}
         onDelete={() => {/* TODO: soft delete + navigate away */}}
         onDoNotContact={() => handleStatusChange('do_not_contact')}
       />
@@ -494,17 +432,6 @@ export default function LeadDetailClient({
                 onDeleteNote={handleDeleteNote}
                 onDeleteActivity={handleDeleteActivity}
               />
-            </Section>
-
-            {/* ── Email History ── */}
-            <Section
-              title="Email History"
-              icon={<Mail className="h-4 w-4 text-muted-foreground" />}
-              count={emails.length}
-              visible={activeTab === 'emails'}
-              alwaysVisible
-            >
-              <EmailHistory emails={emails} />
             </Section>
 
             {/* ── Follow-ups ── */}
