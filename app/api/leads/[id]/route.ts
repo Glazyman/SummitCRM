@@ -179,8 +179,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
     }
 
-    // ── Persist ───────────────────────────────────────────────────────────
-    const { data: lead, error: updateError } = await supabase
+    // ── Persist via admin client (bypasses RLS) ───────────────────────────
+    const { data: lead, error: updateError } = await adminClient
       .from('leads')
       .update(patch)
       .eq('id', id)
