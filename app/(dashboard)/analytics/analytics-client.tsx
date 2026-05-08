@@ -172,18 +172,16 @@ function AnalyticsContent({ userRole, userId }: Props) {
   const visibleTabs = TABS.filter(t => canSee(t.minRole, userRole))
   const activeTab   = visibleTabs.find(t => t.id === tabParam) ? tabParam : visibleTabs[0]?.id ?? 'overview'
 
-  function dateRangeForPreset(preset: DateRangePreset): { start: string; end: string } {
+  const { start, end } = React.useMemo(() => {
     const now = new Date()
     const end = now.toISOString()
     let start = new Date(now)
-    if (preset === 'today')       { start.setHours(0,0,0,0) }
-    else if (preset === '7d')     { start.setDate(start.getDate() - 7) }
-    else if (preset === 'month')  { start = new Date(now.getFullYear(), now.getMonth(), 1) }
-    else                           { start.setDate(start.getDate() - 30) }
+    if (range === 'today')       { start.setHours(0, 0, 0, 0) }
+    else if (range === '7d')     { start.setDate(start.getDate() - 7) }
+    else if (range === 'month')  { start = new Date(now.getFullYear(), now.getMonth(), 1) }
+    else                          { start.setDate(start.getDate() - 30) }
     return { start: start.toISOString(), end }
-  }
-
-  const { start, end } = dateRangeForPreset(range)
+  }, [range])
 
   const [overview,  setOverview]  = useState<CallOverview>(EMPTY_OVERVIEW)
   const [reps,      setReps]      = useState<RepRow[]>([])
