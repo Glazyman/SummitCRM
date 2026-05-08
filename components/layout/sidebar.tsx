@@ -1,5 +1,6 @@
 'use client'
 
+import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -14,8 +15,6 @@ import {
   Building2,
   MoreHorizontal,
   Inbox,
-  Search,
-  HelpCircle,
   Kanban,
   ListChecks,
 } from 'lucide-react'
@@ -35,23 +34,19 @@ const mainNav: NavItem[] = [
   { label: 'Leads',     href: '/leads',     icon: Users },
   { label: 'Pipeline',   href: '/pipeline',   icon: Kanban },
   { label: 'Activities', href: '/activities', icon: ListChecks },
-  { label: 'Campaigns',  href: '/campaigns',  icon: Send, minRole: 'manager' },
-  { label: 'Analytics', href: '/analytics', icon: BarChart2 },
-  { label: 'Admin',     href: '/admin',     icon: Shield, minRole: 'manager' },
+  { label: 'Campaigns',  href: '/campaigns',  icon: Send,     minRole: 'admin' },
+  { label: 'Analytics', href: '/analytics', icon: BarChart2, minRole: 'admin' },
+  { label: 'Admin',     href: '/admin',     icon: Shield,    minRole: 'admin' },
 ]
 
 const bottomNav: NavItem[] = [
   { label: 'Settings', href: '/settings', icon: Settings },
-  { label: 'Get Help', href: '/settings/profile', icon: HelpCircle },
-  { label: 'Search',   href: '/leads', icon: Search },
 ]
 
 const ROLE_RANK: Record<WorkspaceRole, number> = {
-  viewer: 0,
-  rep: 1,
-  manager: 2,
-  admin: 3,
-  super_admin: 4,
+  rep:         1,
+  admin:       2,
+  super_admin: 3,
 }
 
 function canAccess(userRole: WorkspaceRole | null, minRole?: WorkspaceRole): boolean {
@@ -79,14 +74,30 @@ function getInitials(name: string | null | undefined, email: string | null | und
 
 export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarProps) {
   const pathname = usePathname()
+  const [activitiesDue, setActivitiesDue] = React.useState<number | undefined>(undefined)
+
+  React.useEffect(() => {
+    if (role !== 'rep') return
+    fetch('/api/activities/due')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => d && setActivitiesDue(d.count ?? 0))
+      .catch(() => {})
+  }, [role, pathname]) // refresh count on navigation
 
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === href
     return pathname.startsWith(href)
   }
 
-  const visibleMain = mainNav.filter((item) => canAccess(role ?? null, item.minRole))
+  const visibleMain = mainNav.map((item) => {
+    if (item.href === '/activities' && activitiesDue && activitiesDue > 0) {
+      return { ...item, badge: activitiesDue }
+    }
+    return item
+  }).filter((item) => canAccess(role ?? null, item.minRole))
+
   const isAdmin = role === 'admin' || role === 'super_admin'
+  const isRep   = role === 'rep'
   const initials = getInitials(userName, userEmail)
   const displayName = userName ?? userEmail?.split('@')[0] ?? 'You'
 
@@ -138,17 +149,19 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
           </div>
         )}
 
-        {/* Lists section */}
-        <div className="mt-6">
-          <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">
-            Documents
-          </p>
-          <div className="flex flex-col gap-1">
-            <NavLink item={{ label: 'Data Library', href: '/leads', icon: Building2 }} active={false} />
-            <NavLink item={{ label: 'Reports', href: '/analytics', icon: BarChart2 }} active={false} />
-            <NavLink item={{ label: 'Notifications', href: '/notifications', icon: Bell }} active={isActive('/notifications')} />
+        {/* Documents section — admins only */}
+        {!isRep && (
+          <div className="mt-6">
+            <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">
+              Documents
+            </p>
+            <div className="flex flex-col gap-1">
+              <NavLink item={{ label: 'Data Library', href: '/leads', icon: Building2 }} active={false} />
+              <NavLink item={{ label: 'Reports', href: '/analytics', icon: BarChart2 }} active={false} />
+              <NavLink item={{ label: 'Notifications', href: '/notifications', icon: Bell }} active={isActive('/notifications')} />
+            </div>
           </div>
-        </div>
+        )}
       </nav>
 
       {/* Bottom nav */}

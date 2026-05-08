@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   if (!email?.trim()) return NextResponse.json({ error: 'email is required' }, { status: 400 })
 
-  const validRoles: WorkspaceRole[] = ['viewer', 'rep', 'manager', 'admin']
+  const validRoles: WorkspaceRole[] = ['rep', 'admin']
   if (!validRoles.includes(role)) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
   }

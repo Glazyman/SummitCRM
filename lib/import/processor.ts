@@ -26,15 +26,17 @@ import type { ValidatedRow }                                         from './val
 
 // ── Types ─────────────────────────────────────────────────────────────────
 export interface ProcessImportArgs {
-  importId:       string
-  workspaceId:    string
-  userId:         string         // user who triggered the import
-  rows:           Record<string, string>[]  // raw parsed rows (pre-client-parse)
-  mapping:        FieldMapping
-  batchId:        string | null  // existing batch, or null to create new
-  newBatchName:   string         // used when batchId is null
-  duplicateMode:  'skip' | 'update'
-  supabase:       SupabaseClient // admin or service-role client (bypasses RLS)
+  importId:         string
+  workspaceId:      string
+  userId:           string
+  rows:             Record<string, string>[]
+  mapping:          FieldMapping
+  customFieldNames: Record<string, string>  // csvColumn → display name for custom fields
+  batchId:          string | null
+  newBatchName:     string
+  duplicateMode:    'skip' | 'update'
+  assignedTo:       string | null           // assign all leads to this user
+  supabase:         SupabaseClient
 }
 
 export interface ProcessImportResult {
@@ -55,8 +57,8 @@ export async function processImport(
 ): Promise<ProcessImportResult> {
   const {
     importId, workspaceId, userId, rows,
-    mapping, batchId, newBatchName,
-    duplicateMode, supabase,
+    mapping, customFieldNames, batchId, newBatchName,
+    duplicateMode, assignedTo, supabase,
   } = args
 
   // Mark import as processing
@@ -99,7 +101,7 @@ export async function processImport(
     }
 
     // ── Step 2: Apply field mapping ──────────────────────────────────────
-    const mappedRows = applyMappingToAll(rows, mapping)
+    const mappedRows = applyMappingToAll(rows, mapping, customFieldNames)
 
     // ── Step 3: Validate rows ─────────────────────────────────────────────
     const { valid, errors: validationErrors }: ValidationResult = validateRows(mappedRows)
@@ -109,7 +111,7 @@ export async function processImport(
       deduplicateWithinFile(valid)
 
     // ── Step 5: DB-level dedup ────────────────────────────────────────────
-    const emails = uniqueRows.map((r) => r.email)
+    const emails = uniqueRows.map((r) => r.email).filter((e): e is string => !!e)
     const dedupResult = await detectDuplicates(
       workspaceId,
       emails,
@@ -126,7 +128,7 @@ export async function processImport(
         workspaceId,
         importId,
         batchId: resolvedBatchId,
-        assignedTo: null, // batch assignment is at batch level
+        assignedTo: assignedTo ?? null,
       })
     )
 
@@ -171,9 +173,11 @@ export async function processImport(
       .from('lead_imports')
       .update({
         status:        'complete',
+        batch_id:      resolvedBatchId,
         imported_rows: imported + updated,
         failed_rows:   failed + skipped,
         error_log:     allErrors.slice(0, 1000), // cap stored errors at 1 000
+        completed_at:  new Date().toISOString(),
       } as never)
       .eq('id', importId)
 
@@ -214,8 +218,9 @@ export async function processImport(
     await supabase
       .from('lead_imports')
       .update({
-        status:     'failed',
-        error_log:  [{ row: 0, email: '', reason: message }],
+        status:        'failed',
+        error_log:     [{ row: 0, email: '', reason: message }],
+        completed_at:  new Date().toISOString(),
       } as never)
       .eq('id', importId)
 

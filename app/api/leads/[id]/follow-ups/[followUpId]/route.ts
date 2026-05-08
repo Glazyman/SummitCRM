@@ -31,9 +31,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       .single() as { data: { workspace_id: string; role: WorkspaceRole } | null; error: unknown }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (member.role === 'viewer') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
 
     const body = await req.json()
     const parsed = updateFollowUpSchema.safeParse(body)
@@ -49,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (
       'assigned_to' in patch
       && patch.assigned_to
-      && !['super_admin', 'admin', 'manager'].includes(member.role)
+      && !['super_admin', 'admin'].includes(member.role)
       && patch.assigned_to !== user.id
     ) {
       return NextResponse.json({ error: 'Reps can only assign follow-ups to themselves' }, { status: 403 })
@@ -123,9 +120,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (member.role === 'viewer') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
 
     const { error } = await supabase
       .from('follow_ups')

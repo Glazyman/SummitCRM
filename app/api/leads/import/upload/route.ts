@@ -39,15 +39,22 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return apiUnauthorized()
 
-    const claims = user.app_metadata as {
-      workspace_id?: string
-      workspace_role?: string
-    }
-    const workspaceId = claims.workspace_id
-    const role        = claims.workspace_role
+    const admin = createAdminClient()
+    const { data: member, error: memberErr } = await (admin as any)
+      .from('workspace_members')
+      .select('workspace_id, role, is_active')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
 
-    if (!workspaceId) return apiError('Not a workspace member', 403)
-    if (!role || !['super_admin', 'admin', 'manager', 'rep'].includes(role)) {
+    if (memberErr || !member) {
+      return apiError('User is not an active member of any workspace', 403)
+    }
+
+    const workspaceId = member.workspace_id
+    const role        = member.role
+
+    if (!['super_admin', 'admin', 'rep'].includes(role)) {
       return apiError('Insufficient permissions', 403)
     }
 
@@ -67,8 +74,6 @@ export async function POST(request: NextRequest) {
     const { fileName, fileSize, totalRows } = parsed.data
 
     // ── Create import record ───────────────────────────────────────────
-    const admin = createAdminClient()
-
     const { data: importRecord, error: importErr } = await admin
       .from('lead_imports')
       .insert({

@@ -12,28 +12,40 @@ export interface ParsedFile {
 }
 
 export type CrmField =
+  | 'full_name'
+  | 'first_name'    // internal only — set by full_name split
+  | 'last_name'     // internal only — set by full_name split
   | 'email'
-  | 'first_name'
-  | 'last_name'
+  | 'email_2'
+  | 'email_3'
   | 'phone'
+  | 'phone_2'
+  | 'phone_3'
+  | 'company_phone'
   | 'title'
   | 'company'
+  | 'contact_state'
   | 'website'
   | 'linkedin_url'
   | 'custom'
   | 'ignore'
 
-export const CRM_FIELDS: { value: CrmField; label: string; required?: boolean; description?: string }[] = [
-  { value: 'email',        label: 'Email',        required: true,  description: 'Required' },
-  { value: 'first_name',   label: 'First Name' },
-  { value: 'last_name',    label: 'Last Name' },
-  { value: 'company',      label: 'Company' },
-  { value: 'title',        label: 'Job Title' },
-  { value: 'phone',        label: 'Phone' },
-  { value: 'website',      label: 'Website' },
-  { value: 'linkedin_url', label: 'LinkedIn URL' },
-  { value: 'custom',       label: 'Custom field' },
-  { value: 'ignore',       label: 'Skip / Ignore' },
+export const CRM_FIELDS: { value: CrmField; label: string; description?: string }[] = [
+  { value: 'full_name',     label: 'Full Name',       description: 'Splits into first + last name' },
+  { value: 'email',         label: 'Email (primary)', description: 'Recommended for deduplication' },
+  { value: 'email_2',       label: 'Email 2' },
+  { value: 'email_3',       label: 'Email 3' },
+  { value: 'phone',         label: 'Phone (primary)' },
+  { value: 'phone_2',       label: 'Phone 2' },
+  { value: 'phone_3',       label: 'Phone 3' },
+  { value: 'company_phone', label: 'Company Phone' },
+  { value: 'company',       label: 'Company' },
+  { value: 'title',         label: 'Job Title' },
+  { value: 'contact_state', label: 'State' },
+  { value: 'website',       label: 'Website' },
+  { value: 'linkedin_url',  label: 'LinkedIn URL' },
+  { value: 'custom',        label: 'Custom field' },
+  { value: 'ignore',        label: 'Skip / Ignore' },
 ]
 
 /** Map from CSV column name → CRM field key */
@@ -46,7 +58,12 @@ export interface ImportOptions {
   newBatchName: string
   /** What to do when email already exists in workspace */
   duplicateMode: 'skip' | 'update'
+  /** Assign all imported leads to this user ID (optional) */
+  assignedTo: string | null
 }
+
+/** Custom display names for columns mapped to 'custom' (csvColumn → desired field name) */
+export type CustomFieldNames = Record<string, string>
 
 export interface ImportResult {
   importId: string

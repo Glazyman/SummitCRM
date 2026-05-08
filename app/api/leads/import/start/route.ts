@@ -23,8 +23,11 @@ import { auditLog }             from '@/lib/security/audit'
 // ── Request schema ─────────────────────────────────────────────────────────
 const fieldMappingSchema = z.record(
   z.string(),
-  z.enum(['email', 'first_name', 'last_name', 'phone', 'title', 'company',
-          'website', 'linkedin_url', 'custom', 'ignore'] as const)
+  z.enum(['full_name', 'first_name', 'last_name',
+          'email', 'email_2', 'email_3',
+          'phone', 'phone_2', 'phone_3', 'company_phone',
+          'title', 'company', 'contact_state', 'website', 'linkedin_url',
+          'custom', 'ignore'] as const)
 )
 
 const startImportSchema = z.object({
@@ -35,11 +38,15 @@ const startImportSchema = z.object({
 
   mapping: fieldMappingSchema,
 
+  customFieldNames: z.record(z.string(), z.string()).optional().default({}),
+
   batchId: z.string().uuid().nullable().optional().default(null),
 
   newBatchName: z.string().max(200).default(''),
 
   duplicateMode: z.enum(['skip', 'update']).default('skip'),
+
+  assignedTo: z.string().uuid().nullable().optional().default(null),
 
   fileName: z.string().max(255).optional().default('import.csv'),
 })
@@ -69,7 +76,7 @@ export async function POST(request: NextRequest) {
     const workspaceId = member.workspace_id
     const role        = member.role
 
-    if (!['super_admin', 'admin', 'manager', 'rep'].includes(role)) {
+    if (!['super_admin', 'admin', 'rep'].includes(role)) {
       return apiError('Insufficient permissions — rep role or above required', 403)
     }
 
@@ -86,7 +93,7 @@ export async function POST(request: NextRequest) {
       return apiError(parsed.error.issues[0].message)
     }
 
-    const { rows: rawRows, mapping, batchId, newBatchName, duplicateMode, fileName } = parsed.data
+    const { rows: rawRows, mapping, customFieldNames, batchId, newBatchName, duplicateMode, assignedTo, fileName } = parsed.data
 
     // Coerce row values to strings (client sends Record<string, string> but JSON typing loses that)
     const rows: Record<string, string>[] = rawRows.map((r) =>
@@ -94,11 +101,7 @@ export async function POST(request: NextRequest) {
     )
 
     // ── Preflight check ─────────────────────────────────────────────────
-    const emailColumn = findEmailColumn(mapping)
-    if (!emailColumn) {
-      return apiError('Field mapping is missing an Email column. Please map at least one column to "Email".')
-    }
-
+    const emailColumn = findEmailColumn(mapping) ?? undefined // may be undefined — email is optional
     const preflight = preflightCheck(rows, emailColumn)
     if (!preflight.ok) {
       return apiError(preflight.reason ?? 'Preflight check failed')
@@ -147,13 +150,15 @@ export async function POST(request: NextRequest) {
     const result = await processImport({
       importId,
       workspaceId,
-      userId:        user.id,
+      userId:           user.id,
       rows,
       mapping,
-      batchId:       batchId ?? null,
-      newBatchName:  effectiveBatchName,
+      customFieldNames: customFieldNames ?? {},
+      batchId:          batchId ?? null,
+      newBatchName:     effectiveBatchName,
       duplicateMode,
-      supabase:      admin,
+      assignedTo:       assignedTo ?? null,
+      supabase:         admin,
     })
 
     auditLog({

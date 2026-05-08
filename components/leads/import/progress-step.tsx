@@ -123,9 +123,10 @@ export function ProgressStep({ onStart, onViewLeads, onImportAnother }: Progress
   }
 
   // ── Done state ───────────────────────────────────────────────────────────
-  const allFailed = result && result.imported === 0 && result.failed > 0
+  const allSkipped   = result && result.imported === 0 && result.failed === 0 && result.skipped > 0
+  const allFailed    = result && result.imported === 0 && result.failed > 0 && !allSkipped
   const partialSuccess = result && result.imported > 0 && result.failed > 0
-  const fullSuccess = result && result.failed === 0
+  const fullSuccess  = result && result.failed === 0 && result.imported > 0
 
   return (
     <div className="space-y-8">
@@ -133,32 +134,35 @@ export function ProgressStep({ onStart, onViewLeads, onImportAnother }: Progress
       <div className="flex flex-col items-center py-6 text-center">
         <div className={cn(
           'mb-4 flex h-16 w-16 items-center justify-center rounded-full',
-          allFailed
-            ? 'bg-destructive/10'
-            : partialSuccess
-              ? 'bg-secondary'
-              : 'bg-secondary'
+          allFailed  ? 'bg-destructive/10' : 'bg-secondary'
         )}>
           {allFailed
             ? <XCircle className="h-8 w-8 text-destructive" />
-            : partialSuccess
+            : allSkipped
               ? <AlertTriangle className="h-8 w-8 text-foreground" />
-              : <CheckCircle2 className="h-8 w-8 text-foreground" />
+              : partialSuccess
+                ? <AlertTriangle className="h-8 w-8 text-foreground" />
+                : <CheckCircle2 className="h-8 w-8 text-foreground" />
           }
         </div>
 
         <h3 className="text-2xl font-bold">
           {allFailed
             ? 'No leads imported'
-            : `${result!.imported.toLocaleString()} lead${result!.imported !== 1 ? 's' : ''} imported`
+            : allSkipped
+              ? 'All leads already exist'
+              : `${result!.imported.toLocaleString()} lead${result!.imported !== 1 ? 's' : ''} imported`
           }
         </h3>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          {fullSuccess
-            ? 'All rows processed successfully.'
-            : partialSuccess
-              ? `${result!.failed.toLocaleString()} rows had issues and were skipped.`
-              : 'All rows failed validation. Download the error report to investigate.'}
+          {allSkipped
+            ? `All ${result!.skipped} leads in this file already exist in your workspace. Switch to "Update existing" to overwrite their fields.`
+            : fullSuccess
+              ? 'All rows imported successfully.'
+              : partialSuccess
+                ? `${result!.failed.toLocaleString()} rows had errors and were skipped.`
+                : 'All rows failed validation. Download the error report to investigate.'
+          }
         </p>
 
         {/* Progress bar showing success ratio */}
@@ -185,13 +189,13 @@ export function ProgressStep({ onStart, onViewLeads, onImportAnother }: Progress
             icon={Users}
           />
           <ResultStat
-            label="Skipped"
+            label="Already existed"
             value={result.skipped}
             color="blue"
             icon={MailCheck}
           />
           <ResultStat
-            label="Failed"
+            label="Errors"
             value={result.failed}
             color={result.failed > 0 ? 'red' : 'muted'}
             icon={AlertCircle}
@@ -199,8 +203,8 @@ export function ProgressStep({ onStart, onViewLeads, onImportAnother }: Progress
         </div>
       )}
 
-      {/* Error report section */}
-      {result && result.errors.length > 0 && (
+      {/* Error report section — only for actual errors, not just skipped duplicates */}
+      {result && result.errors.length > 0 && !allSkipped && (
         <div className="rounded-xl border border-border bg-secondary">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">

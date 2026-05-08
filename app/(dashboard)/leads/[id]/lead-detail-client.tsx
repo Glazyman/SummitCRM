@@ -443,6 +443,8 @@ export default function LeadDetailClient({
               onSave={handleSaveProfile}
               onRenameBatch={canEditBatch ? handleRenameBatch : undefined}
               canEditBatch={canEditBatch}
+              onStatusChange={handleStatusChange}
+              onInterestChange={handleInterestChange}
             />
           </div>
 

@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     const { user, member, admin } = ctx
 
-    if (!['super_admin', 'admin', 'manager', 'rep'].includes(member.role)) {
+    if (!['super_admin', 'admin', 'rep'].includes(member.role)) {
       return apiError('Insufficient permissions', 403)
     }
 

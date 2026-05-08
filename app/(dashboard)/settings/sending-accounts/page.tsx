@@ -1,10 +1,11 @@
 'use client'
 
 import * as React from 'react'
+import Link from 'next/link'
 import {
   Mail, Plus, MoreHorizontal, CheckCircle2, XCircle,
   AlertTriangle, RefreshCw, Pencil, Trash2, Activity,
-  Server, Key,
+  Server, Key, ArrowLeft,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -119,6 +120,9 @@ export default function SendingAccountsPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <Link href="/settings" className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="h-4 w-4" /> Settings
+      </Link>
 
       {/* ── Page header ── */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">

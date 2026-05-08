@@ -30,17 +30,16 @@ export default async function AdminDashboardPage() {
   const role = member?.role ?? 'rep'
 
   // Only admin and manager can access this page
-  if (!['admin', 'super_admin', 'manager'].includes(role)) {
+  if (!['admin', 'super_admin'].includes(role)) {
     redirect('/dashboard')
   }
 
-  const isAdmin   = ['admin', 'super_admin'].includes(role)
-  const isManager = role === 'manager'
+  const isAdmin = ['admin', 'super_admin'].includes(role)
 
   return (
     <AdminDashboardClient
       isAdmin={isAdmin}
-      isManager={isManager}
+      isManager={false}
       userRole={role}
     />
   )

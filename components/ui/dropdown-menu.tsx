@@ -194,20 +194,26 @@ function DropdownMenuContent({
 
   if (!open || !mounted) return null
 
+  const transformOrigin =
+    align === 'end'    ? 'top right' :
+    align === 'center' ? 'top center' :
+                         'top left'
+
   const menu = (
     <div
       ref={contentRef}
       role="menu"
       style={{
-        position: 'fixed',
-        top:      0,
-        left:     0,
+        position:        'fixed',
+        top:             0,
+        left:            0,
         minWidth,
-        zIndex:   100,
+        zIndex:          100,
+        transformOrigin,
       }}
       className={cn(
         'flex flex-col rounded-xl border border-border bg-popover shadow-card',
-        'animate-in fade-in-0 zoom-in-95 duration-100',
+        'animate-dropdown-in',
         className
       )}
     >

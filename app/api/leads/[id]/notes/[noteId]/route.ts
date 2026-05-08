@@ -29,9 +29,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (member.role === 'viewer') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
 
     const body = await req.json()
     const parsed = updateNoteSchema.safeParse(body)
@@ -78,9 +75,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       .single() as { data: { workspace_id: string; role: string } | null }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (member.role === 'viewer') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
 
     // Verify ownership: only the author or an admin/manager may delete
     const { data: existingNote } = await (admin as any)
@@ -94,7 +88,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     if (!existingNote) return NextResponse.json({ error: 'Note not found' }, { status: 404 })
 
-    const isAdmin = ['admin', 'super_admin', 'manager'].includes(member.role)
+    const isAdmin = ['admin', 'super_admin'].includes(member.role)
     if (existingNote.author_id !== user.id && !isAdmin) {
       return NextResponse.json({ error: 'Cannot delete another user\'s note' }, { status: 403 })
     }

@@ -2,24 +2,30 @@
 
 import * as React from 'react'
 import {
-  Mail, Phone, Building2, Globe,
-  Briefcase, Package, UserRound, Sparkles,
-  Pencil, Check, X, ExternalLink, Tag,
+  Mail, Phone, Building2, Globe, MapPin,
+  Package, UserRound, Sparkles,
+  Pencil, Check, X, ExternalLink, ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { STATUS_CONFIG } from '@/components/leads/status-config'
-import type { LeadDetail, TeamMember } from './types'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu'
+import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } from '@/components/leads/status-config'
+import type { LeadDetail, TeamMember, LeadStatus, InterestStatus } from './types'
 
 interface LeadProfileCardProps {
-  lead:            LeadDetail
-  teamMembers:     TeamMember[]
-  onSave:          (patch: Partial<LeadDetail>) => Promise<void>
+  lead:               LeadDetail
+  teamMembers:        TeamMember[]
+  onSave:             (patch: Partial<LeadDetail>) => Promise<void>
   /** When set, user can rename the linked batch (updates all leads in that batch). */
-  onRenameBatch?:  (name: string) => Promise<void>
-  canEditBatch?:   boolean
+  onRenameBatch?:     (name: string) => Promise<void>
+  canEditBatch?:      boolean
+  onStatusChange?:    (status: LeadStatus) => void
+  onInterestChange?:  (status: InterestStatus) => void
 }
 
 type EditableField =
@@ -43,6 +49,8 @@ export function LeadProfileCard({
   onSave,
   onRenameBatch,
   canEditBatch = true,
+  onStatusChange,
+  onInterestChange,
 }: LeadProfileCardProps) {
   const [editing, setEditing]     = React.useState(false)
   const [saving,  setSaving]      = React.useState(false)
@@ -51,9 +59,10 @@ export function LeadProfileCard({
   const [batchDraft, setBatchDraft]     = React.useState('')
   const [batchSaving, setBatchSaving]   = React.useState(false)
 
-  const name     = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '—'
-  const initials = [lead.first_name?.[0], lead.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
-  const statusMeta = STATUS_CONFIG[lead.status]
+  const name         = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '—'
+  const initials     = [lead.first_name?.[0], lead.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
+  const statusMeta   = STATUS_CONFIG[lead.status]
+  const interestMeta = lead.interest_status ? INTEREST_CONFIG[lead.interest_status as InterestStatus] : null
 
   function startEdit() {
     setDraft({
@@ -154,17 +163,93 @@ export function LeadProfileCard({
           </div>
         </div>
 
-        {/* Status + edit button */}
-        <div className="mt-3 flex items-center justify-between">
-          <span className={cn(
-            'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
-            statusMeta.badge
-          )}>
-            {statusMeta.label}
-          </span>
+        {/* Status + Interest + edit button */}
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Status dropdown */}
+            {onStatusChange ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity',
+                      statusMeta.badge
+                    )}
+                  >
+                    {statusMeta.label}
+                    <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" minWidth="170px">
+                  <DropdownMenuLabel>Change status</DropdownMenuLabel>
+                  {ALL_STATUSES.map((s) => {
+                    const m = STATUS_CONFIG[s]
+                    return (
+                      <DropdownMenuItem
+                        key={s}
+                        onClick={() => onStatusChange(s)}
+                        className={cn(s === lead.status && 'opacity-50 cursor-default')}
+                      >
+                        <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
+                        {m.label}
+                        {s === lead.status && (
+                          <span className="ml-auto text-xs text-muted-foreground">current</span>
+                        )}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <span className={cn(
+                'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                statusMeta.badge
+              )}>
+                {statusMeta.label}
+              </span>
+            )}
+
+            {/* Interest level dropdown */}
+            {onInterestChange && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity',
+                      interestMeta ? interestMeta.badge : 'bg-slate-100 text-slate-600 border-slate-200'
+                    )}
+                  >
+                    {interestMeta?.label ?? 'Interest'}
+                    <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" minWidth="160px">
+                  <DropdownMenuLabel>Interest level</DropdownMenuLabel>
+                  {ALL_INTEREST_STATUSES.map((s) => {
+                    const m = INTEREST_CONFIG[s]
+                    return (
+                      <DropdownMenuItem
+                        key={s}
+                        onClick={() => onInterestChange(s)}
+                        className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}
+                      >
+                        <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
+                        {m.label}
+                        {s === lead.interest_status && (
+                          <span className="ml-auto text-xs text-muted-foreground">current</span>
+                        )}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
 
           {!editing ? (
-            <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={startEdit}>
+            <Button size="sm" variant="ghost" className="h-7 shrink-0 gap-1.5 text-xs" onClick={startEdit}>
               <Pencil className="h-3 w-3" /> Edit
             </Button>
           ) : (
@@ -188,6 +273,7 @@ export function LeadProfileCard({
           icon={<Mail className="h-3.5 w-3.5" />}
           label="Email"
           editing={editing}
+          empty={!lead.email && !editing}
         >
           {editing ? (
             <input
@@ -197,12 +283,23 @@ export function LeadProfileCard({
               className={cn(fieldInput)}
             />
           ) : (
-            <a
-              href={`mailto:${lead.email}`}
-              className="font-mono text-xs text-primary hover:underline break-all"
-            >
-              {lead.email}
-            </a>
+            <div className="space-y-1">
+              {lead.email && (
+                <a href={`mailto:${lead.email}`} className="block font-mono text-xs text-primary hover:underline break-all">
+                  {lead.email}
+                </a>
+              )}
+              {lead.custom_fields?.email_2 && (
+                <a href={`mailto:${lead.custom_fields.email_2}`} className="block font-mono text-xs text-primary/70 hover:underline break-all">
+                  {lead.custom_fields.email_2}
+                </a>
+              )}
+              {lead.custom_fields?.email_3 && (
+                <a href={`mailto:${lead.custom_fields.email_3}`} className="block font-mono text-xs text-primary/70 hover:underline break-all">
+                  {lead.custom_fields.email_3}
+                </a>
+              )}
+            </div>
           )}
         </ProfileField>
 
@@ -210,7 +307,7 @@ export function LeadProfileCard({
           icon={<Phone className="h-3.5 w-3.5" />}
           label="Phone"
           editing={editing}
-          empty={!lead.phone && !editing}
+          empty={!lead.phone && !lead.custom_fields?.phone_2 && !editing}
         >
           {editing ? (
             <input
@@ -221,11 +318,36 @@ export function LeadProfileCard({
               className={cn(fieldInput)}
             />
           ) : (
-            lead.phone && (
-              <a href={`tel:${lead.phone}`} className="text-sm hover:underline">
-                {lead.phone}
-              </a>
-            )
+            <div className="space-y-1">
+              {lead.phone && (
+                <a href={`tel:${lead.phone}`} className="block text-sm hover:underline">
+                  {lead.phone}
+                </a>
+              )}
+              {lead.custom_fields?.phone_2 && (
+                <a href={`tel:${lead.custom_fields.phone_2}`} className="block text-sm text-muted-foreground hover:underline">
+                  {lead.custom_fields.phone_2}
+                </a>
+              )}
+              {lead.custom_fields?.phone_3 && (
+                <a href={`tel:${lead.custom_fields.phone_3}`} className="block text-sm text-muted-foreground hover:underline">
+                  {lead.custom_fields.phone_3}
+                </a>
+              )}
+              {lead.custom_fields?.company_phone && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-1">Company</p>
+                  <a href={`tel:${lead.custom_fields.company_phone}`} className="block text-sm text-muted-foreground hover:underline">
+                    {lead.custom_fields.company_phone}
+                  </a>
+                  {lead.custom_fields?.company_phone_2 && (
+                    <a href={`tel:${lead.custom_fields.company_phone_2}`} className="block text-sm text-muted-foreground hover:underline">
+                      {lead.custom_fields.company_phone_2}
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </ProfileField>
 
@@ -287,10 +409,10 @@ export function LeadProfileCard({
           )}
         </ProfileField>
 
-        {/* Source */}
-        {lead.source && (
-          <ProfileField icon={<Tag className="h-3.5 w-3.5" />} label="Source">
-            <span className="text-sm capitalize">{lead.source.replace(/_/g, ' ')}</span>
+        {/* State — from custom_fields, read-only */}
+        {lead.custom_fields?.contact_state && (
+          <ProfileField icon={<MapPin className="h-3.5 w-3.5" />} label="State">
+            <span className="text-sm">{lead.custom_fields.contact_state}</span>
           </ProfileField>
         )}
 
@@ -381,6 +503,7 @@ export function LeadProfileCard({
             <span className="text-sm text-muted-foreground">Unassigned</span>
           )}
         </ProfileField>
+
       </div>
 
       {/* ── AI Summary ── */}

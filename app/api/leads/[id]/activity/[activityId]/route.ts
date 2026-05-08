@@ -28,9 +28,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       .single() as { data: { workspace_id: string; role: string } | null }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (member.role === 'viewer') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
 
     // Fetch the entry to validate ownership
     const { data: entry } = await (admin as any)
@@ -42,7 +39,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     if (!entry) return NextResponse.json({ error: 'Activity entry not found' }, { status: 404 })
 
-    const isAdmin = ['admin', 'super_admin', 'manager'].includes(member.role)
+    const isAdmin = ['admin', 'super_admin'].includes(member.role)
     if (entry.user_id !== user.id && !isAdmin) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }

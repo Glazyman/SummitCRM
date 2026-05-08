@@ -38,19 +38,15 @@ interface Props {
 }
 
 const ROLE_LABELS: Record<WorkspaceRole, string> = {
-  super_admin: 'Super Admin',
+  super_admin: 'Admin',
   admin:       'Admin',
-  manager:     'Manager',
   rep:         'Rep',
-  viewer:      'Viewer',
 }
 
 const ROLE_COLORS: Record<WorkspaceRole, string> = {
   super_admin: 'bg-primary/10 text-primary border-primary/20',
   admin:       'bg-primary/10 text-primary border-primary/20',
-  manager:     'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400',
   rep:         'bg-muted text-muted-foreground border-border',
-  viewer:      'bg-muted/50 text-muted-foreground border-border',
 }
 
 // ── Invite form ────────────────────────────────────────────────────────────
@@ -78,10 +74,8 @@ function InviteForm({ onInvite }: { onInvite: (email: string, role: WorkspaceRol
   }
 
   const availableRoles: { value: WorkspaceRole; label: string; desc: string }[] = [
-    { value: 'rep',     label: 'Rep',     desc: 'Can view assigned leads, send emails' },
-    { value: 'manager', label: 'Manager', desc: 'View all leads, manage campaigns' },
-    { value: 'admin',   label: 'Admin',   desc: 'Full access, manage team' },
-    { value: 'viewer',  label: 'Viewer',  desc: 'Read-only access' },
+    { value: 'rep',   label: 'Rep',   desc: 'Can view leads, log calls, send emails' },
+    { value: 'admin', label: 'Admin', desc: 'Full access — manage team, settings, and all leads' },
   ]
 
   return (
@@ -346,7 +340,7 @@ export default function TeamSettingsClient({
                           onChange={(e) => handleRoleChange(member.id, e.target.value as WorkspaceRole)}
                           className="h-7 rounded-lg border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                         >
-                          {(['viewer', 'rep', 'manager', 'admin'] as WorkspaceRole[]).map((r) => (
+                          {(['rep', 'admin'] as WorkspaceRole[]).map((r) => (
                             <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                           ))}
                         </select>

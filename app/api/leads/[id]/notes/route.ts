@@ -26,9 +26,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (member.role === 'viewer') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
 
     const body = await req.json()
     const parsed = createNoteSchema.safeParse(body)

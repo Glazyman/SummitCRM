@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     ? await getDashboardMetrics(supabase, member.workspace_id, user.id, role)
     : emptyDashboardMetrics()
   const totalLeadsDescription =
-    role === 'rep' || role === 'viewer' ? 'assigned to you' : 'in workspace'
+    role === 'rep' || false ? 'assigned to you' : 'in workspace'
 
   return (
     <div className="space-y-5">
@@ -38,43 +38,62 @@ export default async function DashboardPage() {
           {getGreeting()}, {firstName ?? 'there'}
         </h1>
         <p className="mt-1 text-muted-foreground">
-          {role === 'viewer'
+          {false
             ? "Here's a read-only view of your workspace."
             : "Here's what's happening in your workspace today."}
         </p>
       </div>
 
       {/* Stats grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Leads"
-          value={formatNumber(metrics.totalLeads)}
-          description={totalLeadsDescription}
-          icon={Users}
-          color="blue"
-        />
-        <StatCard
-          title="Emails Sent"
-          value={formatNumber(metrics.emailsSentThisWeek)}
-          description="this week"
-          icon={Send}
-          color="green"
-        />
-        <StatCard
-          title="Open Rate"
-          value={formatPercent(metrics.openRateLast30Days)}
-          description="last 30 days"
-          icon={BarChart2}
-          color="purple"
-        />
-        <StatCard
-          title="Unread"
-          value={formatNumber(metrics.unreadNotifications)}
-          description="notifications"
-          icon={Bell}
-          color="amber"
-        />
-      </div>
+      {role === 'rep' ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard
+            title="Total Leads"
+            value={formatNumber(metrics.totalLeads)}
+            description="assigned to you"
+            icon={Users}
+            color="blue"
+          />
+          <StatCard
+            title="Follow-ups Due"
+            value={formatNumber(metrics.followUpsDue)}
+            description="pending today"
+            icon={Bell}
+            color="amber"
+          />
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Leads"
+            value={formatNumber(metrics.totalLeads)}
+            description={totalLeadsDescription}
+            icon={Users}
+            color="blue"
+          />
+          <StatCard
+            title="Emails Sent"
+            value={formatNumber(metrics.emailsSentThisWeek)}
+            description="this week"
+            icon={Send}
+            color="green"
+          />
+          <StatCard
+            title="Open Rate"
+            value={formatPercent(metrics.openRateLast30Days)}
+            description="last 30 days"
+            icon={BarChart2}
+            color="purple"
+          />
+          <StatCard
+            title="Unread"
+            value={formatNumber(metrics.unreadNotifications)}
+            description="notifications"
+            icon={Bell}
+            color="amber"
+          />
+        </div>
+      )}
 
       {/* Getting started checklist — only show for admin+ */}
       {(role === 'admin' || role === 'super_admin') && (
@@ -104,7 +123,7 @@ export default async function DashboardPage() {
               <SetupStep
                 number={3}
                 title="Invite your team"
-                description="Add reps and managers to your workspace."
+                description="Add reps and admins to your workspace."
                 href="/settings/team"
                 done={metrics.setup.hasTeamMembers}
               />
@@ -120,7 +139,7 @@ export default async function DashboardPage() {
         </Card>
       )}
 
-      {/* Quick actions — for reps */}
+      {/* Rep: quick actions */}
       {role === 'rep' && (
         <div className="grid gap-4 sm:grid-cols-2">
           <QuickActionCard
@@ -132,7 +151,7 @@ export default async function DashboardPage() {
           />
           <QuickActionCard
             title="Notifications"
-            description="Check replies, bounces, and follow-up reminders."
+            description="Check your follow-up reminders and activity."
             href="/notifications"
             icon={Bell}
             color="amber"
@@ -140,37 +159,10 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Manager quick actions */}
-      {role === 'manager' && (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <QuickActionCard
-            title="All Leads"
-            description="View all workspace leads and activity."
-            href="/leads"
-            icon={Users}
-            color="blue"
-          />
-          <QuickActionCard
-            title="Campaigns"
-            description="Create and manage bulk email campaigns."
-            href="/campaigns"
-            icon={Send}
-            color="green"
-          />
-          <QuickActionCard
-            title="Analytics"
-            description="Track team performance and email metrics."
-            href="/analytics"
-            icon={BarChart2}
-            color="purple"
-          />
-        </div>
-      )}
-
-      {/* Overdue follow-ups widget — visible to all roles with assignments */}
-      {role !== 'viewer' && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <OverdueFollowUpsWidget />
+      {/* Overdue follow-ups widget */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <OverdueFollowUpsWidget />
+        {role !== 'rep' && (
           <QuickActionCard
             title="Notifications"
             description="Replies, bounces, quota alerts, and follow-up reminders."
@@ -178,8 +170,8 @@ export default async function DashboardPage() {
             icon={Bell}
             color="amber"
           />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -198,6 +190,7 @@ type DashboardMetrics = {
   emailsSentThisWeek: number
   openRateLast30Days: number
   unreadNotifications: number
+  followUpsDue: number
   setup: {
     hasSendingAccount: boolean
     hasLeads: boolean
@@ -212,6 +205,7 @@ function emptyDashboardMetrics(): DashboardMetrics {
     emailsSentThisWeek: 0,
     openRateLast30Days: 0,
     unreadNotifications: 0,
+    followUpsDue: 0,
     setup: {
       hasSendingAccount: false,
       hasLeads: false,
@@ -239,6 +233,7 @@ async function getDashboardMetrics(
     sentLast30Result,
     openedLast30Result,
     unreadResult,
+    followUpsDueResult,
     sendingAccountsResult,
     membersResult,
     campaignsResult,
@@ -271,6 +266,12 @@ async function getDashboardMetrics(
       .eq('user_id', userId)
       .eq('is_read', false),
     supabase
+      .from('follow_ups')
+      .select('id', { count: 'exact', head: true })
+      .eq('assigned_to', userId)
+      .is('completed_at', null)
+      .lte('due_at', now.toISOString()),
+    supabase
       .from('sending_accounts')
       .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
@@ -295,6 +296,7 @@ async function getDashboardMetrics(
     emailsSentThisWeek: emailsThisWeekResult.count ?? 0,
     openRateLast30Days: sentLast30 > 0 ? Math.round((openedLast30 / sentLast30) * 100) : 0,
     unreadNotifications: unreadResult.count ?? 0,
+    followUpsDue: followUpsDueResult.count ?? 0,
     setup: {
       hasSendingAccount: canManageSetup && (sendingAccountsResult.count ?? 0) > 0,
       hasLeads: (leadsResult.count ?? 0) > 0,

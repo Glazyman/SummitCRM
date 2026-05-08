@@ -66,7 +66,7 @@ Deno.serve(async (req: Request) => {
   // ── Fetch import record ─────────────────────────────────────────────
   const { data: importRecord, error: fetchErr } = await supabase
     .from('lead_imports')
-    .select('id, workspace_id, imported_by, field_mapping, storage_path, status')
+    .select('id, workspace_id, created_by, field_mapping, storage_path, status')
     .eq('id', importId)
     .single()
 
@@ -78,7 +78,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'Import already complete' }, 409)
   }
 
-  const { workspace_id: workspaceId, imported_by: userId, field_mapping: fieldMapping, storage_path: storagePath } = importRecord
+  const { workspace_id: workspaceId, created_by: userId, field_mapping: fieldMapping, storage_path: storagePath } = importRecord
 
   // Mark as processing
   await supabase
@@ -227,18 +227,20 @@ Deno.serve(async (req: Request) => {
       .from('lead_imports')
       .update({
         status:        'complete',
+        batch_id:      resolvedBatchId,
         imported_rows: inserted + updated,
         failed_rows:   failed + skipped,
         error_log:     allErrors.slice(0, 1000),
+        completed_at:  new Date().toISOString(),
       })
       .eq('id', importId)
 
     // ── Log activity ────────────────────────────────────────────────
     if (inserted + updated > 0) {
       await supabase.from('activity_logs').insert({
-        workspace_id:  workspaceId,
-        user_id:       userId,
-        activity_type: 'lead_imported',
+        workspace_id: workspaceId,
+        user_id:      userId,
+        type:         'lead_imported',
         metadata: {
           import_id:  importId,
           batch_id:   resolvedBatchId,
@@ -259,8 +261,9 @@ Deno.serve(async (req: Request) => {
     await supabase
       .from('lead_imports')
       .update({
-        status:    'failed',
-        error_log: [{ row: 0, email: '', reason: message }],
+        status:       'failed',
+        error_log:    [{ row: 0, email: '', reason: message }],
+        completed_at: new Date().toISOString(),
       })
       .eq('id', importId)
 

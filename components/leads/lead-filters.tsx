@@ -15,6 +15,7 @@ interface LeadFiltersProps {
   batches:     FilterBatch[]
   teamMembers: FilterMember[]
   isAdmin:     boolean
+  isRep?:      boolean
   onChange:    (patch: Partial<LeadFilters>) => void
   onClear:     () => void
 }
@@ -27,6 +28,7 @@ export function LeadFiltersPanel({
   batches,
   teamMembers,
   isAdmin,
+  isRep,
   onChange,
   onClear,
 }: LeadFiltersProps) {
@@ -60,7 +62,7 @@ export function LeadFiltersPanel({
 
   return (
     <div className="space-y-3">
-      {/* Top row: search + filter toggle */}
+      {/* Top row: search + batch (for reps) + filter toggle */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         {/* Search */}
         <div className="relative flex-1">
@@ -89,15 +91,35 @@ export function LeadFiltersPanel({
           )}
         </div>
 
+        {/* Batch — upfront for reps (their primary organizer by industry) */}
+        {isRep && batches.length > 0 && (
+          <select
+            value={filters.batchId ?? ''}
+            onChange={(e) => onChange({ batchId: e.target.value || null, page: 1 })}
+            className={cn(
+              'h-9 rounded-lg border border-input bg-background px-3 text-sm sm:w-44',
+              'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0',
+              filters.batchId && 'border-primary/50 bg-primary/5 text-primary'
+            )}
+          >
+            <option value="">All batches</option>
+            {batches.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        )}
+
         <div className="flex items-center gap-2">
-          {/* My Leads toggle */}
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-sm transition-colors hover:bg-muted">
-            <ToggleSwitch
-              checked={filters.myLeads}
-              onChange={(v) => onChange({ myLeads: v, page: 1 })}
-            />
-            <span className="font-medium">My Leads</span>
-          </label>
+          {/* My Leads toggle — hidden for reps (they only see their own leads) */}
+          {!isRep && (
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-sm transition-colors hover:bg-muted">
+              <ToggleSwitch
+                checked={filters.myLeads}
+                onChange={(v) => onChange({ myLeads: v, page: 1 })}
+              />
+              <span className="font-medium">My Leads</span>
+            </label>
+          )}
 
           {/* Expand filters */}
           <Button
@@ -171,23 +193,25 @@ export function LeadFiltersPanel({
               </div>
             </div>
 
-            {/* Batch */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Batch</label>
-              <select
-                value={filters.batchId ?? ''}
-                onChange={(e) => onChange({ batchId: e.target.value || null, page: 1 })}
-                className={cn(
-                  'h-9 w-full rounded-lg border border-input bg-background px-3 text-sm',
-                  'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0'
-                )}
-              >
-                <option value="">All batches</option>
-                {batches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-            </div>
+            {/* Batch — only in expanded panel for admins; reps have it upfront */}
+            {!isRep && (
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Batch</label>
+                <select
+                  value={filters.batchId ?? ''}
+                  onChange={(e) => onChange({ batchId: e.target.value || null, page: 1 })}
+                  className={cn(
+                    'h-9 w-full rounded-lg border border-input bg-background px-3 text-sm',
+                    'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0'
+                  )}
+                >
+                  <option value="">All batches</option>
+                  {batches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Assigned to (admin/manager only) */}
             {isAdmin && (

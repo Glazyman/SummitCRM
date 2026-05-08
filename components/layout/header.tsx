@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
+import { FollowUpBell }     from '@/components/notifications/followup-bell'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { WorkspaceRole } from '@/types/database'
 
@@ -34,17 +35,13 @@ function getPageTitle(pathname: string): string {
 const ROLE_STYLES: Record<WorkspaceRole, string> = {
   super_admin: 'border-border bg-secondary text-foreground',
   admin:       'border-border bg-secondary text-foreground',
-  manager:     'border-border bg-secondary text-foreground',
   rep:         'border-border bg-secondary text-foreground',
-  viewer:      'border-border bg-muted text-muted-foreground',
 }
 
 const ROLE_LABELS: Record<WorkspaceRole, string> = {
-  super_admin: 'Super Admin',
+  super_admin: 'Admin',
   admin:       'Admin',
-  manager:     'Manager',
   rep:         'Rep',
-  viewer:      'Viewer',
 }
 
 function RoleBadge({ role }: { role: WorkspaceRole }) {
@@ -151,7 +148,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
       <div className="flex items-center gap-1">
         {/* Notifications */}
         <div className="flex h-9 w-9 items-center justify-center">
-          <NotificationBell />
+          {role === 'rep' ? <FollowUpBell /> : <NotificationBell />}
         </div>
 
         {/* User dropdown */}

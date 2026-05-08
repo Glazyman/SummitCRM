@@ -41,7 +41,7 @@ export async function GET() {
       .single() as { data: { workspace_id: string; role: string } | null }
 
     if (!member) return NextResponse.json({ error: 'No workspace found' }, { status: 403 })
-    if (!['admin', 'super_admin', 'manager'].includes(member.role)) {
+    if (!['admin', 'super_admin'].includes(member.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
       .single() as { data: { workspace_id: string; role: string } | null }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (!['admin', 'super_admin', 'manager'].includes(member.role)) {
+    if (!['admin', 'super_admin'].includes(member.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

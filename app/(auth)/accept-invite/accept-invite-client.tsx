@@ -10,11 +10,9 @@ import { cn } from '@/lib/utils'
 import type { WorkspaceRole } from '@/types/database'
 
 const ROLE_LABELS: Record<WorkspaceRole, string> = {
-  super_admin: 'Super Admin',
+  super_admin: 'Admin',
   admin:       'Admin',
-  manager:     'Manager',
   rep:         'Rep',
-  viewer:      'Viewer',
 }
 
 interface Props {

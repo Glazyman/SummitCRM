@@ -27,7 +27,6 @@ export interface LeadDetail {
   assigned_to:      string | null
   assigned_name:    string | null
   assigned_avatar:  string | null
-  source:           string | null
   ai_summary:       string | null
   custom_fields:    Record<string, string>
   created_at:       string

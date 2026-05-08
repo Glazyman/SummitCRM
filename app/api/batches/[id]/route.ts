@@ -29,9 +29,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       .single() as { data: { workspace_id: string; role: string } | null }
 
     if (!member) return apiUnauthorized()
-    if (member.role === 'viewer') {
-      return apiError('Insufficient permissions', 403)
-    }
 
     let body: unknown
     try {

@@ -90,7 +90,7 @@ export async function detectDuplicates(
  *   - `skipped`   : rows whose email IS in existingEmails (for 'skip' mode)
  * Also collects per-row DedupError entries for skipped rows.
  */
-export function partitionRows<T extends { email: string }>(
+export function partitionRows<T extends { email?: string | null }>(
   rows: T[],
   dedup: DedupResult,
   mode: 'skip' | 'update'
@@ -105,6 +105,13 @@ export function partitionRows<T extends { email: string }>(
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
+
+    // No email → always insert (can't dedup without one)
+    if (!row.email) {
+      toInsert.push(row)
+      continue
+    }
+
     const emailKey = row.email.toLowerCase()
 
     if (dedup.existingEmails.has(emailKey)) {
@@ -113,11 +120,9 @@ export function partitionRows<T extends { email: string }>(
         if (existingId) {
           toUpdate.push({ ...row, existingId })
         } else {
-          // ID not found (shouldn't happen, but fall back to re-insert)
           toInsert.push(row)
         }
       } else {
-        // mode === 'skip'
         skipped.push({
           row: i + 1,
           email: row.email,
@@ -139,7 +144,7 @@ export function partitionRows<T extends { email: string }>(
  * Returns the list of rows after removing intra-file duplicates,
  * plus errors for the removed rows.
  */
-export function deduplicateWithinFile<T extends { email: string }>(
+export function deduplicateWithinFile<T extends { email?: string | null }>(
   rows: T[]
 ): { unique: T[]; duplicates: DedupError[] } {
   const seen = new Map<string, number>() // email → first row index
@@ -147,11 +152,17 @@ export function deduplicateWithinFile<T extends { email: string }>(
   const duplicates: DedupError[] = []
 
   for (let i = 0; i < rows.length; i++) {
-    const email = rows[i].email.toLowerCase()
+    const rawEmail = rows[i].email
+    // Rows without email are always unique (no basis for dedup)
+    if (!rawEmail) {
+      unique.push(rows[i])
+      continue
+    }
+    const email = rawEmail.toLowerCase()
     if (seen.has(email)) {
       duplicates.push({
         row: i + 1,
-        email: rows[i].email,
+        email: rawEmail,
         reason: `Duplicate within file: same email as row ${(seen.get(email)! + 1)}`,
       })
     } else {

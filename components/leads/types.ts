@@ -27,9 +27,9 @@ export interface LeadRow {
   batch_name:       string | null
   assigned_to:      string | null
   assigned_name:    string | null  // joined from workspace_members
-  source:           string | null
   last_activity_at: string | null
   tags:             { id: string; name: string; color: string }[]
+  custom_fields:    Record<string, string>
   created_at:       string
   updated_at:       string
 }
@@ -85,8 +85,8 @@ export type ColumnId =
   | 'assigned'
   | 'last_activity'
   | 'phone'
+  | 'company_phone'
   | 'title'
-  | 'source'
 
 export interface ColumnDef {
   id:         ColumnId
@@ -108,9 +108,9 @@ export const COLUMNS: ColumnDef[] = [
   { id: 'batch',         label: 'Batch',                                        optional: true,  defaultOn: true },
   { id: 'assigned',      label: 'Assigned To',                                  optional: true,  defaultOn: true },
   { id: 'last_activity', label: 'Last Activity',  sortField: 'last_activity_at',optional: true,  defaultOn: true },
-  { id: 'phone',         label: 'Phone',                                        optional: true,  defaultOn: false },
+  { id: 'phone',         label: 'Phone',                                        optional: true,  defaultOn: true },
+  { id: 'company_phone', label: 'Company Phone',                                optional: true,  defaultOn: false },
   { id: 'title',         label: 'Job Title',                                    optional: true,  defaultOn: false },
-  { id: 'source',        label: 'Source',                                       optional: true,  defaultOn: false },
 ]
 
 // ── Status counts (for status bar) ────────────────────────────────────────

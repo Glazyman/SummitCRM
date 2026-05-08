@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 import type { LeadRow } from './types'
 
@@ -85,26 +85,24 @@ export function CreateLeadModal({ open, batches, onClose, onCreate }: CreateLead
 
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <User className="h-4 w-4 text-primary" />
+          <DialogTitle className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
+              <User className="h-4.5 w-4.5 text-primary" />
             </div>
             Add New Lead
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} noValidate>
-          <div className="space-y-4 py-2">
+          <div className="space-y-5 px-6 pb-6">
+
             {/* Name row */}
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                label="First Name"
-                icon={<User className="h-3.5 w-3.5" />}
-              >
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="First Name" icon={<User className="h-3.5 w-3.5" />}>
                 <Input
-                  placeholder="First name"
+                  placeholder="Jane"
                   value={form.first_name}
                   onChange={(e) => patch('first_name', e.target.value)}
                   autoComplete="given-name"
@@ -121,15 +119,11 @@ export function CreateLeadModal({ open, batches, onClose, onCreate }: CreateLead
             </div>
 
             {/* Email */}
-            <FormField
-              label="Email"
-              required
-              icon={<Mail className="h-3.5 w-3.5" />}
-            >
+            <FormField label="Email" required icon={<Mail className="h-3.5 w-3.5" />}>
               <Input
                 ref={emailRef}
                 type="email"
-                placeholder="email@company.com"
+                placeholder="jane@company.com"
                 value={form.email}
                 onChange={(e) => patch('email', e.target.value)}
                 autoComplete="email"
@@ -138,10 +132,10 @@ export function CreateLeadModal({ open, batches, onClose, onCreate }: CreateLead
             </FormField>
 
             {/* Company + Title */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <FormField label="Company" icon={<Building2 className="h-3.5 w-3.5" />}>
                 <Input
-                  placeholder="Company name"
+                  placeholder="Acme Inc."
                   value={form.company}
                   onChange={(e) => patch('company', e.target.value)}
                 />
@@ -156,7 +150,7 @@ export function CreateLeadModal({ open, batches, onClose, onCreate }: CreateLead
             </div>
 
             {/* Phone + Website */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <FormField label="Phone" icon={<Phone className="h-3.5 w-3.5" />}>
                 <Input
                   type="tel"
@@ -196,21 +190,20 @@ export function CreateLeadModal({ open, batches, onClose, onCreate }: CreateLead
 
             {/* Error */}
             {error && (
-              <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive">
                 {error}
               </p>
             )}
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-border mt-4">
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="min-w-[100px]">
+            <Button type="submit" disabled={loading} className="min-w-[110px]">
               {loading ? <Spinner size="sm" /> : 'Add Lead'}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
@@ -230,11 +223,11 @@ function FormField({
   icon?:    React.ReactNode
 }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="flex items-center gap-1.5 text-xs">
+    <div className="space-y-2">
+      <Label className="flex items-center gap-1.5 text-xs font-medium">
         {icon && <span className="text-muted-foreground">{icon}</span>}
         {label}
-        {required && <span className="text-destructive">*</span>}
+        {required && <span className="text-destructive ml-0.5">*</span>}
       </Label>
       {children}
     </div>

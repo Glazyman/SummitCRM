@@ -134,6 +134,12 @@
   h4 { font-size: 1.125rem; font-weight: 500; line-height: 1.5; }
 }
 
+/* ── Dropdown pop-in animation ─────────────────────────────────────────────── */
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* ── Bell shake animation ──────────────────────────────────────────────────── */
 @keyframes bell-shake {
   0%, 100% { transform: rotate(0deg); }
@@ -146,6 +152,10 @@
 
 /* ── Utility overrides ─────────────────────────────────────────────────────── */
 @layer utilities {
+  .animate-dropdown-in {
+    animation: dropdown-in 0.12s ease-out forwards;
+  }
+
   .animate-bell-shake {
     animation: bell-shake 0.8s ease-in-out;
   }

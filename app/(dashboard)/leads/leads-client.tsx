@@ -3,11 +3,12 @@
 import * as React from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Upload, UserPlus, Download, RefreshCw } from 'lucide-react'
+import { Upload, UserPlus, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
 import { LeadStatusBar }        from '@/components/leads/lead-status-bar'
+import { LeadFullPanel }        from '@/components/leads/lead-full-panel'
 import { LeadFiltersPanel }     from '@/components/leads/lead-filters'
 import { LeadTable }            from '@/components/leads/lead-table'
 import { BulkActionBar }        from '@/components/leads/bulk-action-bar'
@@ -15,7 +16,7 @@ import { ColumnVisibilityMenu } from '@/components/leads/column-visibility-menu'
 import { CreateLeadModal }      from '@/components/leads/create-lead-modal'
 
 import { COLUMNS, DEFAULT_FILTERS }        from '@/components/leads/types'
-import type { LeadRow, LeadFilters, LeadStatus, ColumnId, SortField, StatusCount } from '@/components/leads/types'
+import type { LeadRow, LeadFilters, LeadStatus, InterestStatus, ColumnId, SortField, StatusCount } from '@/components/leads/types'
 import type { NewLeadData } from '@/components/leads/create-lead-modal'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@ interface LeadsClientProps {
   teamMembers:   { id: string; name: string }[]
   isAdmin:       boolean
   currentUserId: string
+  role?:         string
 }
 
 const PER_PAGE = 50
@@ -102,7 +104,9 @@ export function LeadsClient({
   teamMembers,
   isAdmin,
   currentUserId,
+  role,
 }: LeadsClientProps) {
+  const isRep = role === 'rep'
   const router       = useRouter()
   const pathname     = usePathname()
   const searchParams = useSearchParams()
@@ -130,9 +134,17 @@ export function LeadsClient({
   const [leads, setLeads]               = React.useState<LeadRow[]>(initialLeads)
   const [selectedIds, setSelectedIds]   = React.useState<Set<string>>(new Set())
   const [createOpen, setCreateOpen]     = React.useState(false)
-  const [visibleColumns, setVisibleCols] = React.useState<Set<ColumnId>>(
-    new Set(COLUMNS.filter((c) => c.defaultOn).map((c) => c.id))
-  )
+  const [visibleColumns, setVisibleCols] = React.useState<Set<ColumnId>>(() => {
+    const defaults = new Set(COLUMNS.filter((c) => c.defaultOn).map((c) => c.id))
+    if (isRep) {
+      defaults.add('phone')    // reps need phone to call
+      defaults.delete('assigned') // redundant — all leads are theirs
+    }
+    return defaults
+  })
+  const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
+  // Derive the panel lead live from state so status/interest changes reflect instantly
+  const selectedLead = selectedLeadId ? (leads.find((l) => l.id === selectedLeadId) ?? null) : null
 
   // ── Keep in sync with server ───────────────────────────────────────────
   // When router.refresh() re-runs the server component, initialLeads gets a
@@ -255,6 +267,18 @@ export function LeadsClient({
     }).catch(console.error)
   }
 
+  // ── Inline interest change (optimistic + API) ─────────────────────────
+  function handleInterestChange(leadId: string, interest_status: InterestStatus) {
+    setLeads((prev) =>
+      prev.map((l) => (l.id === leadId ? { ...l, interest_status, updated_at: new Date().toISOString() } : l))
+    )
+    fetch(`/api/leads/${leadId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ interest_status }),
+    }).catch(console.error)
+  }
+
   // ── Bulk actions ───────────────────────────────────────────────────────
   function handleBulkStatus(status: LeadStatus) {
     const ids = [...selectedIds]
@@ -314,10 +338,19 @@ export function LeadsClient({
     }).catch(console.error)
   }
 
-  function handleDeleteLead(id: string) {
+  async function handleDeleteLead(id: string) {
     setLeads((prev) => prev.filter((l) => l.id !== id))
     setSelectedIds((s) => { const next = new Set(s); next.delete(id); return next })
-    fetch(`/api/leads/${id}`, { method: 'DELETE' }).catch(console.error)
+    try {
+      const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        console.error('Delete failed:', json.error ?? res.status)
+      }
+    } catch (err) {
+      console.error('Delete error:', err)
+    }
+    router.refresh()
   }
 
   async function handleCreateLead(data: NewLeadData) {
@@ -349,9 +382,9 @@ export function LeadsClient({
         batch_name:       batches.find((b) => b.id === lead.batch_id)?.name ?? null,
         assigned_to:      lead.assigned_to ?? null,
         assigned_name:    teamMembers.find((m) => m.id === lead.assigned_to)?.name ?? null,
-        source:           lead.source     ?? 'manual',
         last_activity_at: null,
         tags:             [],
+        custom_fields:    lead.custom_fields ?? {},
         created_at:       lead.created_at,
         updated_at:       lead.updated_at,
       }
@@ -394,29 +427,34 @@ export function LeadsClient({
       {/* ── Page header ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Leads</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isRep ? 'My Leads' : 'Leads'}
+          </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {totalCount.toLocaleString()} lead{totalCount !== 1 ? 's' : ''}
-            {(filters.search || filters.statuses.length > 0 || filters.batchId) && ' matching current filters'}
+            {filters.batchId && batches.find(b => b.id === filters.batchId) && ` · ${batches.find(b => b.id === filters.batchId)!.name}`}
+            {(filters.search || filters.statuses.length > 0) && ' matching filters'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
-            <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Export CSV</span>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/leads/import">
-              <Upload className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline ml-1.5">Import</span>
-            </Link>
-          </Button>
-          <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
-            <UserPlus className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Add Lead</span>
-          </Button>
-        </div>
+        {!isRep && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/leads/import">
+                <Upload className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline ml-1.5">Import</span>
+              </Link>
+            </Button>
+            <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
+              <UserPlus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Add Lead</span>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* ── Status bar ── */}
@@ -433,6 +471,7 @@ export function LeadsClient({
         batches={batches}
         teamMembers={teamMembers}
         isAdmin={isAdmin}
+        isRep={isRep}
         onChange={updateFilters}
         onClear={clearFilters}
       />
@@ -470,6 +509,8 @@ export function LeadsClient({
         onSelectRow={handleSelectRow}
         onSort={handleSort}
         onStatusChange={handleStatusChange}
+        onInterestChange={handleInterestChange}
+        onRowClick={(lead) => setSelectedLeadId(lead.id)}
         onSendEmail={(lead) => console.log('send email to', lead.email)}
         onDeleteLead={handleDeleteLead}
       />
@@ -505,6 +546,28 @@ export function LeadsClient({
         onClose={() => setCreateOpen(false)}
         onCreate={handleCreateLead}
       />
+
+      {/* ── Lead full panel ── */}
+      {selectedLeadId && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/20"
+            onClick={() => setSelectedLeadId(null)}
+          />
+          <LeadFullPanel
+            leadId={selectedLeadId}
+            teamMembers={teamMembers}
+            isAdmin={isAdmin}
+            currentUserId={currentUserId}
+            canEditBatch={true}
+            onClose={() => setSelectedLeadId(null)}
+            onLeadChange={(patch) => {
+              if (patch.status)          handleStatusChange(selectedLeadId, patch.status)
+              if (patch.interest_status) handleInterestChange(selectedLeadId, patch.interest_status)
+            }}
+          />
+        </>
+      )}
     </div>
   )
 }

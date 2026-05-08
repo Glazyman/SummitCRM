@@ -78,7 +78,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
     const member = await getWorkspaceMember(user.id)
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (!['admin', 'super_admin', 'manager'].includes(member.role)) {
+    if (!['admin', 'super_admin'].includes(member.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

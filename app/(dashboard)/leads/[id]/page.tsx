@@ -30,7 +30,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
   const [leadResult, batchesResult, activityResult, notesResult, emailsResult, followUpsResult, callsResult, accountsResult, membersResult] = await Promise.all([
     supabase
       .from('leads')
-      .select('id, workspace_id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, interest_status, is_unsubscribed, batch_id, assigned_to, source, ai_summary, custom_fields, created_at, updated_at')
+      .select('id, workspace_id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, interest_status, is_unsubscribed, batch_id, assigned_to, ai_summary, custom_fields, created_at, updated_at')
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
@@ -76,7 +76,6 @@ export default async function LeadDetailPage({ params }: PageProps) {
     is_unsubscribed: boolean
     batch_id: string | null
     assigned_to: string | null
-    source: string | null
     ai_summary: string | null
     custom_fields: Record<string, string> | null
     created_at: string
@@ -93,7 +92,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
   }
 
   const currentUserId = user.id
-  const isAdmin = ['super_admin', 'admin', 'manager'].includes(member?.role ?? '')
+  const isAdmin = ['super_admin', 'admin'].includes(member?.role ?? '')
   const canEditBatch = member?.role !== 'viewer'
   const teamMembers: TeamMember[] = memberIds.map((userId) => ({ id: userId, name: usersById.get(userId) ?? userId }))
 

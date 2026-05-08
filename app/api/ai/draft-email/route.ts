@@ -50,7 +50,6 @@ export async function POST(req: NextRequest) {
       .single() as { data: { workspace_id: string; role: string } | null }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (member.role === 'viewer') return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     // Rate limit per workspace
     const rl = rateLimit(member.workspace_id, AI_LIMIT.prefix, AI_LIMIT.limit, AI_LIMIT.windowMs)

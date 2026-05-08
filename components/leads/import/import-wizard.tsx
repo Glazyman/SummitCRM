@@ -9,7 +9,7 @@ import { UploadZone } from './upload-zone'
 import { FieldMappingStep } from './field-mapping-step'
 import { OptionsStep } from './options-step'
 import { ProgressStep } from './progress-step'
-import type { ParsedFile, FieldMapping, ImportOptions, ImportResult, ExistingBatch, WizardStep } from './types'
+import type { ParsedFile, FieldMapping, ImportOptions, ImportResult, ExistingBatch, WizardStep, CustomFieldNames } from './types'
 
 // ── Wizard steps config ───────────────────────────────────────────────────
 const STEPS: { id: WizardStep; label: string; description: string }[] = [
@@ -19,14 +19,16 @@ const STEPS: { id: WizardStep; label: string; description: string }[] = [
   { id: 'progress', label: 'Import',    description: 'Processing' },
 ]
 
+interface TeamMember { id: string; name: string }
+
 interface ImportWizardProps {
-  /** Existing batches for the workspace dropdown */
-  batches: ExistingBatch[]
-  /** Called with the final field mapping + options to start the actual import */
+  batches:     ExistingBatch[]
+  teamMembers: TeamMember[]
   onImport: (args: {
-    file: ParsedFile
-    mapping: FieldMapping
-    options: ImportOptions
+    file:             ParsedFile
+    mapping:          FieldMapping
+    customFieldNames: CustomFieldNames
+    options:          ImportOptions
   }) => Promise<ImportResult>
 }
 
@@ -34,16 +36,18 @@ const DEFAULT_OPTIONS: ImportOptions = {
   batchId: null,
   newBatchName: '',
   duplicateMode: 'skip',
+  assignedTo: null,
 }
 
-export function ImportWizard({ batches: initialBatches, onImport }: ImportWizardProps) {
+export function ImportWizard({ batches: initialBatches, teamMembers, onImport }: ImportWizardProps) {
   const router = useRouter()
 
-  const [step, setStep] = useState<WizardStep>('upload')
-  const [file, setFile] = useState<ParsedFile | null>(null)
-  const [mapping, setMapping] = useState<FieldMapping>({})
-  const [options, setOptions] = useState<ImportOptions>(DEFAULT_OPTIONS)
-  const [batches, setBatches] = useState<ExistingBatch[]>(initialBatches)
+  const [step,             setStep]             = useState<WizardStep>('upload')
+  const [file,             setFile]             = useState<ParsedFile | null>(null)
+  const [mapping,          setMapping]          = useState<FieldMapping>({})
+  const [customFieldNames, setCustomFieldNames] = useState<CustomFieldNames>({})
+  const [options,          setOptions]          = useState<ImportOptions>(DEFAULT_OPTIONS)
+  const [batches,          setBatches]          = useState<ExistingBatch[]>(initialBatches)
 
   // Keep batch list fresh — re-fetch from API on mount and after each reset
   async function refreshBatches() {
@@ -57,7 +61,6 @@ export function ImportWizard({ batches: initialBatches, onImport }: ImportWizard
   useEffect(() => { refreshBatches() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const currentIndex = STEPS.findIndex((s) => s.id === step)
-  const emailMapped = Object.values(mapping).includes('email')
 
   // ── Navigation ──────────────────────────────────────────────────────────
   function goNext() {
@@ -76,6 +79,7 @@ export function ImportWizard({ batches: initialBatches, onImport }: ImportWizard
     setStep('upload')
     setFile(null)
     setMapping({})
+    setCustomFieldNames({})
     setOptions(DEFAULT_OPTIONS)
     refreshBatches()
   }
@@ -91,7 +95,7 @@ export function ImportWizard({ batches: initialBatches, onImport }: ImportWizard
   // ── Can proceed? ────────────────────────────────────────────────────────
   function canProceed(): boolean {
     if (step === 'upload') return !!file
-    if (step === 'mapping') return emailMapped
+    if (step === 'mapping') return true
     if (step === 'options') return true
     return false
   }
@@ -114,7 +118,9 @@ export function ImportWizard({ batches: initialBatches, onImport }: ImportWizard
         <FieldMappingStep
           file={file}
           mapping={mapping}
+          customFieldNames={customFieldNames}
           onChange={setMapping}
+          onCustomNamesChange={setCustomFieldNames}
         />
       )
     }
@@ -126,8 +132,8 @@ export function ImportWizard({ batches: initialBatches, onImport }: ImportWizard
           mapping={mapping}
           options={options}
           batches={batches}
+          teamMembers={teamMembers}
           onChange={setOptions}
-          onBatchCreated={(batch) => setBatches((prev) => [batch, ...prev])}
         />
       )
     }
@@ -135,7 +141,7 @@ export function ImportWizard({ batches: initialBatches, onImport }: ImportWizard
     if (step === 'progress' && file) {
       return (
         <ProgressStep
-          onStart={() => onImport({ file, mapping, options })}
+          onStart={() => onImport({ file, mapping, customFieldNames, options })}
           onViewLeads={handleViewLeads}
           onImportAnother={resetWizard}
         />
@@ -185,12 +191,7 @@ export function ImportWizard({ batches: initialBatches, onImport }: ImportWizard
             </Button>
 
             <div className="flex items-center gap-3">
-              {!canProceed() && step === 'mapping' && (
-                <p className="text-xs text-foreground">
-                  Map the Email column to continue
-                </p>
-              )}
-              <Button
+                <Button
                 type="button"
                 onClick={goNext}
                 disabled={!canProceed()}

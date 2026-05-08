@@ -23,14 +23,14 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-  { id: 'overview',   label: 'Overview',   minRole: 'rep'     },
-  { id: 'campaigns',  label: 'Campaigns',  minRole: 'manager' },
-  { id: 'funnel',     label: 'Funnel',     minRole: 'rep'     },
-  { id: 'reps',       label: 'Rep stats',  minRole: 'admin'   },
-  { id: 'batches',    label: 'Batches',    minRole: 'manager' },
+  { id: 'overview',   label: 'Overview',   minRole: 'rep'   },
+  { id: 'campaigns',  label: 'Campaigns',  minRole: 'rep'   },
+  { id: 'funnel',     label: 'Funnel',     minRole: 'rep'   },
+  { id: 'reps',       label: 'Rep stats',  minRole: 'admin' },
+  { id: 'batches',    label: 'Batches',    minRole: 'rep'   },
 ]
 
-const ROLE_RANK: Record<string, number> = { viewer: 0, rep: 1, manager: 2, admin: 3, super_admin: 4 }
+const ROLE_RANK: Record<string, number> = { rep: 1, admin: 2, super_admin: 3 }
 function canSee(tabRole: string, userRole: string) {
   return (ROLE_RANK[userRole] ?? 0) >= (ROLE_RANK[tabRole] ?? 0)
 }

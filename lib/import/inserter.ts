@@ -15,7 +15,7 @@ export interface LeadInsert {
   import_id:      string
   batch_id:       string | null
   assigned_to:    string | null
-  email:          string
+  email?:         string | null
   first_name?:    string
   last_name?:     string
   phone?:         string
@@ -65,7 +65,7 @@ export function buildLeadInsert(
     import_id:     context.importId,
     batch_id:      context.batchId,
     assigned_to:   context.assignedTo,
-    email:         row.email,
+    email:         row.email ?? null,
     custom_fields: row.custom_fields ?? {},
     source:        'csv_import',
     status:        'new',
@@ -145,7 +145,7 @@ export async function insertLeadsChunked(
       // Chunk failed after retry — log each row as an error
       console.error('[inserter] chunk insert failed:', error.message)
       for (const lead of chunk) {
-        errors.push({ email: lead.email, reason: error.message })
+        errors.push({ email: lead.email ?? '', reason: error.message })
       }
     } else {
       inserted += chunk.length

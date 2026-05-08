@@ -23,7 +23,7 @@ export async function GET(_req: Request) {
       .single() as { data: { workspace_id: string; role: string } | null }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (!['admin', 'super_admin', 'manager'].includes(member.role)) {
+    if (!['admin', 'super_admin'].includes(member.role)) {
       return NextResponse.json({ error: 'Admin role required' }, { status: 403 })
     }
 

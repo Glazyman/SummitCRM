@@ -30,9 +30,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       .single() as { data: { workspace_id: string; role: WorkspaceRole } | null; error: unknown }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (member.role === 'viewer') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
 
     const body = await req.json()
     const parsed = createFollowUpSchema.safeParse(body)
@@ -41,7 +38,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const assignedTo = parsed.data.assigned_to || user.id
-    if (!['super_admin', 'admin', 'manager'].includes(member.role) && assignedTo !== user.id) {
+    if (!['super_admin', 'admin'].includes(member.role) && assignedTo !== user.id) {
       return NextResponse.json({ error: 'Reps can only assign follow-ups to themselves' }, { status: 403 })
     }
 

@@ -4,7 +4,7 @@
 // after schema changes. Manual types are here until the CLI is configured.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type WorkspaceRole = 'super_admin' | 'admin' | 'manager' | 'rep' | 'viewer'
+export type WorkspaceRole = 'super_admin' | 'admin' | 'rep'
 
 export type LeadStatus =
   | 'new'

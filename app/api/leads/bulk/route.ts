@@ -76,7 +76,7 @@ export async function DELETE(req: NextRequest) {
   if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
 
   // Only managers/admins can bulk delete
-  if (!['admin', 'super_admin', 'manager'].includes(member.role)) {
+  if (!['admin', 'super_admin'].includes(member.role)) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 

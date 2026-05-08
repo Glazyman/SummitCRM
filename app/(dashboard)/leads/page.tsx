@@ -13,6 +13,7 @@ export default async function LeadsPage() {
   let isAdmin       = false
   let currentUserId = ''
   let workspaceId   = ''
+  let role          = 'rep'
   let leads: LeadRow[] = []
   let batches: { id: string; name: string }[] = []
   let teamMembers: { id: string; name: string }[] = []
@@ -31,18 +32,24 @@ export default async function LeadsPage() {
         .eq('is_active', true)
         .single() as { data: { role: string; workspace_id: string } | null; error: unknown }
 
-      const role = member?.role ?? 'rep'
-      isAdmin    = ['super_admin', 'admin', 'manager'].includes(role)
+      role    = member?.role ?? 'rep'
+      isAdmin = ['super_admin', 'admin'].includes(role)
       workspaceId = member?.workspace_id ?? ''
+      const isRep = role === 'rep'
+
+      let leadsQuery = supabase
+        .from('leads')
+        .select('id, workspace_id, first_name, last_name, email, phone, company, title, website, linkedin_url, status, interest_status, pipeline_stage_id, batch_id, assigned_to, created_at, updated_at')
+        .eq('workspace_id', workspaceId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1000)
+
+      // Reps only see leads assigned to them
+      if (isRep) leadsQuery = leadsQuery.eq('assigned_to', user.id)
 
       const [leadsResult, batchesResult, membersResult] = await Promise.all([
-        supabase
-          .from('leads')
-          .select('id, workspace_id, first_name, last_name, email, phone, company, title, website, linkedin_url, status, interest_status, pipeline_stage_id, batch_id, assigned_to, source, created_at, updated_at')
-          .eq('workspace_id', workspaceId)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false })
-          .limit(1000),
+        leadsQuery,
         supabase
           .from('lead_batches')
           .select('id, name')
@@ -88,7 +95,7 @@ export default async function LeadsPage() {
         pipeline_stage_id?: string | null
         batch_id: string | null
         assigned_to: string | null
-        source: string | null
+        custom_fields: Record<string, string> | null
         created_at: string
         updated_at: string
       }>).map((lead) => ({
@@ -99,6 +106,7 @@ export default async function LeadsPage() {
         assigned_name:     lead.assigned_to ? usersById.get(lead.assigned_to) ?? null : null,
         last_activity_at:  null,
         tags:              [],
+        custom_fields:     lead.custom_fields ?? {},
       }))
     }
   } catch {
@@ -117,6 +125,7 @@ export default async function LeadsPage() {
         teamMembers={teamMembers}
         isAdmin={isAdmin}
         currentUserId={currentUserId}
+        role={role}
       />
     </Suspense>
   )

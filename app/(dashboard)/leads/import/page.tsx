@@ -2,16 +2,17 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ImportPageClient } from './import-page-client'
 
 export const metadata: Metadata = { title: 'Import Leads' }
 
 export default async function ImportPage() {
-  const supabase = await createClient()
+  const supabase    = await createClient()
+  const adminClient = createAdminClient()
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch existing batches for the workspace
   const { data: memberData } = await supabase
     .from('workspace_members')
     .select('workspace_id')
@@ -21,17 +22,35 @@ export default async function ImportPage() {
 
   const workspaceId = memberData?.workspace_id
 
-  const { data: batches } = workspaceId
-    ? await supabase
-        .from('lead_batches')
-        .select('id, name')
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false }) as unknown as {
-          data: { id: string; name: string }[] | null
-        }
-    : { data: [] as { id: string; name: string }[] }
+  const [batchesResult, membersResult] = await Promise.all([
+    workspaceId
+      ? supabase
+          .from('lead_batches')
+          .select('id, name')
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false }) as unknown as { data: { id: string; name: string }[] | null }
+      : { data: [] as { id: string; name: string }[] },
 
-  const formattedBatches = (batches ?? []).map((b) => ({
+    workspaceId
+      ? (adminClient as any)
+          .from('workspace_members')
+          .select('user_id')
+          .eq('workspace_id', workspaceId)
+          .eq('is_active', true) as { data: { user_id: string }[] | null }
+      : { data: [] as { user_id: string }[] },
+  ])
+
+  const memberIds = (membersResult.data ?? []).map((m: { user_id: string }) => m.user_id)
+  const { data: usersData } = await adminClient.auth.admin.listUsers()
+  const usersById = new Map(
+    (usersData?.users ?? [])
+      .filter(u => memberIds.includes(u.id))
+      .map(u => [u.id, (u.user_metadata?.full_name as string | undefined) ?? u.email ?? u.id])
+  )
+
+  const teamMembers = memberIds.map(id => ({ id, name: usersById.get(id) ?? id }))
+
+  const formattedBatches = (batchesResult.data ?? []).map(b => ({
     id: b.id,
     name: b.name,
     leadCount: 0,
@@ -39,12 +58,8 @@ export default async function ImportPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
       <div className="flex items-center gap-4">
-        <Link
-          href="/leads"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
+        <Link href="/leads" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
           Back to Leads
         </Link>
@@ -57,7 +72,7 @@ export default async function ImportPage() {
         </p>
       </div>
 
-      <ImportPageClient batches={formattedBatches} />
+      <ImportPageClient batches={formattedBatches} teamMembers={teamMembers} />
     </div>
   )
 }

@@ -6,17 +6,18 @@ import { ImportWizard }   from '@/components/leads/import/import-wizard'
 import { ImportHistory }  from '@/components/leads/import/import-history'
 import { cn }             from '@/lib/utils'
 import type {
-  ExistingBatch, ParsedFile, FieldMapping, ImportOptions, ImportResult,
+  ExistingBatch, ParsedFile, FieldMapping, ImportOptions, ImportResult, CustomFieldNames,
 } from '@/components/leads/import/types'
 import type { ImportRecord } from '@/components/leads/import/import-history'
 
 interface ImportPageClientProps {
-  batches: ExistingBatch[]
+  batches:     ExistingBatch[]
+  teamMembers: { id: string; name: string }[]
 }
 
 type Tab = 'import' | 'history'
 
-export function ImportPageClient({ batches }: ImportPageClientProps) {
+export function ImportPageClient({ batches, teamMembers }: ImportPageClientProps) {
   const [activeTab, setActiveTab]       = useState<Tab>('import')
   const [historyRecords, setHistoryRecords] = useState<ImportRecord[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -25,22 +26,26 @@ export function ImportPageClient({ batches }: ImportPageClientProps) {
   async function handleImport({
     file,
     mapping,
+    customFieldNames,
     options,
   }: {
-    file:    ParsedFile
-    mapping: FieldMapping
-    options: ImportOptions
+    file:             ParsedFile
+    mapping:          FieldMapping
+    customFieldNames: CustomFieldNames
+    options:          ImportOptions
   }): Promise<ImportResult> {
     const res = await fetch('/api/leads/import/start', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        rows:          file.rawData,
+        rows:             file.rawData,
         mapping,
-        batchId:       options.batchId ?? null,
-        newBatchName:  options.newBatchName,
-        duplicateMode: options.duplicateMode,
-        fileName:      file.name,
+        customFieldNames,
+        batchId:          options.batchId ?? null,
+        newBatchName:     options.newBatchName,
+        duplicateMode:    options.duplicateMode,
+        assignedTo:       options.assignedTo ?? null,
+        fileName:         file.name,
       }),
     })
 
@@ -85,13 +90,14 @@ export function ImportPageClient({ batches }: ImportPageClientProps) {
         data?: {
           items: Array<{
             id:           string
+            fileName:     string
             status:       string
             totalRows:    number
             importedRows: number
             failedRows:   number
             batch:        { id: string; name: string } | null
             createdAt:    string
-            updatedAt:    string
+            completedAt:  string | null
             hasErrors:    boolean
           }>
         }
@@ -101,7 +107,7 @@ export function ImportPageClient({ batches }: ImportPageClientProps) {
       if (json.data?.items) {
         const records: ImportRecord[] = json.data.items.map((item) => ({
           id:          item.id,
-          fileName:    `import-${item.id.slice(0, 8)}`,
+          fileName:    item.fileName,
           status:      item.status as ImportRecord['status'],
           totalRows:   item.totalRows,
           importedRows: item.importedRows,
@@ -109,7 +115,10 @@ export function ImportPageClient({ batches }: ImportPageClientProps) {
           batchName:   item.batch?.name,
           batchId:     item.batch?.id,
           createdAt:   item.createdAt,
-          completedAt: item.status !== 'processing' ? item.updatedAt : undefined,
+          completedAt:
+            item.status !== 'processing' && item.completedAt
+              ? item.completedAt
+              : undefined,
           hasErrors:   item.hasErrors,
         }))
         setHistoryRecords(records)
@@ -148,6 +157,7 @@ export function ImportPageClient({ batches }: ImportPageClientProps) {
       {activeTab === 'import' ? (
         <ImportWizard
           batches={batches}
+          teamMembers={teamMembers}
           onImport={handleImport}
         />
       ) : (

@@ -29,7 +29,6 @@ export const MOCK_LEAD: LeadDetail = {
   assigned_to:     'u1',
   assigned_name:   'Alice Chen',
   assigned_avatar: null,
-  source:          'csv_import',
   ai_summary:      'James is actively evaluating outreach tools for a 30-person sales team. Key pain points: manual follow-ups and email tracking. Decision timeline: Q3 2026.',
   custom_fields: {
     linkedin_followers: '2,400',

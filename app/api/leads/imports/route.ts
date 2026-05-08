@@ -18,12 +18,22 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return apiUnauthorized()
 
-    const claims      = user.app_metadata as { workspace_id?: string; workspace_role?: string }
-    const workspaceId = claims.workspace_id
-    const role        = claims.workspace_role
+    const admin = createAdminClient()
+    const { data: member, error: memberErr } = await (admin as any)
+      .from('workspace_members')
+      .select('workspace_id, role, is_active')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
 
-    if (!workspaceId) return apiError('Not a workspace member', 403)
-    if (!role || !['super_admin', 'admin', 'manager', 'rep'].includes(role)) {
+    if (memberErr || !member) {
+      return apiError('User is not an active member of any workspace', 403)
+    }
+
+    const workspaceId = member.workspace_id
+    const role        = member.role
+
+    if (!['super_admin', 'admin', 'rep'].includes(role)) {
       return apiError('Insufficient permissions', 403)
     }
 
@@ -34,33 +44,33 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit
 
     // ── Query ──────────────────────────────────────────────────────────
-    const admin = createAdminClient()
-
-    // Managers and reps only see their own imports; admins see all
-    const isAdmin = ['super_admin', 'admin', 'manager'].includes(role)
+    // RLS parity: reps see only their imports; manager+ see all workspace imports
+    const seesAllImports = ['super_admin', 'admin'].includes(role)
 
     const baseQuery = admin
       .from('lead_imports')
       .select(`
         id,
         status,
+        file_name,
         total_rows,
         imported_rows,
         failed_rows,
         field_mapping,
         storage_path,
         created_at,
-        updated_at,
-        imported_by,
+        completed_at,
+        created_by,
+        batch_id,
         lead_batches ( id, name, lead_count )
       `, { count: 'exact' })
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    const query = isAdmin
+    const query = seesAllImports
       ? baseQuery
-      : baseQuery.eq('imported_by', user.id)
+      : baseQuery.eq('created_by', user.id)
 
     const { data: records, error, count } = await query as {
       data: ImportListRow[] | null
@@ -75,14 +85,15 @@ export async function GET(request: NextRequest) {
 
     const items = (records ?? []).map((r) => ({
       id:           r.id,
+      fileName:     r.file_name,
       status:       r.status,
       totalRows:    r.total_rows,
       importedRows: r.imported_rows,
       failedRows:   r.failed_rows,
       batch:        r.lead_batches ?? null,
-      importedBy:   r.imported_by,
+      createdBy:    r.created_by,
       createdAt:    r.created_at,
-      updatedAt:    r.updated_at,
+      completedAt:  r.completed_at,
       hasErrors:    (r.failed_rows ?? 0) > 0,
       successRate:
         r.total_rows > 0
@@ -109,6 +120,7 @@ export async function GET(request: NextRequest) {
 // ── Private types ─────────────────────────────────────────────────────────
 interface ImportListRow {
   id:            string
+  file_name:     string
   status:        string
   total_rows:    number
   imported_rows: number
@@ -116,7 +128,8 @@ interface ImportListRow {
   field_mapping: Record<string, string>
   storage_path:  string | null
   created_at:    string
-  updated_at:    string
-  imported_by:   string
+  completed_at:  string | null
+  created_by:    string
+  batch_id:      string | null
   lead_batches:  { id: string; name: string; lead_count: number } | null
 }

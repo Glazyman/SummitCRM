@@ -3,12 +3,23 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Settings, MoreHorizontal, GripVertical, User, Building2 } from 'lucide-react'
+import {
+  Plus, Settings, MoreHorizontal, GripVertical, User, Building2,
+  X, Mail, Phone, Globe, ExternalLink, ChevronDown,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { INTEREST_CONFIG } from '@/components/leads/status-config'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu'
+import {
+  INTEREST_CONFIG, ALL_INTEREST_STATUSES,
+  STATUS_CONFIG, ALL_STATUSES,
+} from '@/components/leads/status-config'
 import type { InterestStatus } from '@/types/database'
+import type { LeadStatus } from '@/components/leads/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface PipelineStage {
@@ -54,6 +65,9 @@ export default function PipelineClient({ stages, initialLeads, isAdmin }: Props)
   const [draggingId, setDraggingId] = React.useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = React.useState<string | null>(null)
   const [search, setSearch] = React.useState('')
+  const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
+  // track whether a drag just happened so card click doesn't open drawer
+  const didDragRef = React.useRef(false)
 
   // Sync with server component data after router.refresh()
   React.useEffect(() => {
@@ -96,8 +110,14 @@ export default function PipelineClient({ stages, initialLeads, isAdmin }: Props)
     return leadsByStage.get(stageId)?.length ?? 0
   }
 
+  // ── Drawer lead patch (optimistic) ───────────────────────────────────
+  function patchLead(leadId: string, patch: Partial<PipelineLead>) {
+    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, ...patch } : l))
+  }
+
   // ── Drag and drop ────────────────────────────────────────────────────
   function handleDragStart(e: React.DragEvent, leadId: string) {
+    didDragRef.current = true
     setDraggingId(leadId)
     e.dataTransfer.effectAllowed = 'move'
   }
@@ -105,6 +125,8 @@ export default function PipelineClient({ stages, initialLeads, isAdmin }: Props)
   function handleDragEnd() {
     setDraggingId(null)
     setDragOverStage(null)
+    // reset after a tick so the click handler (which fires after dragend) can check
+    setTimeout(() => { didDragRef.current = false }, 0)
   }
 
   function handleDragOver(e: React.DragEvent, stageId: string) {
@@ -256,6 +278,9 @@ export default function PipelineClient({ stages, initialLeads, isAdmin }: Props)
                         isDragging={draggingId === lead.id}
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
+                        onOpen={() => {
+                          if (!didDragRef.current) setSelectedLeadId(lead.id)
+                        }}
                       />
                     ))
                   )}
@@ -280,6 +305,21 @@ export default function PipelineClient({ stages, initialLeads, isAdmin }: Props)
           })}
         </div>
       </div>
+      {/* ── Lead drawer ── */}
+      {selectedLeadId && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/20"
+            onClick={() => setSelectedLeadId(null)}
+          />
+          <LeadDrawer
+            leadId={selectedLeadId}
+            onClose={() => setSelectedLeadId(null)}
+            onLeadChange={(patch) => patchLead(selectedLeadId, patch)}
+          />
+        </>
+      )}
     </div>
   )
 }
@@ -290,11 +330,13 @@ function LeadCard({
   isDragging,
   onDragStart,
   onDragEnd,
+  onOpen,
 }: {
   lead:         PipelineLead
   isDragging:   boolean
   onDragStart:  (e: React.DragEvent, id: string) => void
   onDragEnd:    () => void
+  onOpen:       () => void
 }) {
   const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
   const interestMeta = INTEREST_CONFIG[lead.interest_status as InterestStatus]
@@ -304,10 +346,11 @@ function LeadCard({
       draggable
       onDragStart={(e) => onDragStart(e, lead.id)}
       onDragEnd={onDragEnd}
+      onClick={onOpen}
       className={cn(
-        'group relative rounded-xl border bg-background p-3 cursor-grab active:cursor-grabbing transition-all duration-150',
+        'group relative rounded-xl border bg-background p-3 cursor-pointer transition-all duration-150',
         isDragging
-          ? 'opacity-50 scale-95 border-primary/50 shadow-none'
+          ? 'opacity-50 scale-95 border-primary/50 shadow-none cursor-grabbing'
           : 'border-border hover:border-primary/30 hover:shadow-sm'
       )}
     >
@@ -316,14 +359,10 @@ function LeadCard({
         <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
       </div>
 
-      {/* Lead name + link */}
-      <Link
-        href={`/leads/${lead.id}`}
-        onClick={(e) => e.stopPropagation()}
-        className="block font-medium text-sm text-foreground hover:text-primary transition-colors leading-tight mb-1 pr-5 truncate"
-      >
+      {/* Lead name */}
+      <p className="font-medium text-sm text-foreground leading-tight mb-1 pr-5 truncate">
         {name}
-      </Link>
+      </p>
 
       {/* Company */}
       {lead.company && (
@@ -344,12 +383,239 @@ function LeadCard({
       {/* Interest badge */}
       <div className="flex items-center justify-between mt-2">
         <span className={cn(
-          'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border',
+          'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap',
           interestMeta.badge
         )}>
           {interestMeta.icon} {interestMeta.label}
         </span>
       </div>
+    </div>
+  )
+}
+
+// ── Lead drawer ────────────────────────────────────────────────────────────
+interface FullLead {
+  id:              string
+  first_name:      string | null
+  last_name:       string | null
+  email:           string
+  phone:           string | null
+  company:         string | null
+  title:           string | null
+  website:         string | null
+  status:          LeadStatus
+  interest_status: InterestStatus
+}
+
+function LeadDrawer({
+  leadId,
+  onClose,
+  onLeadChange,
+}: {
+  leadId:        string
+  onClose:       () => void
+  onLeadChange:  (patch: Partial<PipelineLead>) => void
+}) {
+  const [lead, setLead]       = React.useState<FullLead | null>(null)
+  const [loading, setLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    setLoading(true)
+    setLead(null)
+    fetch(`/api/leads/${leadId}`)
+      .then((r) => r.json())
+      .then((d) => setLead(d.lead ?? null))
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [leadId])
+
+  async function changeStatus(status: LeadStatus) {
+    if (!lead) return
+    setLead((l) => l ? { ...l, status } : l)
+    onLeadChange({ status })
+    await fetch(`/api/leads/${leadId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }).catch(console.error)
+  }
+
+  async function changeInterest(interest_status: InterestStatus) {
+    if (!lead) return
+    setLead((l) => l ? { ...l, interest_status } : l)
+    onLeadChange({ interest_status })
+    await fetch(`/api/leads/${leadId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interest_status }),
+    }).catch(console.error)
+  }
+
+  const name = lead
+    ? [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
+    : '…'
+
+  const statusMeta   = lead ? STATUS_CONFIG[lead.status] : null
+  const interestMeta = lead ? INTEREST_CONFIG[lead.interest_status] : null
+
+  return (
+    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-border bg-card shadow-xl">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+        <div className="min-w-0">
+          <p className="font-semibold leading-tight truncate">{name}</p>
+          {lead?.company && (
+            <p className="mt-0.5 text-sm text-muted-foreground truncate">{lead.company}</p>
+          )}
+          {lead?.title && !lead.company && (
+            <p className="mt-0.5 text-sm text-muted-foreground truncate">{lead.title}</p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Link
+            href={`/leads/${leadId}`}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            title="View full profile"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-foreground" />
+        </div>
+      )}
+
+      {!loading && lead && (
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+
+          {/* Status + Interest badges */}
+          <div className="flex flex-wrap gap-2">
+            {/* Status dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:opacity-80 transition-opacity',
+                    statusMeta?.badge
+                  )}
+                >
+                  {statusMeta?.label}
+                  <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" minWidth="170px">
+                <DropdownMenuLabel>Change status</DropdownMenuLabel>
+                {ALL_STATUSES.map((s) => {
+                  const m = STATUS_CONFIG[s]
+                  return (
+                    <DropdownMenuItem
+                      key={s}
+                      onClick={() => changeStatus(s)}
+                      className={cn(s === lead.status && 'opacity-50 cursor-default')}
+                    >
+                      <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
+                      {m.label}
+                      {s === lead.status && (
+                        <span className="ml-auto text-xs text-muted-foreground">current</span>
+                      )}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Interest dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:opacity-80 transition-opacity',
+                    interestMeta?.badge
+                  )}
+                >
+                  {interestMeta?.label}
+                  <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" minWidth="160px">
+                <DropdownMenuLabel>Interest level</DropdownMenuLabel>
+                {ALL_INTEREST_STATUSES.map((s) => {
+                  const m = INTEREST_CONFIG[s]
+                  return (
+                    <DropdownMenuItem
+                      key={s}
+                      onClick={() => changeInterest(s)}
+                      className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}
+                    >
+                      <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
+                      {m.label}
+                      {s === lead.interest_status && (
+                        <span className="ml-auto text-xs text-muted-foreground">current</span>
+                      )}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Contact info */}
+          <div className="space-y-3">
+            <a
+              href={`mailto:${lead.email}`}
+              className="flex items-center gap-2.5 text-sm text-primary hover:underline"
+            >
+              <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate">{lead.email}</span>
+            </a>
+
+            {lead.phone && (
+              <a
+                href={`tel:${lead.phone}`}
+                className="flex items-center gap-2.5 text-sm hover:underline"
+              >
+                <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                {lead.phone}
+              </a>
+            )}
+
+            {lead.website && (
+              <a
+                href={lead.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2.5 text-sm text-primary hover:underline"
+              >
+                <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{lead.website.replace(/^https?:\/\//, '')}</span>
+              </a>
+            )}
+          </div>
+
+          {/* Full profile link */}
+          <div className="pt-2 border-t border-border">
+            <Link
+              href={`/leads/${leadId}`}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              View full profile
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

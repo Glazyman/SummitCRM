@@ -11,12 +11,19 @@ import type { MappedRawRow } from './validator'
 
 // ── Types re-exported for convenience ─────────────────────────────────────
 export type CrmFieldKey =
-  | 'email'
+  | 'full_name'
   | 'first_name'
   | 'last_name'
+  | 'email'
+  | 'email_2'
+  | 'email_3'
   | 'phone'
+  | 'phone_2'
+  | 'phone_3'
+  | 'company_phone'
   | 'title'
   | 'company'
+  | 'contact_state'
   | 'website'
   | 'linkedin_url'
   | 'custom'
@@ -24,11 +31,16 @@ export type CrmFieldKey =
 
 export type FieldMapping = Record<string, CrmFieldKey>
 
-/** Standard CRM fields (used for mapping UI labels and validation) */
+/** Fields that map directly onto lead columns */
 export const STANDARD_CRM_FIELDS: CrmFieldKey[] = [
   'email', 'first_name', 'last_name', 'phone',
   'title', 'company', 'website', 'linkedin_url',
 ]
+
+/** Fields stored in custom_fields JSON for secondary contact info */
+const CUSTOM_FIELD_KEYS = new Set<CrmFieldKey>([
+  'email_2', 'email_3', 'phone_2', 'phone_3', 'company_phone', 'contact_state',
+])
 
 // ── Core mapper ────────────────────────────────────────────────────────────
 /**
@@ -45,7 +57,8 @@ export const STANDARD_CRM_FIELDS: CrmFieldKey[] = [
  */
 export function applyMapping(
   rawRow: Record<string, string>,
-  mapping: FieldMapping
+  mapping: FieldMapping,
+  customFieldNames: Record<string, string> = {}
 ): MappedRawRow {
   const result: Record<string, string | Record<string, string>> = {}
   const customFields: Record<string, string> = {}
@@ -54,11 +67,23 @@ export function applyMapping(
     if (crmField === 'ignore') continue
 
     const value = rawRow[csvColumn]?.trim() ?? ''
-    if (!value) continue // skip empty values — don't overwrite defaults with empty
+    if (!value) continue
 
-    if (crmField === 'custom') {
-      // Store using sanitised column name as key (lowercase, no spaces)
-      const key = sanitiseCustomKey(csvColumn)
+    if (crmField === 'full_name') {
+      // Split "First Last" into first_name + last_name
+      const parts = value.trim().split(/\s+/)
+      if (parts.length >= 2) {
+        result.first_name = parts[0]
+        result.last_name  = parts.slice(1).join(' ')
+      } else {
+        result.first_name = parts[0]
+      }
+    } else if (CUSTOM_FIELD_KEYS.has(crmField)) {
+      // Secondary contact info → stored in custom_fields
+      customFields[crmField] = value
+    } else if (crmField === 'custom') {
+      const displayName = customFieldNames[csvColumn]?.trim()
+      const key = displayName ? sanitiseCustomKey(displayName) : sanitiseCustomKey(csvColumn)
       customFields[key] = value
     } else {
       result[crmField] = value
@@ -74,13 +99,13 @@ export function applyMapping(
 
 /**
  * Apply mapping to all rows in the file.
- * Returns an array of MappedRawRow in the same order as input.
  */
 export function applyMappingToAll(
   rows: Record<string, string>[],
-  mapping: FieldMapping
+  mapping: FieldMapping,
+  customFieldNames: Record<string, string> = {}
 ): MappedRawRow[] {
-  return rows.map((row) => applyMapping(row, mapping))
+  return rows.map((row) => applyMapping(row, mapping, customFieldNames))
 }
 
 // ── Auto-detection ─────────────────────────────────────────────────────────
@@ -92,31 +117,35 @@ export function autoDetectField(csvHeader: string): CrmFieldKey {
   // Normalise: lowercase, remove separators
   const s = csvHeader.toLowerCase().replace(/[\s_\-\.]/g, '')
 
+  // Full name
+  if (s === 'name' || s === 'fullname' || s === 'contactfullname' || s === 'contactname') return 'full_name'
+  if (s === 'firstname' || s === 'fname' || s === 'first' || s === 'givenname') return 'ignore'
+  if (s === 'lastname'  || s === 'lname' || s === 'last'  || s === 'surname' || s === 'familyname') return 'ignore'
+
+  // Emails
+  if (s === 'email1' || s === 'email' || s === 'emailaddress') return 'email'
+  if (s === 'email2') return 'email_2'
+  if (s === 'email3' || s === 'contactemail') return 'email_3'
+  if (s.includes('emailvalid') || s.includes('emailtotal')) return 'ignore'
   if (s.includes('email') || s.includes('mail')) return 'email'
 
-  if (s === 'firstname' || s === 'fname' || s === 'first' ||
-      s === 'givenname' || s === 'forename') return 'first_name'
+  // Phones
+  if (s === 'contactphone1' || s === 'phone1' || s === 'phone' || s === 'mobile') return 'phone'
+  if (s === 'contactphone2' || s === 'phone2') return 'phone_2'
+  if (s === 'contactphone3' || s === 'phone3') return 'phone_3'
+  if (s.includes('companyphone') || s.includes('businessphone')) return 'company_phone'
+  if (s.includes('phone') || s.includes('mobile') || s.includes('tel') || s.includes('cell')) return 'phone'
 
-  if (s === 'lastname'  || s === 'lname'  || s === 'last'  ||
-      s === 'surname'   || s === 'familyname') return 'last_name'
+  // LinkedIn — must come before generic URL/website checks
+  if (s.includes('linkedin') || s === 'liprofile' || s === 'contactliprofileurl') return 'linkedin_url'
 
-  // "name" by itself → first_name (most common)
-  if (s === 'name' || s === 'fullname' || s === 'contactname') return 'first_name'
+  // Other standard fields
+  if (s.includes('company') || s === 'organization' || s === 'org' || s === 'employer') return 'company'
+  if (s.includes('title') || s === 'jobtitle' || s === 'position' || s === 'designation') return 'title'
+  if (s.includes('website') || s === 'domain' || s === 'site' || s === 'web') return 'website'
 
-  if (s.includes('company')  || s === 'organization' ||
-      s === 'org'            || s === 'employer'      ||
-      s === 'firm'           || s === 'business') return 'company'
-
-  if (s.includes('title')    || s === 'jobtitle'     || s === 'position' ||
-      s === 'role'           || s === 'designation') return 'title'
-
-  if (s.includes('phone')    || s.includes('mobile') || s.includes('tel') ||
-      s.includes('cell')     || s === 'contact') return 'phone'
-
-  if (s.includes('website')  || s === 'domain'       || s === 'site' ||
-      s === 'web'            || s === 'url') return 'website'
-
-  if (s.includes('linkedin') || s === 'li' || s === 'linkedinprofile') return 'linkedin_url'
+  // State / location
+  if (s === 'contactstate' || s === 'contactstateabbr' || s === 'state' || s === 'stateabbr' || s === 'province') return 'contact_state'
 
   return 'ignore'
 }

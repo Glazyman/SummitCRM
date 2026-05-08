@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { NOTIFICATION_META } from './types'
 import type { NotificationPreference, NotificationType } from './types'
 
-const ALL_TYPES = Object.keys(NOTIFICATION_META) as NotificationType[]
+const ALL_TYPES: NotificationType[] = ['lead_assigned', 'follow_up_due']
 
 /** Build a full preferences array from API response — fills defaults for any missing type */
 function normPrefs(raw: NotificationPreference[]): NotificationPreference[] {

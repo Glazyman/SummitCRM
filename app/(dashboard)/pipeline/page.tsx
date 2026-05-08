@@ -52,7 +52,7 @@ export default async function PipelinePage() {
     assigned_to: string | null; batch_id: string | null; created_at: string; updated_at: string
   }>
 
-  const isAdmin = ['admin', 'super_admin', 'manager'].includes(member.role)
+  const isAdmin = ['admin', 'super_admin'].includes(member.role)
 
   // If no stages exist yet, use defaults (will be seeded on first load)
   const defaultStages = stages.length === 0 ? [

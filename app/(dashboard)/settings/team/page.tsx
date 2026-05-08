@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
 import TeamSettingsClient from './team-settings-client'
 
-export const metadata: Metadata = { title: 'Team — Summits CRM' }
+export const metadata: Metadata = { title: 'Team Members — Settings' }
 
 export default async function TeamPage() {
   const supabase = await createClient() as any
@@ -17,7 +19,7 @@ export default async function TeamPage() {
     .eq('is_active', true)
     .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
 
-  if (!currentMember || !['admin', 'super_admin', 'manager'].includes(currentMember.role)) {
+  if (!currentMember || !['admin', 'super_admin'].includes(currentMember.role)) {
     redirect('/settings')
   }
 
@@ -37,11 +39,16 @@ export default async function TeamPage() {
   const isAdmin = ['admin', 'super_admin'].includes(currentMember.role)
 
   return (
-    <TeamSettingsClient
-      workspaceId={currentMember.workspace_id}
-      currentUserId={user.id}
-      isAdmin={isAdmin}
-      pendingInvitations={invitations ?? []}
-    />
+    <div className="space-y-4">
+      <Link href="/settings" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="h-4 w-4" /> Settings
+      </Link>
+      <TeamSettingsClient
+        workspaceId={currentMember.workspace_id}
+        currentUserId={user.id}
+        isAdmin={isAdmin}
+        pendingInvitations={invitations ?? []}
+      />
+    </div>
   )
 }

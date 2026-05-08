@@ -32,21 +32,31 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return apiUnauthorized()
 
-  const claims      = user.app_metadata as { workspace_id?: string }
-  const workspaceId = claims.workspace_id
-  if (!workspaceId) return apiError('Not a workspace member', 403)
+  const admin = createAdminClient()
+  const { data: member, error: memberErr } = await (admin as any)
+    .from('workspace_members')
+    .select('workspace_id, role, is_active')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
+
+  if (memberErr || !member) {
+    return apiError('User is not an active member of any workspace', 403)
+  }
+
+  const workspaceId = member.workspace_id
 
   // ── Fetch import error_log ───────────────────────────────────────────
-  const admin = createAdminClient()
 
   const { data: record, error } = await admin
     .from('lead_imports')
-    .select('id, workspace_id, error_log, status, total_rows, failed_rows, created_at')
+    .select('id, workspace_id, created_by, error_log, status, total_rows, failed_rows, created_at')
     .eq('id', importId)
     .single() as {
       data: {
         id:           string
         workspace_id: string
+        created_by:   string
         error_log:    ImportError[] | null
         status:       string
         total_rows:   number
@@ -58,6 +68,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   if (error || !record) return apiNotFound('Import')
   if (record.workspace_id !== workspaceId) return apiError('Forbidden', 403)
+  if (member.role === 'rep' && record.created_by !== user.id) {
+    return apiError('Forbidden', 403)
+  }
 
   const errors: ImportError[] = record.error_log ?? []
 

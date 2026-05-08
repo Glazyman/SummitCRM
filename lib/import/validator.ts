@@ -49,10 +49,10 @@ function normaliseLinkedIn(s?: string): string | undefined {
 export const mappedRowSchema = z.object({
   email: z
     .string()
-    .min(1, 'Email is required')
     .max(254, 'Email exceeds maximum length')
     .email('Invalid email format')
-    .transform((v) => v.toLowerCase().trim()),
+    .transform((v) => v.toLowerCase().trim())
+    .optional(),
 
   first_name: z
     .string()
@@ -157,7 +157,7 @@ export function validateRows(rows: MappedRawRow[]): ValidationResult {
  */
 export function preflightCheck(
   rows: Record<string, string>[],
-  emailColumn: string
+  emailColumn: string | undefined
 ): { ok: boolean; reason?: string } {
   if (rows.length === 0) {
     return { ok: false, reason: 'File contains no data rows.' }
@@ -168,25 +168,9 @@ export function preflightCheck(
       reason: `File contains ${rows.length.toLocaleString()} rows. Maximum is ${MAX_ROWS_PER_IMPORT.toLocaleString()}.`,
     }
   }
-
-  // Check email column exists in first row
-  const firstRow = rows[0]
-  if (!(emailColumn in firstRow)) {
+  // Email is optional — only validate the column exists if one was mapped
+  if (emailColumn && !(emailColumn in rows[0])) {
     return { ok: false, reason: `Column "${emailColumn}" not found in file headers.` }
   }
-
-  // Sample first 10 rows for email validity
-  const sample = rows.slice(0, 10)
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  for (const row of sample) {
-    const email = row[emailColumn]?.trim()
-    if (!email) {
-      return { ok: false, reason: 'First few rows have no email value. Confirm the correct column is mapped to Email.' }
-    }
-    if (!emailRegex.test(email)) {
-      return { ok: false, reason: `Sample email "${email}" is not a valid email address. Check field mapping.` }
-    }
-  }
-
   return { ok: true }
 }

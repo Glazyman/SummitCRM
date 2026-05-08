@@ -6,6 +6,42 @@ import type { LeadStatus, WorkspaceRole } from '@/types/database'
 
 type Params = { params: Promise<{ id: string }> }
 
+// ── GET /api/leads/:id ────────────────────────────────────────────────────
+export async function GET(_req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params
+    const cookieStore = await cookies()
+    const supabase = (await createServerClient(cookieStore)) as unknown as ReturnType<typeof createAdminClient>
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: member } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single() as { data: { workspace_id: string } | null; error: unknown }
+
+    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+
+    const { data: lead, error } = await supabase
+      .from('leads')
+      .select('id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, interest_status, pipeline_stage_id, assigned_to, batch_id, ai_summary, custom_fields, created_at, updated_at')
+      .eq('id', id)
+      .eq('workspace_id', member.workspace_id)
+      .is('deleted_at', null)
+      .single()
+
+    if (error || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+
+    return NextResponse.json({ lead })
+  } catch (err) {
+    console.error('[GET /api/leads/[id]]', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 // All current lead_status enum values (original + extended)
 const leadStatusSchema = z.enum([
   'new',
@@ -76,9 +112,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       .single() as { data: { workspace_id: string; role: WorkspaceRole } | null; error: unknown }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (member.role === 'viewer') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
 
     const body = await req.json()
     const parsed = patchSchema.safeParse(body)
@@ -157,7 +190,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         id, workspace_id, first_name, last_name, email, phone, title,
         company, website, linkedin_url, status, interest_status,
         pipeline_stage_id, is_unsubscribed, batch_id, assigned_to,
-        source, ai_summary, custom_fields, created_at, updated_at
+        ai_summary, custom_fields, created_at, updated_at
       `)
       .single()
 
@@ -206,6 +239,42 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ lead })
   } catch (err) {
     console.error('[PATCH /api/leads/[id]]', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// ── DELETE /api/leads/:id ─────────────────────────────────────────────────
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params
+    const cookieStore = await cookies()
+    const supabase = (await createServerClient(cookieStore)) as unknown as ReturnType<typeof createAdminClient>
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: member } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single() as { data: { workspace_id: string } | null; error: unknown }
+
+    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+
+    // Hard delete via admin client (bypasses RLS)
+    const admin = createAdminClient()
+    const { error } = await admin
+      .from('leads')
+      .delete()
+      .eq('id', id)
+      .eq('workspace_id', member.workspace_id)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('[DELETE /api/leads/[id]]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

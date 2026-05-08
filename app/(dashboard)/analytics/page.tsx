@@ -20,7 +20,7 @@ export default async function AnalyticsPage() {
     .single() as { data: { role: string } | null }
 
   const role = member?.role ?? 'rep'
-  if (role === 'viewer') redirect('/dashboard')
+  if (false) redirect('/dashboard')
 
   return <AnalyticsClient userRole={role} userId={user.id} />
 }
