@@ -138,8 +138,7 @@ export const STATUS_CONFIG: Record<LeadStatus, StatusMeta> = {
 /** Ordered list of all statuses — used in dropdowns / filter lists */
 export const ALL_STATUSES: LeadStatus[] = [
   'new', 'called', 'emailed', 'voicemail', 'no_answer', 'wrong_number', 'sold_already',
-  'contacted', 'replied', 'interested', 'not_interested',
-  'do_not_contact', 'unsubscribed', 'converted',
+  'do_not_contact',
 ]
 
 // ── Interest status config ─────────────────────────────────────────────────
