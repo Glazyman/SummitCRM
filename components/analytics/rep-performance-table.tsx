@@ -1,14 +1,10 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
-import { Users, Phone, Calendar, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown, Trophy } from 'lucide-react'
-import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+import React from 'react'
+import { Phone, Calendar, AlertTriangle, CheckCircle2, Users } from 'lucide-react'
+import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { cn } from '@/lib/utils'
 import type { RepRow } from './types'
-
-type SortKey = keyof Pick<RepRow, 'calls' | 'calls_answered' | 'follow_ups_completed' | 'follow_ups_overdue' | 'leads_assigned'>
 
 const OUTCOME_COLORS: Record<string, string> = {
   answered:     '#10b981',
@@ -22,243 +18,204 @@ function initials(name: string | null, email: string) {
   return email[0]?.toUpperCase() ?? '?'
 }
 
-// ── Team-wide donut ───────────────────────────────────────────────────────
-function TeamDonut({ reps }: { reps: RepRow[] }) {
-  const answered  = reps.reduce((s, r) => s + r.calls_answered, 0)
-  const voicemail = reps.reduce((s, r) => s + r.calls_voicemail, 0)
-  const noAnswer  = reps.reduce((s, r) => s + r.calls_no_answer, 0)
-  const wrong     = reps.reduce((s, r) => s + r.calls_wrong_number, 0)
-  const total     = answered + voicemail + noAnswer + wrong
-
+// ── Per-rep donut ──────────────────────────────────────────────────────────
+function RepDonut({ rep }: { rep: RepRow }) {
   const data = [
-    { name: 'Answered',  value: answered,  color: OUTCOME_COLORS.answered  },
-    { name: 'Voicemail', value: voicemail, color: OUTCOME_COLORS.voicemail },
-    { name: 'No Answer', value: noAnswer,  color: OUTCOME_COLORS.no_answer },
-    { name: 'Wrong #',   value: wrong,     color: OUTCOME_COLORS.wrong_number },
+    { name: 'Answered',  value: rep.calls_answered,     color: OUTCOME_COLORS.answered  },
+    { name: 'Voicemail', value: rep.calls_voicemail,    color: OUTCOME_COLORS.voicemail },
+    { name: 'No Answer', value: rep.calls_no_answer,    color: OUTCOME_COLORS.no_answer },
+    { name: 'Wrong #',   value: rep.calls_wrong_number, color: OUTCOME_COLORS.wrong_number },
   ].filter(d => d.value > 0)
 
-  if (total === 0) return <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">No calls in this period</div>
+  if (rep.calls === 0) {
+    return (
+      <div className="flex h-[120px] items-center justify-center text-xs text-muted-foreground/50">
+        No calls
+      </div>
+    )
+  }
 
   return (
     <div className="relative">
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={120}>
         <PieChart>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={60} outerRadius={82} paddingAngle={2} dataKey="value" strokeWidth={0}>
+          <Pie data={data} cx="50%" cy="50%" innerRadius={34} outerRadius={50} paddingAngle={2} dataKey="value" strokeWidth={0}>
             {data.map((d, i) => <Cell key={i} fill={d.color} />)}
           </Pie>
-          <RTooltip formatter={(v) => [String(v)]} contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', background: 'hsl(var(--popover))' }} />
+          <RTooltip
+            formatter={(v) => [String(v)]}
+            contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '11px', background: 'hsl(var(--popover))' }}
+          />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold">{total}</span>
-        <span className="text-[11px] text-muted-foreground">total calls</span>
-      </div>
-      <div className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1">
-        {data.map(d => (
-          <div key={d.name} className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <span className="h-2 w-2 rounded-full" style={{ background: d.color }} />
-            {d.name} — {d.value}
-          </div>
-        ))}
+        <span className="text-xl font-bold">{rep.calls}</span>
+        <span className="text-[10px] text-muted-foreground">calls</span>
       </div>
     </div>
   )
 }
 
-// ── Calls by rep bar chart ────────────────────────────────────────────────
-function CallsByRepChart({ reps }: { reps: RepRow[] }) {
-  const data = reps.slice(0, 10).map(r => ({
-    name:     r.full_name?.split(' ')[0] ?? r.user_email.split('@')[0],
-    answered: r.calls_answered,
-    voicemail: r.calls_voicemail,
-    no_answer: r.calls_no_answer,
-    wrong:    r.calls_wrong_number,
-  }))
-
-  if (data.length === 0) return <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">No data</div>
+// ── Single rep card ────────────────────────────────────────────────────────
+function RepCard({ rep, rank }: { rep: RepRow; rank: number }) {
+  const answerRate  = rep.calls > 0 ? Math.round(rep.calls_answered / rep.calls * 100) : 0
+  const fuTotal     = rep.follow_ups_pending + rep.follow_ups_completed
+  const fuPct       = fuTotal > 0 ? Math.round(rep.follow_ups_completed / fuTotal * 100) : 0
+  const maxOutcome  = Math.max(rep.calls_answered, rep.calls_voicemail, rep.calls_no_answer, rep.calls_wrong_number, 1)
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-        <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-        <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={60} />
-        <RTooltip contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', background: 'hsl(var(--popover))' }} />
-        <Bar dataKey="answered"  name="Answered"  stackId="a" fill={OUTCOME_COLORS.answered}  radius={[0, 0, 0, 0]} />
-        <Bar dataKey="voicemail" name="Voicemail" stackId="a" fill={OUTCOME_COLORS.voicemail} />
-        <Bar dataKey="no_answer" name="No Answer" stackId="a" fill={OUTCOME_COLORS.no_answer} />
-        <Bar dataKey="wrong"     name="Wrong #"   stackId="a" fill={OUTCOME_COLORS.wrong_number} radius={[0, 4, 4, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+          {initials(rep.full_name, rep.user_email)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold truncate">{rep.full_name ?? rep.user_email}</p>
+          <p className="text-xs text-muted-foreground capitalize">{rep.role === 'super_admin' ? 'Admin' : rep.role}</p>
+        </div>
+        <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+          #{rank}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 divide-x divide-border">
+        {/* Left — donut + answer rate */}
+        <div className="p-4 space-y-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+            <Phone className="h-3 w-3" /> Calls
+          </p>
+          <RepDonut rep={rep} />
+          {/* Answer rate */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Answer rate</span>
+              <span className="font-bold" style={{ color: answerRate > 50 ? OUTCOME_COLORS.answered : undefined }}>
+                {answerRate}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+              <div className="h-full rounded-full" style={{ width: `${answerRate}%`, background: OUTCOME_COLORS.answered }} />
+            </div>
+          </div>
+          {/* Outcome breakdown */}
+          {rep.calls > 0 && (
+            <div className="space-y-1">
+              {[
+                { label: 'Answered',  value: rep.calls_answered,     color: OUTCOME_COLORS.answered  },
+                { label: 'Voicemail', value: rep.calls_voicemail,    color: OUTCOME_COLORS.voicemail },
+                { label: 'No Answer', value: rep.calls_no_answer,    color: OUTCOME_COLORS.no_answer },
+                { label: 'Wrong #',   value: rep.calls_wrong_number, color: OUTCOME_COLORS.wrong_number },
+              ].filter(r => r.value > 0).map(r => (
+                <div key={r.label} className="flex items-center gap-1.5 text-[11px]">
+                  <div className="h-1.5 rounded-full" style={{ width: `${Math.round(r.value / maxOutcome * 48)}px`, background: r.color, minWidth: '4px' }} />
+                  <span className="text-muted-foreground">{r.label}</span>
+                  <span className="ml-auto font-medium tabular-nums">{r.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right — follow-ups + leads */}
+        <div className="p-4 space-y-4">
+          {/* Follow-ups */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+              <Calendar className="h-3 w-3" /> Follow-ups
+            </p>
+            {/* Completion ring visual */}
+            <div className="flex items-center gap-3">
+              <div className="relative h-12 w-12 shrink-0">
+                <svg viewBox="0 0 36 36" className="h-12 w-12 -rotate-90">
+                  <circle cx="18" cy="18" r="14" fill="none" stroke="hsl(var(--muted))" strokeWidth="3" />
+                  <circle
+                    cx="18" cy="18" r="14" fill="none"
+                    stroke={fuPct === 100 ? OUTCOME_COLORS.answered : fuPct > 50 ? '#3b82f6' : '#f59e0b'}
+                    strokeWidth="3"
+                    strokeDasharray={`${fuPct * 0.879} 87.9`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-[10px] font-bold">{fuPct}%</span>
+                </div>
+              </div>
+              <div className="space-y-0.5 text-xs">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                  <span>{rep.follow_ups_completed} done</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Calendar className="h-3 w-3" />
+                  <span>{rep.follow_ups_pending} pending</span>
+                </div>
+                {rep.follow_ups_overdue > 0 && (
+                  <div className="flex items-center gap-1.5 text-destructive">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span className="font-medium">{rep.follow_ups_overdue} overdue</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Leads */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+              <Users className="h-3 w-3" /> Leads
+            </p>
+            <div className="text-2xl font-bold tabular-nums">{rep.leads_assigned}</div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Active</span>
+                <span className="font-medium">{rep.leads_active}</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                <div className="h-full rounded-full bg-primary"
+                  style={{ width: rep.leads_assigned > 0 ? `${Math.round(rep.leads_active / rep.leads_assigned * 100)}%` : '0%' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
-// ── Main table ────────────────────────────────────────────────────────────
+// ── Main export ───────────────────────────────────────────────────────────
 interface Props { reps: RepRow[]; loading?: boolean }
 
 export function RepPerformanceTable({ reps, loading }: Props) {
-  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'calls', dir: 'desc' })
-  const sorted = useMemo(() =>
-    [...reps].sort((a, b) => {
-      const d = sort.dir === 'asc' ? 1 : -1
-      return ((a[sort.key] as number) > (b[sort.key] as number) ? 1 : -1) * d
-    }), [reps, sort])
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="rounded-2xl border border-border bg-card h-64 animate-pulse" />
+        ))}
+      </div>
+    )
+  }
 
-  const onSort = (key: SortKey) => setSort(p => ({ key, dir: p.key === key && p.dir === 'desc' ? 'asc' : 'desc' }))
-  const maxCalls = Math.max(...reps.map(r => r.calls), 1)
+  if (reps.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
+        <Users className="h-8 w-8 opacity-30" />
+        <p className="text-sm">No reps found for this period.</p>
+      </div>
+    )
+  }
 
-  const cols: Array<{ key: SortKey; label: string }> = [
-    { key: 'calls',                label: 'Calls'       },
-    { key: 'calls_answered',       label: 'Answered'    },
-    { key: 'follow_ups_completed', label: 'FU Done'     },
-    { key: 'follow_ups_overdue',   label: 'FU Overdue'  },
-    { key: 'leads_assigned',       label: 'Leads'       },
-  ]
+  const sorted = [...reps].sort((a, b) => b.calls - a.calls)
 
   return (
-    <div className="space-y-6">
-      {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2"><Phone className="h-4 w-4" /> Call Outcome Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? <div className="h-[200px] animate-pulse bg-muted rounded-lg" /> : <TeamDonut reps={reps} />}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> Calls by Rep</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? <div className="h-[220px] animate-pulse bg-muted rounded-lg" /> : <CallsByRepChart reps={reps} />}
-          </CardContent>
-        </Card>
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">{reps.length} rep{reps.length !== 1 ? 's' : ''} · ranked by call volume</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {sorted.map((rep, i) => (
+          <RepCard key={rep.user_id} rep={rep} rank={i + 1} />
+        ))}
       </div>
-
-      {/* Table */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Users className="h-5 w-5" /> Rep Details
-            <span className="ml-auto text-sm font-normal text-muted-foreground">{reps.length} reps</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40">
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-8">#</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Rep</th>
-                  {cols.map(c => (
-                    <th key={c.key} className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
-                      <button onClick={() => onSort(c.key)} className="flex items-center gap-1 hover:text-foreground">
-                        {c.label}
-                        {sort.key === c.key
-                          ? sort.dir === 'asc' ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-primary" />
-                          : <ChevronsUpDown className="h-3.5 w-3.5 opacity-30" />}
-                      </button>
-                    </th>
-                  ))}
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Volume</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i} className="border-b animate-pulse">
-                    {Array.from({ length: 8 }).map((__, j) => (
-                      <td key={j} className="px-4 py-3"><div className="h-4 w-16 rounded bg-muted" /></td>
-                    ))}
-                  </tr>
-                ))}
-                {!loading && sorted.map((rep, i) => {
-                  const isTop = i === 0 && rep.calls > 0
-                  const fuPct = (rep.follow_ups_completed + rep.follow_ups_pending) > 0
-                    ? Math.round(rep.follow_ups_completed / (rep.follow_ups_completed + rep.follow_ups_pending) * 100) : 0
-                  return (
-                    <tr key={rep.user_id} className={cn('border-b last:border-0 transition-colors', isTop ? 'bg-muted/40' : 'hover:bg-muted/30')}>
-                      <td className="px-4 py-3 text-muted-foreground font-medium">
-                        {isTop ? <Trophy className="h-4 w-4 text-amber-500" /> : i + 1}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                            {initials(rep.full_name, rep.user_email)}
-                          </div>
-                          <div>
-                            <p className="font-medium leading-tight">{rep.full_name ?? rep.user_email}</p>
-                            <p className="text-[10px] text-muted-foreground capitalize">{rep.role}</p>
-                          </div>
-                        </div>
-                      </td>
-                      {/* Calls */}
-                      <td className="px-4 py-3">
-                        <span className={cn('text-lg font-bold tabular-nums', rep.calls === 0 && 'text-muted-foreground/40')}>{rep.calls}</span>
-                      </td>
-                      {/* Answered */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium" style={{ color: rep.calls_answered > 0 ? OUTCOME_COLORS.answered : undefined }}>
-                            {rep.calls_answered}
-                          </span>
-                          {rep.calls > 0 && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {Math.round(rep.calls_answered / rep.calls * 100)}%
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      {/* FU Completed */}
-                      <td className="px-4 py-3">
-                        <div className="space-y-1">
-                          <span className="font-medium">{rep.follow_ups_completed}</span>
-                          {(rep.follow_ups_completed + rep.follow_ups_pending) > 0 && (
-                            <Progress value={fuPct} className="h-1 w-16" />
-                          )}
-                        </div>
-                      </td>
-                      {/* FU Overdue */}
-                      <td className="px-4 py-3">
-                        {rep.follow_ups_overdue > 0 ? (
-                          <span className="flex items-center gap-1 font-medium text-destructive">
-                            <AlertTriangle className="h-3 w-3" />{rep.follow_ups_overdue}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground/40">0</span>
-                        )}
-                      </td>
-                      {/* Leads */}
-                      <td className="px-4 py-3">
-                        <div>
-                          <span className="font-medium">{rep.leads_assigned}</span>
-                          {rep.leads_active < rep.leads_assigned && (
-                            <span className="text-[10px] text-muted-foreground ml-1">({rep.leads_active} active)</span>
-                          )}
-                        </div>
-                      </td>
-                      {/* Volume bar */}
-                      <td className="px-4 py-3 w-28">
-                        {rep.calls > 0 ? (
-                          <div className="flex h-4 overflow-hidden rounded-full bg-muted w-24">
-                            <div style={{ width: `${(rep.calls_answered / maxCalls) * 100}%`, background: OUTCOME_COLORS.answered }} />
-                            <div style={{ width: `${(rep.calls_voicemail / maxCalls) * 100}%`, background: OUTCOME_COLORS.voicemail }} />
-                            <div style={{ width: `${(rep.calls_no_answer / maxCalls) * 100}%`, background: OUTCOME_COLORS.no_answer }} />
-                            <div style={{ width: `${(rep.calls_wrong_number / maxCalls) * 100}%`, background: OUTCOME_COLORS.wrong_number }} />
-                          </div>
-                        ) : (
-                          <div className="h-4 w-24 rounded-full bg-muted/40" />
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
-  LeadFunnelChart, RepPerformanceTable, BatchComparisonTable, AnalyticsExportButton,
+  RepPerformanceTable, BatchComparisonTable, AnalyticsExportButton,
 } from '@/components/analytics'
-import type { FunnelData, RepRow, BatchRow, CallOverview, AnalyticsTab } from '@/components/analytics'
+import type { RepRow, BatchRow, CallOverview, AnalyticsTab } from '@/components/analytics'
 import { DateRangePicker } from '@/components/admin/date-range-picker'
 import type { DateRangePreset } from '@/components/admin/types'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,7 +22,6 @@ interface TabConfig { id: AnalyticsTab; label: string; minRole: string }
 const TABS: TabConfig[] = [
   { id: 'overview', label: 'Overview',         minRole: 'rep'   },
   { id: 'reps',     label: 'Rep Performance',  minRole: 'admin' },
-  { id: 'funnel',   label: 'Lead Funnel',      minRole: 'rep'   },
   { id: 'batches',  label: 'Batches',          minRole: 'rep'   },
 ]
 
@@ -31,7 +30,6 @@ function canSee(tabRole: string, userRole: string) {
   return (ROLE_RANK[userRole] ?? 0) >= (ROLE_RANK[tabRole] ?? 0)
 }
 
-const EMPTY_FUNNEL: FunnelData = { funnel: [], breakdown: [], total: 0 }
 const EMPTY_OVERVIEW: CallOverview = {
   total: 0, answered: 0, voicemail: 0, no_answer: 0, wrong_number: 0, callback: 0,
   follow_ups_due: 0, follow_ups_overdue: 0, leads_total: 0, leads_active: 0,
@@ -185,11 +183,9 @@ function AnalyticsContent({ userRole, userId }: Props) {
 
   const [overview,  setOverview]  = useState<CallOverview>(EMPTY_OVERVIEW)
   const [reps,      setReps]      = useState<RepRow[]>([])
-  const [funnel,    setFunnel]    = useState<FunnelData>(EMPTY_FUNNEL)
   const [batches,   setBatches]   = useState<BatchRow[]>([])
 
   const [loadingReps,    setLR] = useState(false)
-  const [loadingFunnel,  setLF] = useState(false)
   const [loadingBatches, setLB] = useState(false)
 
   const fetchReps = useCallback(async () => {
@@ -205,14 +201,6 @@ function AnalyticsContent({ userRole, userId }: Props) {
     } catch {} finally { setLR(false) }
   }, [start, end, isAdmin])
 
-  const fetchFunnel = useCallback(async () => {
-    setLF(true)
-    try {
-      const res = await fetch('/api/analytics/funnel')
-      if (res.ok) setFunnel(await res.json())
-    } catch {} finally { setLF(false) }
-  }, [])
-
   const fetchBatches = useCallback(async () => {
     setLB(true)
     try {
@@ -223,9 +211,8 @@ function AnalyticsContent({ userRole, userId }: Props) {
 
   useEffect(() => {
     void fetchReps()
-    void fetchFunnel()
     void fetchBatches()
-  }, [fetchReps, fetchFunnel, fetchBatches])
+  }, [fetchReps, fetchBatches])
 
   const setParam = (key: string, value: string) => {
     const p = new URLSearchParams(searchParams.toString())
@@ -255,7 +242,7 @@ function AnalyticsContent({ userRole, userId }: Props) {
             <div className="flex items-center gap-2 shrink-0">
               <DateRangePicker value={range} onChange={v => setParam('range', v)} className="hidden md:flex" />
               <AnalyticsExportButton view={activeTab} start={start} end={end} />
-              <Button variant="outline" size="sm" onClick={() => { void fetchReps(); void fetchFunnel(); void fetchBatches() }}
+              <Button variant="outline" size="sm" onClick={() => { void fetchReps(); void fetchBatches() }}
                 disabled={isLoading} className="gap-1.5 h-9">
                 <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
                 <span className="hidden sm:inline">Refresh</span>
@@ -265,6 +252,7 @@ function AnalyticsContent({ userRole, userId }: Props) {
           <div className="pb-3 md:hidden">
             <DateRangePicker value={range} onChange={v => setParam('range', v)} className="w-full" />
           </div>
+
           {/* Tab bar */}
           <div className="flex items-center gap-0 -mb-px overflow-x-auto">
             {visibleTabs.map(tab => (
@@ -287,37 +275,6 @@ function AnalyticsContent({ userRole, userId }: Props) {
 
         {activeTab === 'reps' && isAdmin && (
           <RepPerformanceTable reps={reps} loading={loadingReps} />
-        )}
-
-        {activeTab === 'funnel' && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <LeadFunnelChart data={funnel} loading={loadingFunnel} />
-            <div className="space-y-3">
-              {funnel.funnel.slice(1).map((stage, i) => {
-                const prev = funnel.funnel[i]
-                const kept = prev?.count > 0 ? Math.round(stage.count / prev.count * 100) : 0
-                return (
-                  <div key={stage.status} className="rounded-xl border p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium capitalize">{prev?.status} → {stage.status}</span>
-                      <Badge variant="secondary" className="text-xs">{kept}% continue</Badge>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full bg-primary" style={{ width: `${kept}%` }} />
-                      </div>
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        {stage.count.toLocaleString()} / {prev?.count.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-              {funnel.funnel.length === 0 && (
-                <div className="rounded-xl border p-8 text-center text-muted-foreground text-sm">No funnel data yet.</div>
-              )}
-            </div>
-          </div>
         )}
 
         {activeTab === 'batches' && (
