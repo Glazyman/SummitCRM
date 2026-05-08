@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Phone, ArrowUpRight, CheckCircle2, Circle, Clock,
   AlertCircle, Minus, ChevronDown, Plus, X,
-  User, Mail,
+  User, Mail, Building2, ExternalLink,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -65,6 +65,122 @@ function fmtDate(iso: string) {
 // ── Shared select style ────────────────────────────────────────────────────────
 const selectCls = 'h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
 
+// ── Activity side panel ────────────────────────────────────────────────────────
+function ActivityPanel({
+  activity,
+  onClose,
+  onDone,
+}: {
+  activity: Activity
+  onClose:  () => void
+  onDone:   () => void
+}) {
+  const done = !!activity.completed_at
+  const due  = fmtDate(activity.due_at)
+  const name = leadName(activity.lead)
+
+  return (
+    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-border bg-card shadow-xl animate-dropdown-in">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <div className="flex items-center gap-2">
+          <span className={cn(
+            'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium',
+            activity.type === 'callback' ? 'bg-blue-500/10 text-blue-600' : 'bg-violet-500/10 text-violet-600'
+          )}>
+            {activity.type === 'callback' ? <Phone className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+            {activity.type === 'callback' ? 'Call Back' : 'Follow-up'}
+          </span>
+          <span className={cn('text-xs font-medium', due.overdue ? 'text-red-500' : 'text-muted-foreground')}>
+            <Clock className="inline h-3 w-3 mr-0.5" />{due.label}
+          </span>
+        </div>
+        <button type="button" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+        {/* Task */}
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Task</p>
+          <p className="font-semibold">{activity.title}</p>
+          {activity.notes && <p className="text-sm text-muted-foreground">{activity.notes}</p>}
+        </div>
+
+        {/* Lead contact info */}
+        {activity.lead ? (
+          <div className="rounded-xl border border-border p-4 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold">{name}</p>
+                {activity.lead.company && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Building2 className="h-3 w-3" />{activity.lead.company}
+                  </p>
+                )}
+              </div>
+              <Link
+                href={`/leads/${activity.lead.id}`}
+                className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+                onClick={onClose}
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> View lead
+              </Link>
+            </div>
+
+            <div className="space-y-2 border-t border-border pt-3">
+              {activity.lead.phone && (
+                <a href={`tel:${activity.lead.phone}`} className="flex items-center gap-2.5 text-sm hover:text-primary transition-colors">
+                  <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  {activity.lead.phone}
+                </a>
+              )}
+              {activity.lead.email && (
+                <a href={`mailto:${activity.lead.email}`} className="flex items-center gap-2.5 text-sm text-primary hover:underline">
+                  <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{activity.lead.email}</span>
+                </a>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No lead linked.</p>
+        )}
+      </div>
+
+      {/* Footer — Done button */}
+      <div className="border-t border-border px-5 py-4">
+        {done ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-emerald-600">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="font-medium">Completed</span>
+            </div>
+            <button
+              type="button"
+              onClick={onDone}
+              className="w-full text-sm text-muted-foreground hover:text-foreground underline underline-offset-2"
+            >
+              Mark as open again
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onDone}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-3 text-sm font-semibold hover:bg-primary/90 transition-colors"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            Mark Done
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   initialActivities: Activity[]
@@ -77,6 +193,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
   const router = useRouter()
   const [activities,      setActivities]      = useState<Activity[]>(initialActivities)
   const [justCompleted,   setJustCompleted]   = useState<Set<string>>(new Set())
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
   const [search,          setSearch]          = useState('')
   const [filterType,      setFilterType]      = useState('')
   const [filterAssigned,  setFilterAssigned]  = useState('')
@@ -120,18 +237,21 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
   // ── Toggle done (with brief visual linger) ────────────────────────────────
   async function toggleDone(activity: Activity) {
     const nowDone = !activity.completed_at
+    const updatedAt = nowDone ? new Date().toISOString() : null
 
-    // Optimistic update
     setActivities((prev) => prev.map((a) =>
-      a.id === activity.id ? { ...a, completed_at: nowDone ? new Date().toISOString() : null } : a
+      a.id === activity.id ? { ...a, completed_at: updatedAt } : a
     ))
+    if (selectedActivity?.id === activity.id) {
+      setSelectedActivity((s) => s ? { ...s, completed_at: updatedAt } : s)
+    }
 
     if (nowDone) {
-      // Keep visible for 1.5s then let the filter hide it
       setJustCompleted((s) => new Set([...s, activity.id]))
       const t = setTimeout(() => {
         setJustCompleted((s) => { const n = new Set(s); n.delete(activity.id); return n })
-      }, 1500)
+        setSelectedActivity((s) => s?.id === activity.id ? null : s)
+      }, 1200)
       timers.current.set(activity.id, t)
     } else {
       const t = timers.current.get(activity.id)
@@ -231,7 +351,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
 
         <select value={filterDone} onChange={(e) => setFilterDone(e.target.value)} className={selectCls}>
           <option value="false">Open</option>
-          <option value="true">Completed</option>
+          <option value="true">Past / Completed</option>
           <option value="">All</option>
         </select>
       </div>
@@ -270,12 +390,12 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
               return (
                 <tr
                   key={a.id}
-                  onClick={() => a.lead && router.push(`/leads/${a.lead.id}`)}
+                  onClick={() => setSelectedActivity(a)}
                   className={cn(
                     'group transition-all cursor-pointer',
                     done && !linger ? 'opacity-40' : 'hover:bg-muted/30',
                     linger && 'bg-emerald-50/50 dark:bg-emerald-950/20',
-                    a.lead && 'cursor-pointer'
+                    selectedActivity?.id === a.id && 'bg-primary/5'
                   )}
                 >
                   {/* Complete toggle */}
@@ -365,6 +485,18 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
           </tbody>
         </table>
       </div>
+
+      {/* Activity side panel */}
+      {selectedActivity && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setSelectedActivity(null)} />
+          <ActivityPanel
+            activity={selectedActivity}
+            onClose={() => setSelectedActivity(null)}
+            onDone={() => toggleDone(selectedActivity)}
+          />
+        </>
+      )}
 
       {/* New Activity Dialog */}
       <Dialog open={showNew} onClose={() => setShowNew(false)}>
