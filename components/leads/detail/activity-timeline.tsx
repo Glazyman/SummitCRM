@@ -12,9 +12,10 @@ import { STATUS_CONFIG } from '@/components/leads/status-config'
 import type { ActivityEntry, ActivityType, LeadStatus } from './types'
 
 interface ActivityTimelineProps {
-  entries:           ActivityEntry[]
-  onEditNote:        (noteId: string, content: string) => void
-  onDeleteNote:      (noteId: string) => void
+  entries:            ActivityEntry[]
+  onEditNote:         (noteId: string, content: string) => void
+  onDeleteNote:       (noteId: string) => void
+  onDeleteActivity?:  (activityId: string) => void
 }
 
 // ── Icon + color config per activity type ─────────────────────────────────
@@ -53,6 +54,7 @@ export function ActivityTimeline({
   entries,
   onEditNote,
   onDeleteNote,
+  onDeleteActivity,
 }: ActivityTimelineProps) {
   if (entries.length === 0) {
     return (
@@ -74,6 +76,7 @@ export function ActivityTimeline({
           isLast={idx === entries.length - 1}
           onEditNote={onEditNote}
           onDeleteNote={onDeleteNote}
+          onDeleteActivity={onDeleteActivity}
         />
       ))}
     </div>
@@ -86,11 +89,13 @@ function TimelineEntry({
   isLast,
   onEditNote,
   onDeleteNote,
+  onDeleteActivity,
 }: {
-  entry:        ActivityEntry
-  isLast:       boolean
-  onEditNote:   (id: string, content: string) => void
-  onDeleteNote: (id: string) => void
+  entry:             ActivityEntry
+  isLast:            boolean
+  onEditNote:        (id: string, content: string) => void
+  onDeleteNote:      (id: string) => void
+  onDeleteActivity?: (id: string) => void
 }) {
   const FALLBACK_META: ActivityMeta = {
     icon:  Activity,
@@ -101,6 +106,9 @@ function TimelineEntry({
   }
   const meta = ACTIVITY_META[entry.type] ?? FALLBACK_META
   const Icon = meta.icon
+
+  // Activity log entries (non-notes) show a delete button on hover
+  const isDeletableActivity = entry.source === 'activity' && !!onDeleteActivity
 
   return (
     <div className="group relative flex gap-3 pb-5">
@@ -122,12 +130,24 @@ function TimelineEntry({
       <div className="min-w-0 flex-1 pt-0.5">
         <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-0.5">
           <EntryBody entry={entry} />
-          <time
-            className="shrink-0 text-xs text-muted-foreground tabular-nums"
-            dateTime={entry.created_at}
-          >
-            {relativeTime(entry.created_at)}
-          </time>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <time
+              className="text-xs text-muted-foreground tabular-nums"
+              dateTime={entry.created_at}
+            >
+              {relativeTime(entry.created_at)}
+            </time>
+            {isDeletableActivity && (
+              <button
+                type="button"
+                onClick={() => onDeleteActivity!(entry.id)}
+                title="Delete this entry"
+                className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* User attribution */}

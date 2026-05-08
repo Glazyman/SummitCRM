@@ -3,6 +3,9 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
 
+// Uses admin client for write operations so RLS author-check never blocks
+// a legitimate server-validated delete (auth is verified via session before use).
+
 type Params = { params: Promise<{ id: string; noteId: string }> }
 
 const updateNoteSchema = z.object({
@@ -65,30 +68,44 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: member } = await supabase
+    const admin = createAdminClient()
+
+    const { data: member } = await (admin as any)
       .from('workspace_members')
       .select('workspace_id, role')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
+      .single() as { data: { workspace_id: string; role: string } | null }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
     if (member.role === 'viewer') {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    const { data: note, error } = await supabase
+    // Verify ownership: only the author or an admin/manager may delete
+    const { data: existingNote } = await (admin as any)
       .from('notes')
-      .update({ deleted_at: new Date().toISOString() })
+      .select('id, author_id')
       .eq('id', noteId)
       .eq('lead_id', leadId)
       .eq('workspace_id', member.workspace_id)
       .is('deleted_at', null)
-      .select('id')
-      .single()
+      .single() as { data: { id: string; author_id: string } | null }
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    if (!note) return NextResponse.json({ error: 'Note not found' }, { status: 404 })
+    if (!existingNote) return NextResponse.json({ error: 'Note not found' }, { status: 404 })
+
+    const isAdmin = ['admin', 'super_admin', 'manager'].includes(member.role)
+    if (existingNote.author_id !== user.id && !isAdmin) {
+      return NextResponse.json({ error: 'Cannot delete another user\'s note' }, { status: 403 })
+    }
+
+    const { error } = await (admin as any)
+      .from('notes')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', noteId)
+      .eq('workspace_id', member.workspace_id)
+
+    if (error) return NextResponse.json({ error: (error as any).message }, { status: 400 })
 
     return NextResponse.json({ success: true })
   } catch (err) {

@@ -185,15 +185,39 @@ export default function LeadDetailClient({
   }
 
   async function handleDeleteNote(noteId: string) {
-    const previous = activity
-    setActivity((prev) => prev.filter((e) => e.note_id !== noteId))
+    // Capture the entry being removed so we can splice it back on failure,
+    // without clobbering any state changes (e.g. status entries) added concurrently.
+    let removed: ActivityEntry | undefined
+    let removedIndex = -1
+    setActivity((prev) => {
+      removedIndex = prev.findIndex((e) => e.note_id === noteId)
+      removed = prev[removedIndex]
+      return prev.filter((e) => e.note_id !== noteId)
+    })
     try {
       await requestJson<{ success: boolean }>(`/api/leads/${lead.id}/notes/${noteId}`, {
         method: 'DELETE',
       })
     } catch (err) {
-      setActivity(previous)
+      // Targeted restore: splice the note back at its original position
+      if (removed) {
+        setActivity((prev) => {
+          const idx = removedIndex >= 0 ? Math.min(removedIndex, prev.length) : prev.length
+          return [...prev.slice(0, idx), removed!, ...prev.slice(idx)]
+        })
+      }
       console.error(err)
+    }
+  }
+
+  async function handleDeleteActivity(activityId: string) {
+    setActivity((prev) => prev.filter((e) => e.id !== activityId))
+    try {
+      await requestJson<{ success: boolean }>(`/api/leads/${lead.id}/activity/${activityId}`, {
+        method: 'DELETE',
+      })
+    } catch (err) {
+      console.error('Could not delete activity entry', err)
     }
   }
 
@@ -435,6 +459,7 @@ export default function LeadDetailClient({
                 entries={activity}
                 onEditNote={handleEditNote}
                 onDeleteNote={handleDeleteNote}
+                onDeleteActivity={handleDeleteActivity}
               />
             </Section>
 
