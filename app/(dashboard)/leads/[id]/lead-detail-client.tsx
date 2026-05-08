@@ -32,16 +32,17 @@ type TabId = typeof TABS[number]['id']
 
 // ── Props ─────────────────────────────────────────────────────────────────
 interface LeadDetailClientProps {
-  lead:         LeadDetail
-  activity:     ActivityEntry[]
-  emails:       EmailHistoryItem[]
-  followUps:    FollowUp[]
-  calls:        CallLogItem[]
-  teamMembers:  TeamMember[]
-  accounts:     SendingAccountPublic[]
-  quotas:       Record<string, QuotaStatus>
-  currentUserId:string
-  isAdmin:      boolean
+  lead:          LeadDetail
+  activity:      ActivityEntry[]
+  emails:        EmailHistoryItem[]
+  followUps:     FollowUp[]
+  calls:         CallLogItem[]
+  teamMembers:   TeamMember[]
+  accounts:      SendingAccountPublic[]
+  quotas:        Record<string, QuotaStatus>
+  currentUserId: string
+  isAdmin:       boolean
+  canEditBatch:  boolean
 }
 
 export default function LeadDetailClient({
@@ -55,6 +56,7 @@ export default function LeadDetailClient({
   quotas,
   currentUserId,
   isAdmin,
+  canEditBatch,
 }: LeadDetailClientProps) {
   const router = useRouter()
 
@@ -84,6 +86,17 @@ export default function LeadDetailClient({
       setLead(previous)
       throw err
     }
+  }
+
+  async function handleRenameBatch(name: string) {
+    if (!lead.batch_id) return
+    await requestJson<{ data: { batch: { id: string; name: string } } }>(`/api/batches/${lead.batch_id}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name }),
+    })
+    setLead((l) => ({ ...l, batch_name: name }))
+    router.refresh()
   }
 
   async function handleStatusChange(status: LeadStatus) {
@@ -428,6 +441,8 @@ export default function LeadDetailClient({
               lead={lead}
               teamMembers={teamMembers}
               onSave={handleSaveProfile}
+              onRenameBatch={canEditBatch ? handleRenameBatch : undefined}
+              canEditBatch={canEditBatch}
             />
           </div>
 

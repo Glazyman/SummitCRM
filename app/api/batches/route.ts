@@ -57,7 +57,7 @@ export async function GET() {
 }
 
 const createSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(200),
+  name: z.string().min(1, 'Name is required').max(150),
 })
 
 export async function POST(request: NextRequest) {

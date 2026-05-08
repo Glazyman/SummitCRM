@@ -104,15 +104,18 @@ export async function POST(request: NextRequest) {
       return apiError(preflight.reason ?? 'Preflight check failed')
     }
 
-    // Batch is optional — leads can be imported without a batch assignment.
-    // If no batch is chosen and no new name is provided, auto-create one from the filename
-    // so the import is still discoverable in history.
+    // Batch is optional. If none chosen, use a short neutral default (not the CSV filename);
+    // users rename batches on the lead profile or batch list.
     let effectiveBatchName = newBatchName.trim()
     if (!batchId && !effectiveBatchName) {
-      const base = fileName.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ').slice(0, 80).trim()
-      effectiveBatchName = base
-        ? `${base} — ${new Date().toLocaleDateString()}`
-        : `Import ${new Date().toLocaleString()}`
+      const when = new Date()
+      effectiveBatchName = `Import — ${when.toLocaleString(undefined, {
+        month:  'short',
+        day:    'numeric',
+        year:   'numeric',
+        hour:   'numeric',
+        minute: '2-digit',
+      })}`
     }
 
     // ── Create lead_imports record ──────────────────────────────────────

@@ -94,6 +94,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
 
   const currentUserId = user.id
   const isAdmin = ['super_admin', 'admin', 'manager'].includes(member?.role ?? '')
+  const canEditBatch = member?.role !== 'viewer'
   const teamMembers: TeamMember[] = memberIds.map((userId) => ({ id: userId, name: usersById.get(userId) ?? userId }))
 
   const activity: ActivityEntry[] = ((activityResult.data ?? []) as Array<{
@@ -214,6 +215,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
         quotas={quotas}
         currentUserId={currentUserId}
         isAdmin={isAdmin}
+        canEditBatch={canEditBatch}
       />
     </Suspense>
   )

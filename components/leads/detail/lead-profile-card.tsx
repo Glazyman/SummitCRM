@@ -14,9 +14,12 @@ import { STATUS_CONFIG } from '@/components/leads/status-config'
 import type { LeadDetail, TeamMember } from './types'
 
 interface LeadProfileCardProps {
-  lead:        LeadDetail
-  teamMembers: TeamMember[]
-  onSave:      (patch: Partial<LeadDetail>) => Promise<void>
+  lead:            LeadDetail
+  teamMembers:     TeamMember[]
+  onSave:          (patch: Partial<LeadDetail>) => Promise<void>
+  /** When set, user can rename the linked batch (updates all leads in that batch). */
+  onRenameBatch?:  (name: string) => Promise<void>
+  canEditBatch?:   boolean
 }
 
 type EditableField =
@@ -34,10 +37,19 @@ const FIELD_LABELS: Record<EditableField, string> = {
   linkedin_url:'LinkedIn',
 }
 
-export function LeadProfileCard({ lead, teamMembers, onSave }: LeadProfileCardProps) {
+export function LeadProfileCard({
+  lead,
+  teamMembers,
+  onSave,
+  onRenameBatch,
+  canEditBatch = true,
+}: LeadProfileCardProps) {
   const [editing, setEditing]     = React.useState(false)
   const [saving,  setSaving]      = React.useState(false)
   const [draft,   setDraft]       = React.useState<Partial<LeadDetail>>({})
+  const [batchEditing, setBatchEditing] = React.useState(false)
+  const [batchDraft, setBatchDraft]     = React.useState('')
+  const [batchSaving, setBatchSaving]   = React.useState(false)
 
   const name     = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '—'
   const initials = [lead.first_name?.[0], lead.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
@@ -282,10 +294,77 @@ export function LeadProfileCard({ lead, teamMembers, onSave }: LeadProfileCardPr
           </ProfileField>
         )}
 
-        {/* Batch */}
-        {lead.batch_name && (
+        {/* Batch — `batch_name` is always the saved name from `lead_batches`; editable here */}
+        {lead.batch_id && (
           <ProfileField icon={<Package className="h-3.5 w-3.5" />} label="Batch">
-            <span className="text-sm">{lead.batch_name}</span>
+            {batchEditing ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Input
+                  value={batchDraft}
+                  onChange={(e) => setBatchDraft(e.target.value)}
+                  maxLength={150}
+                  placeholder="Batch name"
+                  className="h-8 min-w-[10rem] flex-1 text-sm"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setBatchEditing(false)
+                      setBatchDraft(lead.batch_name ?? '')
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  disabled={batchSaving || !batchDraft.trim()}
+                  onClick={async () => {
+                    if (!onRenameBatch || !batchDraft.trim()) return
+                    setBatchSaving(true)
+                    try {
+                      await onRenameBatch(batchDraft.trim())
+                      setBatchEditing(false)
+                    } finally {
+                      setBatchSaving(false)
+                    }
+                  }}
+                >
+                  {batchSaving ? 'Saving…' : 'Save'}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 shrink-0"
+                  disabled={batchSaving}
+                  onClick={() => {
+                    setBatchEditing(false)
+                    setBatchDraft(lead.batch_name ?? '')
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-sm break-words">{lead.batch_name ?? 'Unnamed batch'}</span>
+                {canEditBatch && onRenameBatch && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 gap-1 px-2 text-xs text-muted-foreground"
+                    onClick={() => {
+                      setBatchDraft(lead.batch_name ?? '')
+                      setBatchEditing(true)
+                    }}
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Rename
+                  </Button>
+                )}
+              </div>
+            )}
           </ProfileField>
         )}
 
