@@ -104,9 +104,15 @@ export async function POST(request: NextRequest) {
       return apiError(preflight.reason ?? 'Preflight check failed')
     }
 
-    // Require batch assignment (either an existing batch or a new name)
-    if (!batchId && !newBatchName.trim()) {
-      return apiError('Assign the import to an existing batch or provide a new batch name.')
+    // Batch is optional — leads can be imported without a batch assignment.
+    // If no batch is chosen and no new name is provided, auto-create one from the filename
+    // so the import is still discoverable in history.
+    let effectiveBatchName = newBatchName.trim()
+    if (!batchId && !effectiveBatchName) {
+      const base = fileName.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ').slice(0, 80).trim()
+      effectiveBatchName = base
+        ? `${base} — ${new Date().toLocaleDateString()}`
+        : `Import ${new Date().toLocaleString()}`
     }
 
     // ── Create lead_imports record ──────────────────────────────────────
@@ -142,7 +148,7 @@ export async function POST(request: NextRequest) {
       rows,
       mapping,
       batchId:       batchId ?? null,
-      newBatchName:  newBatchName,
+      newBatchName:  effectiveBatchName,
       duplicateMode,
       supabase:      admin,
     })

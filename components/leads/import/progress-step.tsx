@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   CheckCircle2, XCircle, AlertTriangle, Download, ExternalLink,
@@ -28,7 +28,13 @@ export function ProgressStep({ onStart, onViewLeads, onImportAnother }: Progress
   const [error, setError] = useState<string | null>(null)
   const [showErrors, setShowErrors] = useState(false)
 
+  // Guard against React Strict Mode double-invocation of useEffect
+  const started = useRef(false)
+
   useEffect(() => {
+    if (started.current) return
+    started.current = true
+
     let cancelled = false
 
     async function run() {

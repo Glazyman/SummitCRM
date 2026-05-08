@@ -17,11 +17,14 @@ interface OptionsStepProps {
   options: ImportOptions
   batches: ExistingBatch[]
   onChange: (options: ImportOptions) => void
+  onBatchCreated: (batch: ExistingBatch) => void
 }
 
-export function OptionsStep({ file, mapping, options, batches, onChange }: OptionsStepProps) {
+export function OptionsStep({ file, mapping, options, batches, onChange, onBatchCreated }: OptionsStepProps) {
   const [showNewBatchDialog, setShowNewBatchDialog] = useState(false)
   const [newBatchDraft, setNewBatchDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const mappedFields = Object.entries(mapping)
     .filter(([, v]) => v !== 'ignore')
@@ -33,11 +36,35 @@ export function OptionsStep({ file, mapping, options, batches, onChange }: Optio
   const emailCol = Object.entries(mapping).find(([, v]) => v === 'email')?.[0]
   const selectedBatch = batches.find((b) => b.id === options.batchId)
 
-  function confirmNewBatch() {
-    if (!newBatchDraft.trim()) return
-    onChange({ ...options, batchId: null, newBatchName: newBatchDraft.trim() })
-    setNewBatchDraft('')
-    setShowNewBatchDialog(false)
+  async function confirmNewBatch() {
+    const name = newBatchDraft.trim()
+    if (!name) return
+
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const res = await fetch('/api/batches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const json = await res.json() as { data?: { id: string; name: string; leadCount: number }; error?: string }
+
+      if (!res.ok || json.error) {
+        setSaveError(json.error ?? 'Failed to create batch')
+        return
+      }
+
+      const newBatch = json.data!
+      onBatchCreated(newBatch)
+      onChange({ ...options, batchId: newBatch.id, newBatchName: '' })
+      setNewBatchDraft('')
+      setShowNewBatchDialog(false)
+    } catch {
+      setSaveError('Network error — please try again')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -62,7 +89,7 @@ export function OptionsStep({ file, mapping, options, batches, onChange }: Optio
               onChange({ ...options, batchId: val || null, newBatchName: '' })
             }}
           >
-            <option value="">No batch (import without grouping)</option>
+            <option value="">Auto-create batch from file name</option>
             {batches.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name} ({b.leadCount.toLocaleString()} leads)
@@ -70,28 +97,12 @@ export function OptionsStep({ file, mapping, options, batches, onChange }: Optio
             ))}
           </Select>
 
-          {/* Selected batch info */}
+          {/* Selected existing batch info */}
           {selectedBatch && (
             <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2.5 text-sm">
               <Layers className="h-4 w-4 text-primary" />
               <span className="font-medium">{selectedBatch.name}</span>
               <span className="text-muted-foreground">· {selectedBatch.leadCount.toLocaleString()} existing leads</span>
-            </div>
-          )}
-
-          {/* New batch name (when manually entered) */}
-          {options.batchId === null && options.newBatchName && (
-            <div className="flex items-center gap-2 rounded-lg bg-primary/5 px-3 py-2.5 text-sm">
-              <Plus className="h-4 w-4 text-primary" />
-              <span className="font-medium">New batch:</span>
-              <span className="text-primary">{options.newBatchName}</span>
-              <button
-                type="button"
-                className="ml-auto text-xs text-muted-foreground hover:text-destructive"
-                onClick={() => onChange({ ...options, newBatchName: '' })}
-              >
-                Remove
-              </button>
             </div>
           )}
 
@@ -157,7 +168,7 @@ export function OptionsStep({ file, mapping, options, batches, onChange }: Optio
               ? <>Leads will be added to <strong className="text-foreground">{selectedBatch?.name}</strong></>
               : options.newBatchName
                 ? <>New batch <strong className="text-foreground">&ldquo;{options.newBatchName}&rdquo;</strong> will be created</>
-                : 'No batch assignment'
+                : <>A batch will be auto-created from <strong className="text-foreground">{file.name}</strong></>
             }
           </li>
           <li className="flex items-center gap-2">
@@ -183,20 +194,21 @@ export function OptionsStep({ file, mapping, options, batches, onChange }: Optio
                 id="new-batch-name"
                 placeholder="e.g. Q2 SaaS Founders"
                 value={newBatchDraft}
-                onChange={(e) => setNewBatchDraft(e.target.value)}
+                onChange={(e) => { setNewBatchDraft(e.target.value); setSaveError(null) }}
                 autoFocus
                 onKeyDown={(e) => e.key === 'Enter' && confirmNewBatch()}
+                disabled={saving}
               />
-              <p className="text-xs text-muted-foreground">
-                This batch will be created when the import starts.
-              </p>
+              {saveError && (
+                <p className="text-xs text-destructive">{saveError}</p>
+              )}
             </div>
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setShowNewBatchDialog(false)}>
+            <Button variant="outline" size="sm" onClick={() => { setShowNewBatchDialog(false); setSaveError(null) }} disabled={saving}>
               Cancel
             </Button>
-            <Button size="sm" onClick={confirmNewBatch} disabled={!newBatchDraft.trim()}>
+            <Button size="sm" onClick={confirmNewBatch} disabled={!newBatchDraft.trim() || saving} loading={saving}>
               Create batch
             </Button>
           </DialogFooter>

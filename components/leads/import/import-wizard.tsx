@@ -36,13 +36,14 @@ const DEFAULT_OPTIONS: ImportOptions = {
   duplicateMode: 'skip',
 }
 
-export function ImportWizard({ batches, onImport }: ImportWizardProps) {
+export function ImportWizard({ batches: initialBatches, onImport }: ImportWizardProps) {
   const router = useRouter()
 
   const [step, setStep] = useState<WizardStep>('upload')
   const [file, setFile] = useState<ParsedFile | null>(null)
   const [mapping, setMapping] = useState<FieldMapping>({})
   const [options, setOptions] = useState<ImportOptions>(DEFAULT_OPTIONS)
+  const [batches, setBatches] = useState<ExistingBatch[]>(initialBatches)
 
   const currentIndex = STEPS.findIndex((s) => s.id === step)
   const emailMapped = Object.values(mapping).includes('email')
@@ -114,6 +115,7 @@ export function ImportWizard({ batches, onImport }: ImportWizardProps) {
           options={options}
           batches={batches}
           onChange={setOptions}
+          onBatchCreated={(batch) => setBatches((prev) => [batch, ...prev])}
         />
       )
     }
