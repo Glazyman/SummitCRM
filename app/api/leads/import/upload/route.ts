@@ -73,7 +73,9 @@ export async function POST(request: NextRequest) {
       .from('lead_imports')
       .insert({
         workspace_id:  workspaceId,
-        imported_by:   user.id,
+        created_by:    user.id,
+        file_name:     fileName,
+        storage_path:  `${workspaceId}/pending`,
         status:        'processing',
         total_rows:    totalRows,
         imported_rows: 0,

@@ -40,6 +40,8 @@ const startImportSchema = z.object({
   newBatchName: z.string().max(200).default(''),
 
   duplicateMode: z.enum(['skip', 'update']).default('skip'),
+
+  fileName: z.string().max(255).optional().default('import.csv'),
 })
 
 // ── Handler ────────────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
       return apiError(parsed.error.issues[0].message)
     }
 
-    const { rows: rawRows, mapping, batchId, newBatchName, duplicateMode } = parsed.data
+    const { rows: rawRows, mapping, batchId, newBatchName, duplicateMode, fileName } = parsed.data
 
     // Coerce row values to strings (client sends Record<string, string> but JSON typing loses that)
     const rows: Record<string, string>[] = rawRows.map((r) =>
@@ -113,7 +115,9 @@ export async function POST(request: NextRequest) {
       .from('lead_imports')
       .insert({
         workspace_id:  workspaceId,
-        imported_by:   user.id,
+        created_by:    user.id,
+        file_name:     fileName,
+        storage_path:  `${workspaceId}/inline`,
         status:        'processing',
         total_rows:    rows.length,
         imported_rows: 0,

@@ -180,9 +180,9 @@ export async function processImport(
     // ── Step 10: Log activity ─────────────────────────────────────────────
     if (imported + updated > 0) {
       await supabase.from('activity_logs').insert({
-        workspace_id:   workspaceId,
-        user_id:        userId,
-        activity_type:  'lead_imported',
+        workspace_id:  workspaceId,
+        user_id:       userId,
+        type:          'lead_imported',
         metadata: {
           import_id:   importId,
           batch_id:    resolvedBatchId,

@@ -40,6 +40,7 @@ export function ImportPageClient({ batches }: ImportPageClientProps) {
         batchId:       options.batchId ?? null,
         newBatchName:  options.newBatchName,
         duplicateMode: options.duplicateMode,
+        fileName:      file.name,
       }),
     })
 
