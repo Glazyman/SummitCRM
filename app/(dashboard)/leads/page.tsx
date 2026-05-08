@@ -38,7 +38,7 @@ export default async function LeadsPage() {
       const [leadsResult, batchesResult, membersResult] = await Promise.all([
         supabase
           .from('leads')
-          .select('id, workspace_id, first_name, last_name, email, phone, company, title, website, linkedin_url, status, batch_id, assigned_to, source, created_at, updated_at')
+          .select('id, workspace_id, first_name, last_name, email, phone, company, title, website, linkedin_url, status, interest_status, pipeline_stage_id, batch_id, assigned_to, source, created_at, updated_at')
           .eq('workspace_id', workspaceId)
           .is('deleted_at', null)
           .order('created_at', { ascending: false })
@@ -84,6 +84,8 @@ export default async function LeadsPage() {
         website: string | null
         linkedin_url: string | null
         status: LeadRow['status']
+        interest_status?: LeadRow['interest_status']
+        pipeline_stage_id?: string | null
         batch_id: string | null
         assigned_to: string | null
         source: string | null
@@ -91,9 +93,12 @@ export default async function LeadsPage() {
         updated_at: string
       }>).map((lead) => ({
         ...lead,
-        batch_name: lead.batch_id ? batchNames.get(lead.batch_id) ?? null : null,
-        assigned_name: lead.assigned_to ? usersById.get(lead.assigned_to) ?? null : null,
-        last_activity_at: null,
+        interest_status:  lead.interest_status  ?? 'pending',
+        pipeline_stage_id: lead.pipeline_stage_id ?? null,
+        batch_name:        lead.batch_id ? batchNames.get(lead.batch_id) ?? null : null,
+        assigned_name:     lead.assigned_to ? usersById.get(lead.assigned_to) ?? null : null,
+        last_activity_at:  null,
+        tags:              [],
       }))
     }
   } catch {

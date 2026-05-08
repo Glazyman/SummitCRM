@@ -1,0 +1,65 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+// POST /api/leads — create a new lead
+export async function POST(req: NextRequest) {
+  const supabase = await createClient() as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: member } = await supabase
+    .from('workspace_members')
+    .select('workspace_id')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+
+  const body = await req.json().catch(() => ({}))
+  const {
+    first_name, last_name, email, phone, title,
+    company, website, linkedin_url, batch_id,
+    assigned_to, status = 'new',
+  } = body
+
+  if (!email) return NextResponse.json({ error: 'email is required' }, { status: 400 })
+
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .insert({
+      workspace_id: member.workspace_id,
+      first_name:   first_name || null,
+      last_name:    last_name  || null,
+      email:        email.toLowerCase().trim(),
+      phone:        phone      || null,
+      title:        title      || null,
+      company:      company    || null,
+      website:      website    || null,
+      linkedin_url: linkedin_url || null,
+      batch_id:     batch_id   || null,
+      assigned_to:  assigned_to || user.id,
+      status,
+      source:       'manual',
+    })
+    .select()
+    .single()
+
+  if (error) {
+    if (error.code === '23505') {
+      return NextResponse.json({ error: 'A lead with this email already exists' }, { status: 409 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Log activity
+  await supabase.from('activity_logs').insert({
+    workspace_id: member.workspace_id,
+    lead_id:      lead.id,
+    user_id:      user.id,
+    type:         'lead_created',
+    metadata:     { source: 'manual' },
+  })
+
+  return NextResponse.json({ lead }, { status: 201 })
+}

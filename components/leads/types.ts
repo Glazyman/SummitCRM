@@ -4,9 +4,9 @@
  * Frontend-specific types for the lead dashboard.
  * LeadRow = Lead + joined data (batch name, assigned name, last activity).
  */
-import type { LeadStatus } from '@/types/database'
+import type { LeadStatus, InterestStatus } from '@/types/database'
 
-export type { LeadStatus }
+export type { LeadStatus, InterestStatus }
 
 // ── Enriched row returned from the API or server component ────────────────
 export interface LeadRow {
@@ -21,12 +21,15 @@ export interface LeadRow {
   website:          string | null
   linkedin_url:     string | null
   status:           LeadStatus
+  interest_status:  InterestStatus
+  pipeline_stage_id: string | null
   batch_id:         string | null
   batch_name:       string | null
   assigned_to:      string | null
   assigned_name:    string | null  // joined from workspace_members
   source:           string | null
   last_activity_at: string | null
+  tags:             { id: string; name: string; color: string }[]
   created_at:       string
   updated_at:       string
 }
@@ -76,6 +79,8 @@ export type ColumnId =
   | 'email'
   | 'company'
   | 'status'
+  | 'interest'
+  | 'tags'
   | 'batch'
   | 'assigned'
   | 'last_activity'
@@ -98,6 +103,8 @@ export const COLUMNS: ColumnDef[] = [
   { id: 'email',         label: 'Email',          sortField: 'email',           optional: false, defaultOn: true },
   { id: 'company',       label: 'Company',        sortField: 'company',         optional: false, defaultOn: true },
   { id: 'status',        label: 'Status',         sortField: 'status',          optional: false, defaultOn: true },
+  { id: 'interest',      label: 'Interest',                                     optional: true,  defaultOn: true },
+  { id: 'tags',          label: 'Tags',                                         optional: true,  defaultOn: true },
   { id: 'batch',         label: 'Batch',                                        optional: true,  defaultOn: true },
   { id: 'assigned',      label: 'Assigned To',                                  optional: true,  defaultOn: true },
   { id: 'last_activity', label: 'Last Activity',  sortField: 'last_activity_at',optional: true,  defaultOn: true },

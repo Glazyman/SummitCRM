@@ -27,10 +27,10 @@ export default async function LeadDetailPage({ params }: PageProps) {
   const workspaceId = member?.workspace_id
   if (!workspaceId) notFound()
 
-  const [leadResult, batchesResult, activityResult, notesResult, emailsResult, followUpsResult, accountsResult, membersResult] = await Promise.all([
+  const [leadResult, batchesResult, activityResult, notesResult, emailsResult, followUpsResult, callsResult, accountsResult, membersResult] = await Promise.all([
     supabase
       .from('leads')
-      .select('id, workspace_id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, is_unsubscribed, batch_id, assigned_to, source, ai_summary, custom_fields, created_at, updated_at')
+      .select('id, workspace_id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, interest_status, is_unsubscribed, batch_id, assigned_to, source, ai_summary, custom_fields, created_at, updated_at')
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
@@ -40,6 +40,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
     supabase.from('notes').select('id, lead_id, author_id, content, created_at, updated_at').eq('lead_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
     supabase.from('emails').select('id, subject, body_html, sent_by, status, sent_at, opened_at, clicked_at, replied_at, bounced_at, created_at').eq('lead_id', id).order('created_at', { ascending: false }),
     supabase.from('follow_ups').select('id, title, notes, due_at, completed_at, assigned_to').eq('lead_id', id).order('due_at', { ascending: true }),
+    supabase.from('call_logs').select('id, outcome, duration_sec, notes, called_at, logged_by').eq('lead_id', id).order('called_at', { ascending: false }),
     supabase.from('sending_accounts_safe').select('*').eq('workspace_id', workspaceId).eq('is_active', true),
     supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('is_active', true),
   ])
@@ -71,6 +72,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
     website: string | null
     linkedin_url: string | null
     status: LeadDetail['status']
+    interest_status: LeadDetail['interest_status']
     is_unsubscribed: boolean
     batch_id: string | null
     assigned_to: string | null
@@ -83,6 +85,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
 
   const lead: LeadDetail = {
     ...rawLead,
+    interest_status: rawLead.interest_status ?? 'pending',
     batch_name: rawLead.batch_id ? batchNames.get(rawLead.batch_id) ?? null : null,
     assigned_name: rawLead.assigned_to ? usersById.get(rawLead.assigned_to) ?? null : null,
     assigned_avatar: null,
@@ -179,6 +182,19 @@ export default async function LeadDetailPage({ params }: PageProps) {
     }]
   }))
 
+  const calls = ((callsResult.data ?? []) as Array<{
+    id: string
+    outcome: string
+    duration_sec: number | null
+    notes: string | null
+    called_at: string
+    logged_by: string
+  }>).map((c) => ({
+    ...c,
+    outcome: c.outcome as import('@/components/leads/detail/call-history').CallLogItem['outcome'],
+    logger_name: usersById.get(c.logged_by) ?? null,
+  }))
+
   return (
     <Suspense
       fallback={
@@ -192,6 +208,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
         activity={[...activity, ...notes].sort((a, b) => b.created_at.localeCompare(a.created_at))}
         emails={emails}
         followUps={followUps}
+        calls={calls}
         teamMembers={teamMembers}
         accounts={accounts}
         quotas={quotas}

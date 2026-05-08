@@ -229,12 +229,16 @@ export function LeadsClient({
     })
   }
 
-  // ── Inline status change (optimistic) ─────────────────────────────────
+  // ── Inline status change (optimistic + API) ──────────────────────────
   function handleStatusChange(leadId: string, status: LeadStatus) {
     setLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, status, updated_at: new Date().toISOString() } : l))
     )
-    // TODO: PATCH /api/leads/[id] with { status }
+    fetch(`/api/leads/${leadId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ status }),
+    }).catch(console.error)
   }
 
   // ── Bulk actions ───────────────────────────────────────────────────────
@@ -244,12 +248,16 @@ export function LeadsClient({
       prev.map((l) => ids.includes(l.id) ? { ...l, status, updated_at: new Date().toISOString() } : l)
     )
     setSelectedIds(new Set())
-    // TODO: PATCH /api/leads/bulk
+    fetch('/api/leads/bulk', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ids, status }),
+    }).catch(console.error)
   }
 
   function handleBulkAssign(userId: string) {
-    const ids     = [...selectedIds]
-    const member  = teamMembers.find((m) => m.id === userId)
+    const ids    = [...selectedIds]
+    const member = teamMembers.find((m) => m.id === userId)
     setLeads((prev) =>
       prev.map((l) => ids.includes(l.id)
         ? { ...l, assigned_to: userId || null, assigned_name: member?.name ?? null, updated_at: new Date().toISOString() }
@@ -257,6 +265,11 @@ export function LeadsClient({
       )
     )
     setSelectedIds(new Set())
+    fetch('/api/leads/bulk', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ids, assigned_to: userId || null }),
+    }).catch(console.error)
   }
 
   function handleBulkBatch(batchId: string) {
@@ -269,45 +282,69 @@ export function LeadsClient({
       )
     )
     setSelectedIds(new Set())
+    fetch('/api/leads/bulk', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ids, batch_id: batchId }),
+    }).catch(console.error)
   }
 
   function handleBulkDelete() {
     const ids = [...selectedIds]
     setLeads((prev) => prev.filter((l) => !ids.includes(l.id)))
     setSelectedIds(new Set())
-    // TODO: DELETE /api/leads/bulk
+    fetch('/api/leads/bulk', {
+      method:  'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ids }),
+    }).catch(console.error)
   }
 
   function handleDeleteLead(id: string) {
     setLeads((prev) => prev.filter((l) => l.id !== id))
     setSelectedIds((s) => { const next = new Set(s); next.delete(id); return next })
+    fetch(`/api/leads/${id}`, { method: 'DELETE' }).catch(console.error)
   }
 
   async function handleCreateLead(data: NewLeadData) {
-    // Optimistic insert — real API call would replace this
-    const newLead: LeadRow = {
-      id:               `local-${Date.now()}`,
-      workspace_id:     'ws1',
-      first_name:       data.first_name || null,
-      last_name:        data.last_name  || null,
-      email:            data.email,
-      phone:            data.phone      || null,
-      company:          data.company    || null,
-      title:            data.title      || null,
-      website:          data.website    || null,
-      linkedin_url:     null,
-      status:           'new',
-      batch_id:         data.batch_id   || null,
-      batch_name:       batches.find((b) => b.id === data.batch_id)?.name ?? null,
-      assigned_to:      currentUserId,
-      assigned_name:    teamMembers.find((m) => m.id === currentUserId)?.name ?? null,
-      source:           'manual',
-      last_activity_at: null,
-      created_at:       new Date().toISOString(),
-      updated_at:       new Date().toISOString(),
+    try {
+      const res = await fetch('/api/leads', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(data),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to create lead')
+
+      const lead = json.lead
+      const newLead: LeadRow = {
+        id:               lead.id,
+        workspace_id:     lead.workspace_id,
+        first_name:       lead.first_name ?? null,
+        last_name:        lead.last_name  ?? null,
+        email:            lead.email,
+        phone:            lead.phone      ?? null,
+        company:          lead.company    ?? null,
+        title:            lead.title      ?? null,
+        website:          lead.website    ?? null,
+        linkedin_url:     lead.linkedin_url ?? null,
+        status:           lead.status,
+        interest_status:  lead.interest_status ?? 'pending',
+        pipeline_stage_id: null,
+        batch_id:         lead.batch_id   ?? null,
+        batch_name:       batches.find((b) => b.id === lead.batch_id)?.name ?? null,
+        assigned_to:      lead.assigned_to ?? null,
+        assigned_name:    teamMembers.find((m) => m.id === lead.assigned_to)?.name ?? null,
+        source:           lead.source     ?? 'manual',
+        last_activity_at: null,
+        tags:             [],
+        created_at:       lead.created_at,
+        updated_at:       lead.updated_at,
+      }
+      setLeads((prev) => [newLead, ...prev])
+    } catch (err) {
+      console.error('Create lead failed:', err)
     }
-    setLeads((prev) => [newLead, ...prev])
-    // TODO: POST /api/leads
   }
 
   function handleToggleColumn(id: ColumnId) {

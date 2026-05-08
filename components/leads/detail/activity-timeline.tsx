@@ -5,7 +5,7 @@ import {
   UserPlus, FileDown, RefreshCw, StickyNote,
   Mail, Eye, MousePointer, Reply, AlertTriangle,
   Sparkles, Calendar, Send, CheckCircle2,
-  BellOff, Pencil, Trash2, Activity,
+  BellOff, Pencil, Trash2, Activity, Phone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { STATUS_CONFIG } from '@/components/leads/status-config'
@@ -42,6 +42,7 @@ const ACTIVITY_META: Record<ActivityType, ActivityMeta> = {
   follow_up_scheduled: { icon: Calendar,        ring: 'ring-border', bg: 'bg-secondary', color: 'text-foreground',label: 'Follow-up scheduled' },
   follow_up_sent:      { icon: Send,            ring: 'ring-border',       bg: 'bg-secondary',       color: 'text-foreground',      label: 'Follow-up sent' },
   follow_up_completed: { icon: CheckCircle2,    ring: 'ring-border',   bg: 'bg-secondary',   color: 'text-foreground',  label: 'Follow-up completed' },
+  call_logged:         { icon: Phone,           ring: 'ring-border',       bg: 'bg-secondary',       color: 'text-foreground',      label: 'Call logged' },
   unsubscribed:        { icon: BellOff,         ring: 'ring-border',       bg: 'bg-secondary',       color: 'text-foreground',      label: 'Unsubscribed' },
   member_invited:      { icon: UserPlus,        ring: 'ring-border',     bg: 'bg-secondary',     color: 'text-foreground',    label: 'Member invited' },
   role_changed:        { icon: RefreshCw,       ring: 'ring-gray-200',     bg: 'bg-gray-100',        color: 'text-gray-500',                       label: 'Role changed' },

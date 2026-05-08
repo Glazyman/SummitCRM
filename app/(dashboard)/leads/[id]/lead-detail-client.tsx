@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Mail, Activity, Clock } from 'lucide-react'
+import { Mail, Activity, Clock, Phone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LeadActionBar }    from '@/components/leads/detail/lead-action-bar'
 import { LeadProfileCard }  from '@/components/leads/detail/lead-profile-card'
@@ -9,6 +9,7 @@ import { ActivityTimeline } from '@/components/leads/detail/activity-timeline'
 import { NoteEditor }       from '@/components/leads/detail/note-editor'
 import { EmailHistory }     from '@/components/leads/detail/email-history'
 import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
+import { CallHistory }      from '@/components/leads/detail/call-history'
 import { EmailPanel }       from '@/components/email/email-panel'
 import { AIDraftModal }     from '@/components/ai'
 import type {
@@ -16,12 +17,14 @@ import type {
   FollowUp, NewFollowUp, TeamMember, LeadStatus,
 } from '@/components/leads/detail/types'
 import type { SendingAccountPublic, QuotaStatus } from '@/lib/email/types'
+import type { CallLogItem, NewCall } from '@/components/leads/detail/call-history'
 
 // ── Tab config ────────────────────────────────────────────────────────────
 const TABS = [
   { id: 'activity',  label: 'Activity',   Icon: Activity    },
   { id: 'emails',    label: 'Emails',     Icon: Mail        },
   { id: 'followups', label: 'Follow-ups', Icon: Clock       },
+  { id: 'calls',     label: 'Calls',      Icon: Phone       },
 ] as const
 
 type TabId = typeof TABS[number]['id']
@@ -32,6 +35,7 @@ interface LeadDetailClientProps {
   activity:     ActivityEntry[]
   emails:       EmailHistoryItem[]
   followUps:    FollowUp[]
+  calls:        CallLogItem[]
   teamMembers:  TeamMember[]
   accounts:     SendingAccountPublic[]
   quotas:       Record<string, QuotaStatus>
@@ -44,6 +48,7 @@ export default function LeadDetailClient({
   activity:     initialActivity,
   emails:       initialEmails,
   followUps:    initialFollowUps,
+  calls:        initialCalls,
   teamMembers,
   accounts,
   quotas,
@@ -55,6 +60,7 @@ export default function LeadDetailClient({
   const [activity,      setActivity]     = React.useState(initialActivity)
   const [emails,        setEmails]       = React.useState(initialEmails)
   const [followUps,     setFollowUps]    = React.useState(initialFollowUps)
+  const [calls,         setCalls]        = React.useState<CallLogItem[]>(initialCalls)
   const [activeTab,     setActiveTab]    = React.useState<TabId>('activity')
   const [emailPanelOpen,   setEmailPanelOpen]   = React.useState(false)
   const [aiDraftOpen,      setAiDraftOpen]      = React.useState(false)
@@ -91,6 +97,21 @@ export default function LeadDetailClient({
       })
     } catch (err) {
       setLead((l) => ({ ...l, status: prev }))
+      console.error(err)
+    }
+  }
+
+  async function handleInterestChange(interest_status: import('@/types/database').InterestStatus) {
+    const prev = lead.interest_status
+    if (prev === interest_status) return
+    setLead((l) => ({ ...l, interest_status }))
+    try {
+      await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ interest_status }),
+      })
+    } catch (err) {
+      setLead((l) => ({ ...l, interest_status: prev }))
       console.error(err)
     }
   }
@@ -255,6 +276,20 @@ export default function LeadDetailClient({
     setActivity((prev) => [entry, ...prev])
   }
 
+  // ── Call log handler ──────────────────────────────────────────────────
+  async function handleLogCall(data: NewCall) {
+    const res = await fetch(`/api/leads/${lead.id}/calls`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data),
+    })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error ?? 'Failed to log call')
+
+    setCalls((prev) => [{ ...json.call, logger_name: 'You' }, ...prev])
+    addActivity({ type: 'lead_status_changed', metadata: { call_outcome: data.outcome } })
+  }
+
   // ── Pending count badges ──────────────────────────────────────────────
   const pendingFollowUps = followUps.filter((f) => !f.is_completed).length
 
@@ -331,6 +366,7 @@ export default function LeadDetailClient({
         teamMembers={teamMembers}
         isAdmin={isAdmin}
         onStatusChange={handleStatusChange}
+        onInterestChange={handleInterestChange}
         onAssign={handleAssign}
         onSendEmail={() => setEmailPanelOpen(true)}
         onAIDraft={() => setAiDraftOpen(true)}
@@ -425,6 +461,21 @@ export default function LeadDetailClient({
                 onAdd={handleAddFollowUp}
                 onComplete={handleCompleteFollowUp}
                 onDelete={handleDeleteFollowUp}
+              />
+            </Section>
+
+            {/* ── Call History ── */}
+            <Section
+              title="Calls"
+              icon={<Phone className="h-4 w-4 text-muted-foreground" />}
+              count={calls.length || undefined}
+              visible={activeTab === 'calls'}
+              alwaysVisible
+            >
+              <CallHistory
+                calls={calls}
+                onLogCall={handleLogCall}
+                currentUserId={currentUserId}
               />
             </Section>
           </div>

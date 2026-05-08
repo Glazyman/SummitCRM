@@ -3,8 +3,8 @@
  *
  * Types specific to the Lead Detail view.
  */
-import type { LeadStatus } from '@/types/database'
-export type { LeadStatus }
+import type { LeadStatus, InterestStatus } from '@/types/database'
+export type { LeadStatus, InterestStatus }
 
 // ── Full lead detail (all fields + joined data) ──────────────────────────
 export interface LeadDetail {
@@ -19,6 +19,8 @@ export interface LeadDetail {
   website:          string | null
   linkedin_url:     string | null
   status:           LeadStatus
+  interest_status:  InterestStatus
+  pipeline_stage_id?: string | null
   is_unsubscribed:  boolean
   batch_id:         string | null
   batch_name:       string | null
@@ -49,6 +51,7 @@ export type ActivityType =
   | 'follow_up_scheduled'
   | 'follow_up_sent'
   | 'follow_up_completed'
+  | 'call_logged'
   | 'unsubscribed'
   | 'member_invited'
   | 'role_changed'

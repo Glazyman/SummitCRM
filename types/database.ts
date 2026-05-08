@@ -8,6 +8,12 @@ export type WorkspaceRole = 'super_admin' | 'admin' | 'manager' | 'rep' | 'viewe
 
 export type LeadStatus =
   | 'new'
+  | 'called'
+  | 'emailed'
+  | 'voicemail'
+  | 'no_answer'
+  | 'wrong_number'
+  | 'sold_already'
   | 'contacted'
   | 'replied'
   | 'interested'
@@ -15,6 +21,15 @@ export type LeadStatus =
   | 'do_not_contact'
   | 'unsubscribed'
   | 'converted'
+
+export type InterestStatus = 'pending' | 'interested' | 'not_interested'
+
+export type CallOutcome =
+  | 'answered'
+  | 'voicemail'
+  | 'no_answer'
+  | 'wrong_number'
+  | 'callback_requested'
 
 export type EmailStatus =
   | 'queued'
@@ -113,6 +128,8 @@ export interface Lead {
   website: string | null
   linkedin_url: string | null
   status: LeadStatus
+  interest_status: InterestStatus
+  pipeline_stage_id: string | null
   is_unsubscribed: boolean
   unsubscribed_at: string | null
   custom_fields: Record<string, unknown>
@@ -120,6 +137,45 @@ export interface Lead {
   source: string | null
   import_id: string | null
   deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Tag {
+  id: string
+  workspace_id: string
+  name: string
+  color: string
+  created_by: string | null
+  created_at: string
+}
+
+export interface LeadTag {
+  lead_id: string
+  tag_id: string
+  created_at: string
+}
+
+export interface CallLog {
+  id: string
+  workspace_id: string
+  lead_id: string
+  logged_by: string
+  outcome: CallOutcome
+  duration_sec: number | null
+  notes: string | null
+  called_at: string
+  created_at: string
+}
+
+export interface PipelineStage {
+  id: string
+  workspace_id: string
+  name: string
+  color: string
+  position: number
+  is_won: boolean
+  is_lost: boolean
   created_at: string
   updated_at: string
 }
@@ -326,19 +382,26 @@ export type Database = {
       ai_usage_logs: { Row: AiUsageLog; Insert: Partial<AiUsageLog>; Update: Partial<AiUsageLog> }
       follow_ups: { Row: FollowUp; Insert: Partial<FollowUp>; Update: Partial<FollowUp> }
       unsubscribes: { Row: Unsubscribe; Insert: Partial<Unsubscribe>; Update: Partial<Unsubscribe> }
+      tags: { Row: Tag; Insert: Partial<Tag>; Update: Partial<Tag> }
+      lead_tags: { Row: LeadTag; Insert: Partial<LeadTag>; Update: Partial<LeadTag> }
+      call_logs: { Row: CallLog; Insert: Partial<CallLog>; Update: Partial<CallLog> }
+      pipeline_stages: { Row: PipelineStage; Insert: Partial<PipelineStage>; Update: Partial<PipelineStage> }
     }
     Views: Record<string, never>
     Functions: {
       get_my_role: { Args: { ws_id: string }; Returns: WorkspaceRole }
+      seed_default_pipeline_stages: { Args: { p_workspace_id: string }; Returns: void }
     }
     Enums: {
       workspace_role: WorkspaceRole
       lead_status: LeadStatus
+      interest_status: InterestStatus
       email_status: EmailStatus
       campaign_status: CampaignStatus
       notification_type: NotificationType
       activity_type: ActivityType
       sending_account_type: SendingAccountType
+      call_outcome: CallOutcome
     }
   }
 }
