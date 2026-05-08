@@ -24,17 +24,17 @@ export default async function ImportPage() {
   const { data: batches } = workspaceId
     ? await supabase
         .from('lead_batches')
-        .select('id, name, lead_count')
+        .select('id, name')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false }) as unknown as {
-          data: { id: string; name: string; lead_count: number }[] | null
+          data: { id: string; name: string }[] | null
         }
-    : { data: [] as { id: string; name: string; lead_count: number }[] }
+    : { data: [] as { id: string; name: string }[] }
 
   const formattedBatches = (batches ?? []).map((b) => ({
     id: b.id,
     name: b.name,
-    leadCount: b.lead_count ?? 0,
+    leadCount: 0,
   }))
 
   return (

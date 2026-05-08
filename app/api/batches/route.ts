@@ -34,11 +34,10 @@ export async function GET() {
 
     const { data, error } = await (admin as any)
       .from('lead_batches')
-      .select('id, name, created_at, leads(count)')
+      .select('id, name, created_at')
       .eq('workspace_id', member.workspace_id)
-      .is('deleted_at', null)
       .order('created_at', { ascending: false }) as {
-        data: Array<{ id: string; name: string; created_at: string; leads: { count: number }[] }> | null
+        data: Array<{ id: string; name: string; created_at: string }> | null
         error: unknown
       }
 
@@ -47,7 +46,7 @@ export async function GET() {
     const batches = (data ?? []).map((b) => ({
       id: b.id,
       name: b.name,
-      leadCount: b.leads?.[0]?.count ?? 0,
+      leadCount: 0,
       createdAt: b.created_at,
     }))
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -45,6 +45,17 @@ export function ImportWizard({ batches: initialBatches, onImport }: ImportWizard
   const [options, setOptions] = useState<ImportOptions>(DEFAULT_OPTIONS)
   const [batches, setBatches] = useState<ExistingBatch[]>(initialBatches)
 
+  // Keep batch list fresh — re-fetch from API on mount and after each reset
+  async function refreshBatches() {
+    try {
+      const res = await fetch('/api/batches')
+      const json = await res.json() as { data?: { batches: ExistingBatch[] } }
+      if (json.data?.batches) setBatches(json.data.batches)
+    } catch { /* keep existing list on error */ }
+  }
+
+  useEffect(() => { refreshBatches() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const currentIndex = STEPS.findIndex((s) => s.id === step)
   const emailMapped = Object.values(mapping).includes('email')
 
@@ -66,6 +77,7 @@ export function ImportWizard({ batches: initialBatches, onImport }: ImportWizard
     setFile(null)
     setMapping({})
     setOptions(DEFAULT_OPTIONS)
+    refreshBatches()
   }
 
   function handleViewLeads(batchId?: string) {

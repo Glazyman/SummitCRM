@@ -28,45 +28,41 @@ export function ProgressStep({ onStart, onViewLeads, onImportAnother }: Progress
   const [error, setError] = useState<string | null>(null)
   const [showErrors, setShowErrors] = useState(false)
 
-  // Guard against React Strict Mode double-invocation of useEffect
+  // Guard against React Strict Mode double-invocation — ref persists across
+  // the unmount/remount cycle so onStart() is called exactly once.
   const started = useRef(false)
 
   useEffect(() => {
     if (started.current) return
     started.current = true
 
-    let cancelled = false
-
     async function run() {
       // Phase 1: Uploading (0 → 30%)
       setPhase('uploading')
       setStatusText('Uploading file to secure storage…')
-      await animateTo(0, 30, 800, (v) => !cancelled && setProgress(v))
+      await animateTo(0, 30, 800, setProgress)
 
       // Phase 2: Processing (30 → 85%)
       setPhase('processing')
       setStatusText('Processing rows and checking for duplicates…')
-      await animateTo(30, 85, 1200, (v) => !cancelled && setProgress(v))
+      await animateTo(30, 85, 1200, setProgress)
 
       try {
         setStatusText('Almost done — inserting leads…')
         const res = await onStart()
-        if (cancelled) return
 
         // Phase 3: Done (85 → 100%)
-        await animateTo(85, 100, 400, (v) => !cancelled && setProgress(v))
+        await animateTo(85, 100, 400, setProgress)
         setResult(res)
         setPhase('done')
         setStatusText('Import complete!')
       } catch (err) {
-        if (cancelled) return
         setPhase('failed')
         setError(err instanceof Error ? err.message : 'Import failed. Please try again.')
       }
     }
 
     run()
-    return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Failed state ────────────────────────────────────────────────────────
