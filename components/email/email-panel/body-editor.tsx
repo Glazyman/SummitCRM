@@ -165,13 +165,13 @@ export function BodyEditor({
 
       {/* ── Merge variable chips (collapsible) ── */}
       {showMerge && !previewMode && (
-        <div className="flex flex-wrap gap-1 border-b border-border bg-violet-50/50 px-3 py-2 dark:bg-violet-900/10">
+        <div className="flex flex-wrap gap-1 border-b border-border bg-secondary px-3 py-2">
           {MERGE_CHIPS.map((chip) => (
             <button
               key={chip.label}
               type="button"
               onClick={() => insert(chip.label)}
-              className="rounded-md border border-dashed border-violet-300 bg-white px-2 py-0.5 text-xs font-mono text-violet-700 hover:bg-violet-100 dark:border-violet-700 dark:bg-transparent dark:text-violet-400"
+              className="rounded-md border border-dashed border-border bg-white px-2 py-0.5 text-xs font-mono text-foreground hover:bg-secondary"
             >
               {chip.display}
             </button>
@@ -207,7 +207,7 @@ export function BodyEditor({
       <div className="flex items-center justify-between border-t border-border bg-muted/10 px-3 py-1.5">
         <div className="flex items-center gap-3">
           {unknownVars.length > 0 && (
-            <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
+            <span className="flex items-center gap-1 text-[10px] text-foreground">
               <Type className="h-3 w-3" />
               Unknown: {unknownVars.map((v) => `{{${v}}}`).join(', ')}
             </span>

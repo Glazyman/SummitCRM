@@ -10,9 +10,12 @@ import {
   Settings,
   Bell,
   Shield,
-  Star,
+  PlusCircle,
   Building2,
   MoreHorizontal,
+  Inbox,
+  Search,
+  HelpCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WorkspaceRole } from '@/types/database'
@@ -26,16 +29,17 @@ interface NavItem {
 }
 
 const mainNav: NavItem[] = [
-  { label: 'Dashboard',       href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Leads',           href: '/leads',     icon: Users            },
-  { label: 'Campaigns',       href: '/campaigns', icon: Send, minRole: 'manager' },
-  { label: 'Admin Dashboard', href: '/admin',     icon: Shield, minRole: 'manager' },
-  { label: 'Analytics',       href: '/analytics', icon: BarChart2        },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Leads',     href: '/leads',     icon: Users },
+  { label: 'Campaigns', href: '/campaigns', icon: Send, minRole: 'manager' },
+  { label: 'Analytics', href: '/analytics', icon: BarChart2 },
+  { label: 'Admin',     href: '/admin',     icon: Shield, minRole: 'manager' },
 ]
 
 const bottomNav: NavItem[] = [
-  { label: 'Notifications', href: '/notifications', icon: Bell },
-  { label: 'Settings',      href: '/settings',      icon: Settings },
+  { label: 'Settings', href: '/settings', icon: Settings },
+  { label: 'Get Help', href: '/settings/profile', icon: HelpCircle },
+  { label: 'Search',   href: '/leads', icon: Search },
 ]
 
 const ROLE_RANK: Record<WorkspaceRole, number> = {
@@ -85,32 +89,33 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
   return (
     <aside className="flex h-full w-[var(--sidebar-width)] flex-col border-r border-border bg-background">
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-4 pb-5 pt-5">
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] text-sm font-bold tracking-tight text-white"
-          style={{
-            background: 'linear-gradient(135deg, hsl(218 100% 52%), color-mix(in oklch, hsl(218 100% 52%) 60%, #fff))',
-            boxShadow: 'inset 0 -2px 4px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.1)',
-          }}
-        >
+      <div className="flex items-center gap-2.5 px-4 pb-3 pt-4">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold text-foreground shadow-card">
           {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
         </div>
-        <div className="min-w-0">
-          <div className="truncate text-[17px] font-semibold leading-tight tracking-[-0.02em]">
-            Summit
-          </div>
-          <div className="truncate text-[11px] text-muted-foreground leading-tight mt-0.5">
-            {workspaceName ?? 'Workspace'}
-          </div>
-        </div>
+        <p className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-none tracking-[-0.02em]">
+          {workspaceName ?? 'Summit Mergers'}
+        </p>
+        <button
+          type="button"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground"
+          aria-label="Inbox"
+        >
+          <Inbox className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       {/* Main nav */}
-      <nav className="flex flex-1 flex-col overflow-y-auto px-3.5 scrollbar-thin">
-        <p className="mb-1.5 px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-          Workspace
-        </p>
-        <div className="flex flex-col gap-0.5">
+      <nav className="flex flex-1 flex-col overflow-y-auto px-3 scrollbar-thin">
+        <Link
+          href="/leads/import"
+          className="mb-3 flex items-center gap-2 rounded-lg bg-primary px-2.5 py-2 text-[13px] font-medium text-primary-foreground shadow-primary-glow transition-colors hover:bg-primary/90"
+        >
+          <PlusCircle className="h-4 w-4" />
+          Quick Create
+        </Link>
+
+        <div className="flex flex-col gap-1">
           {visibleMain.map((item) => (
             <NavLink key={item.href} item={item} active={isActive(item.href)} />
           ))}
@@ -118,9 +123,9 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
 
         {/* Settings section for admins */}
         {isAdmin && (
-          <div className="mt-5">
-            <p className="mb-1.5 px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-              Workspace settings
+          <div className="mt-6">
+            <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">
+              Admin
             </p>
             <NavLink
               item={{ label: 'Team Members', href: '/settings/team', icon: Users }}
@@ -130,19 +135,20 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
         )}
 
         {/* Lists section */}
-        <div className="mt-5">
-          <p className="mb-1.5 px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-            Lists
+        <div className="mt-6">
+          <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">
+            Documents
           </p>
-          <div className="flex flex-col gap-0.5">
-            <NavLink item={{ label: 'Starred',   href: '/leads?filter=starred',   icon: Star      }} active={false} />
-            <NavLink item={{ label: 'Companies', href: '/leads?filter=companies', icon: Building2 }} active={false} />
+          <div className="flex flex-col gap-1">
+            <NavLink item={{ label: 'Data Library', href: '/leads', icon: Building2 }} active={false} />
+            <NavLink item={{ label: 'Reports', href: '/analytics', icon: BarChart2 }} active={false} />
+            <NavLink item={{ label: 'Notifications', href: '/notifications', icon: Bell }} active={isActive('/notifications')} />
           </div>
         </div>
       </nav>
 
       {/* Bottom nav */}
-      <div className="flex flex-col gap-0.5 px-3.5 pt-2 pb-2">
+      <div className="flex flex-col gap-1 px-3 pb-3 pt-2">
         {bottomNav.map((item) => (
           <NavLink key={item.href} item={item} active={isActive(item.href)} />
         ))}
@@ -151,23 +157,20 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
       {/* Footer — user info */}
       <div className="flex items-center gap-2.5 border-t border-border px-4 py-3">
         {/* Avatar */}
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-          style={{ background: 'linear-gradient(135deg, #7E5BEF, #14B5B5)' }}
-        >
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-[11px] font-semibold text-foreground">
           {initials}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13.5px] font-semibold leading-tight">{displayName}</p>
+          <p className="truncate text-[13px] font-medium leading-tight">{displayName}</p>
           {userEmail && (
-            <p className="truncate text-[11.5px] text-muted-foreground leading-tight mt-0.5">
+            <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
               {userEmail}
             </p>
           )}
         </div>
         <button
           type="button"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           aria-label="More options"
         >
           <MoreHorizontal className="h-4 w-4" />
@@ -190,16 +193,16 @@ function NavLink({
     <Link
       href={item.href}
       className={cn(
-        'flex items-center gap-3 rounded-[10px] px-2.5 py-2.5 text-[14.5px] font-medium transition-all duration-100',
+        'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors duration-100',
         active
-          ? 'bg-card text-foreground shadow-card'
-          : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+          ? 'bg-primary text-primary-foreground shadow-primary-glow'
+          : 'text-foreground/75 hover:bg-secondary hover:text-foreground'
       )}
     >
       <Icon
         className={cn(
-          'h-[18px] w-[18px] shrink-0',
-          active ? 'text-primary' : 'text-muted-foreground'
+          'h-4 w-4 shrink-0',
+          active ? 'text-primary-foreground' : 'text-muted-foreground'
         )}
       />
       <span className="flex-1">{item.label}</span>
@@ -208,7 +211,7 @@ function NavLink({
           className={cn(
             'rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none',
             active
-              ? 'bg-primary/10 text-primary'
+              ? 'bg-primary-foreground/15 text-primary-foreground'
               : 'bg-secondary text-muted-foreground'
           )}
         >

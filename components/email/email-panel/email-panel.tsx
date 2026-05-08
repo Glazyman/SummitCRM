@@ -384,13 +384,13 @@ export function EmailPanel({
 
               {/* Send status messages */}
               {sendStatus === 'sent' && (
-                <div className="flex items-start gap-2 border-t border-green-200/50 bg-green-50/80 px-4 py-2.5 text-xs text-green-700 dark:border-green-800/30 dark:bg-green-900/10 dark:text-green-400 shrink-0">
+                <div className="flex items-start gap-2 border-t border-border bg-secondary px-4 py-2.5 text-xs text-foreground shrink-0">
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   {sendMsg}
                 </div>
               )}
               {sendStatus === 'error' && (
-                <div className="flex items-start gap-2 border-t border-red-200/50 bg-red-50/80 px-4 py-2.5 text-xs text-red-700 dark:border-red-800/30 dark:bg-red-900/10 dark:text-red-400 shrink-0">
+                <div className="flex items-start gap-2 border-t border-border bg-secondary px-4 py-2.5 text-xs text-foreground shrink-0">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   {sendMsg}
                 </div>
@@ -401,7 +401,7 @@ export function EmailPanel({
                 <div className="flex items-center gap-1 px-4 py-1 text-[10px] text-muted-foreground shrink-0">
                   {autoSaveState === 'saving'
                     ? <><Loader2 className="h-2.5 w-2.5 animate-spin" /> Saving draft…</>
-                    : <><CheckCircle2 className="h-2.5 w-2.5 text-green-500" /> Draft saved</>
+                    : <><CheckCircle2 className="h-2.5 w-2.5 text-foreground" /> Draft saved</>
                   }
                 </div>
               )}

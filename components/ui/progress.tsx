@@ -12,8 +12,8 @@ interface ProgressProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const colorMap = {
   default:     'bg-primary',
-  success:     'bg-emerald-500',
-  warning:     'bg-amber-500',
+  success:     'bg-secondary',
+  warning:     'bg-secondary',
   destructive: 'bg-destructive',
 }
 

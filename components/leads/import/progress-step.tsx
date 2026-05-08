@@ -134,14 +134,14 @@ export function ProgressStep({ onStart, onViewLeads, onImportAnother }: Progress
           allFailed
             ? 'bg-destructive/10'
             : partialSuccess
-              ? 'bg-amber-100 dark:bg-amber-900/20'
-              : 'bg-emerald-100 dark:bg-emerald-900/20'
+              ? 'bg-secondary'
+              : 'bg-secondary'
         )}>
           {allFailed
             ? <XCircle className="h-8 w-8 text-destructive" />
             : partialSuccess
-              ? <AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
-              : <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+              ? <AlertTriangle className="h-8 w-8 text-foreground" />
+              : <CheckCircle2 className="h-8 w-8 text-foreground" />
           }
         </div>
 
@@ -199,11 +199,11 @@ export function ProgressStep({ onStart, onViewLeads, onImportAnother }: Progress
 
       {/* Error report section */}
       {result && result.errors.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800/40 dark:bg-amber-900/10">
+        <div className="rounded-xl border border-border bg-secondary">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 text-foreground" />
+              <span className="text-sm font-semibold text-foreground">
                 {result.errors.length} rows need attention
               </span>
             </div>
@@ -211,14 +211,14 @@ export function ProgressStep({ onStart, onViewLeads, onImportAnother }: Progress
               <button
                 type="button"
                 onClick={() => setShowErrors(!showErrors)}
-                className="text-xs text-amber-700 underline underline-offset-2 hover:text-amber-900 dark:text-amber-400"
+                className="text-xs text-foreground underline underline-offset-2 hover:text-foreground"
               >
                 {showErrors ? 'Hide' : 'View'} errors
               </button>
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 gap-1.5 border-amber-300 text-xs text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-400"
+                className="h-7 gap-1.5 border-border text-xs text-foreground hover:bg-secondary"
                 onClick={() => downloadErrors(result.errors)}
               >
                 <Download className="h-3 w-3" />
@@ -229,23 +229,23 @@ export function ProgressStep({ onStart, onViewLeads, onImportAnother }: Progress
 
           {/* Inline error list */}
           {showErrors && (
-            <div className="border-t border-amber-200 dark:border-amber-800/40">
-              <div className="max-h-48 overflow-y-auto divide-y divide-amber-100 dark:divide-amber-800/30">
+            <div className="border-t border-border">
+              <div className="max-h-48 overflow-y-auto divide-y divide-amber-100">
                 {result.errors.slice(0, 50).map((err, i) => (
                   <div key={i} className="flex items-start gap-3 px-4 py-2.5 text-xs">
-                    <span className="w-12 shrink-0 text-amber-600/60 dark:text-amber-500/60">
+                    <span className="w-12 shrink-0 text-foreground">
                       Row {err.row}
                     </span>
-                    <span className="min-w-0 truncate font-mono text-amber-700 dark:text-amber-400">
+                    <span className="min-w-0 truncate font-mono text-foreground">
                       {err.email}
                     </span>
-                    <span className="ml-auto shrink-0 text-amber-600 dark:text-amber-500">
+                    <span className="ml-auto shrink-0 text-foreground">
                       {err.reason}
                     </span>
                   </div>
                 ))}
                 {result.errors.length > 50 && (
-                  <div className="px-4 py-2.5 text-center text-xs text-amber-600 dark:text-amber-500">
+                  <div className="px-4 py-2.5 text-center text-xs text-foreground">
                     + {result.errors.length - 50} more errors. Download report for full list.
                   </div>
                 )}
@@ -286,9 +286,9 @@ function ResultStat({
   icon: React.ComponentType<{ className?: string }>
 }) {
   const styles = {
-    emerald: { bg: 'bg-emerald-100 dark:bg-emerald-900/20', text: 'text-emerald-600 dark:text-emerald-400', val: 'text-emerald-700 dark:text-emerald-300' },
-    blue:    { bg: 'bg-blue-100 dark:bg-blue-900/20',    text: 'text-blue-600 dark:text-blue-400',    val: 'text-blue-700 dark:text-blue-300' },
-    red:     { bg: 'bg-red-100 dark:bg-red-900/20',      text: 'text-red-600 dark:text-red-400',      val: 'text-red-700 dark:text-red-300' },
+    emerald: { bg: 'bg-secondary', text: 'text-foreground', val: 'text-foreground' },
+    blue:    { bg: 'bg-secondary',    text: 'text-foreground',    val: 'text-foreground' },
+    red:     { bg: 'bg-secondary',      text: 'text-foreground',      val: 'text-foreground' },
     muted:   { bg: 'bg-muted',                           text: 'text-muted-foreground',               val: 'text-muted-foreground' },
   }
   const s = styles[color]

@@ -23,42 +23,42 @@ export function CampaignStatsCards({ campaign, className }: CampaignStatsCardsPr
       label:  'Total leads',
       value:  total_leads.toLocaleString(),
       icon:   <Users className="h-4 w-4" />,
-      color:  'text-blue-500 bg-blue-100/60 dark:bg-blue-900/20',
+      color:  'text-foreground bg-secondary',
       sub:    null,
     },
     {
       label:  'Emails sent',
       value:  emails_sent.toLocaleString(),
       icon:   <Send className="h-4 w-4" />,
-      color:  'text-gray-500 bg-gray-100/60 dark:bg-gray-800/40',
+      color:  'text-gray-500 bg-gray-100/60',
       sub:    total_leads > 0 ? `${Math.round((emails_sent / (total_leads)) * 100)}% of total` : null,
     },
     {
       label:  'Open rate',
       value:  emails_sent > 0 ? `${pct(emails_opened)}%` : '—',
       icon:   <Eye className="h-4 w-4" />,
-      color:  'text-blue-500 bg-blue-100/60 dark:bg-blue-900/20',
+      color:  'text-foreground bg-secondary',
       sub:    emails_sent > 0 ? `${emails_opened.toLocaleString()} opens` : null,
     },
     {
       label:  'Click rate',
       value:  emails_sent > 0 ? `${pct(emails_clicked)}%` : '—',
       icon:   <MousePointer className="h-4 w-4" />,
-      color:  'text-teal-500 bg-teal-100/60 dark:bg-teal-900/20',
+      color:  'text-foreground bg-secondary',
       sub:    emails_sent > 0 ? `${emails_clicked.toLocaleString()} clicks` : null,
     },
     {
       label:  'Reply rate',
       value:  emails_sent > 0 ? `${pct(emails_replied)}%` : '—',
       icon:   <Reply className="h-4 w-4" />,
-      color:  'text-emerald-500 bg-emerald-100/60 dark:bg-emerald-900/20',
+      color:  'text-foreground bg-secondary',
       sub:    emails_sent > 0 ? `${emails_replied.toLocaleString()} replies` : null,
     },
     {
       label:  'Bounce rate',
       value:  emails_sent > 0 ? `${pct(emails_bounced)}%` : '—',
       icon:   <AlertTriangle className="h-4 w-4" />,
-      color:  emails_bounced > 5 ? 'text-red-500 bg-red-100/60 dark:bg-red-900/20' : 'text-gray-400 bg-gray-100/60 dark:bg-gray-800/40',
+      color:  emails_bounced > 5 ? 'text-foreground bg-secondary' : 'text-gray-400 bg-gray-100/60',
       sub:    emails_sent > 0 ? `${emails_bounced.toLocaleString()} bounces` : null,
     },
   ]
@@ -97,7 +97,7 @@ export function CampaignProgress({ campaign }: { campaign: Campaign }) {
         <div
           className={cn(
             'h-full rounded-full transition-all',
-            pct === 100 ? 'bg-emerald-500' : 'bg-primary'
+            pct === 100 ? 'bg-secondary' : 'bg-primary'
           )}
           style={{ width: `${pct}%` }}
         />

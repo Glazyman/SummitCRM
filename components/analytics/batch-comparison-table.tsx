@@ -37,7 +37,7 @@ export function BatchComparisonTable({ batches, loading }: Props) {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Layers className="h-5 w-5 text-orange-500" />
+          <Layers className="h-5 w-5 text-foreground" />
           Batch comparison
           <Badge variant="secondary" className="ml-auto text-xs">{batches.length} batches</Badge>
         </CardTitle>
@@ -83,17 +83,17 @@ export function BatchComparisonTable({ batches, loading }: Props) {
                   </td>
                   <td className="px-4 py-3 font-medium">{b.emails_sent.toLocaleString()}</td>
                   <td className="px-4 py-3">
-                    <span className={cn('font-semibold', b.open_rate >= 30 ? 'text-emerald-600 dark:text-emerald-400' : b.open_rate >= 20 ? '' : 'text-orange-500')}>
+                    <span className={cn('font-semibold', b.open_rate >= 30 ? 'text-foreground' : b.open_rate >= 20 ? '' : 'text-foreground')}>
                       {b.open_rate}%
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={cn('font-semibold', b.reply_rate >= 7 ? 'text-emerald-600 dark:text-emerald-400' : b.reply_rate >= 4 ? '' : 'text-orange-500')}>
+                    <span className={cn('font-semibold', b.reply_rate >= 7 ? 'text-foreground' : b.reply_rate >= 4 ? '' : 'text-foreground')}>
                       {b.reply_rate}%
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={cn('font-semibold', b.conversion_rate >= 2 ? 'text-emerald-600 dark:text-emerald-400' : b.conversion_rate >= 1 ? '' : 'text-muted-foreground')}>
+                    <span className={cn('font-semibold', b.conversion_rate >= 2 ? 'text-foreground' : b.conversion_rate >= 1 ? '' : 'text-muted-foreground')}>
                       {b.conversion_rate}%
                     </span>
                   </td>

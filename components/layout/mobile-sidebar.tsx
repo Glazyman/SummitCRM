@@ -23,6 +23,14 @@ export function MobileSidebar({ workspaceName, role, userEmail, userName }: Mobi
     setOpen(false)
   }, [pathname])
 
+  useEffect(() => {
+    function openSidebar() {
+      setOpen(true)
+    }
+    window.addEventListener('open-mobile-sidebar', openSidebar)
+    return () => window.removeEventListener('open-mobile-sidebar', openSidebar)
+  }, [])
+
   if (!open) return null
 
   return (
@@ -30,7 +38,7 @@ export function MobileSidebar({ workspaceName, role, userEmail, userName }: Mobi
       {/* Backdrop */}
       <div
         className={cn(
-          'fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden',
+          'fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden',
           'animate-in fade-in duration-200'
         )}
         onClick={() => setOpen(false)}
@@ -40,7 +48,7 @@ export function MobileSidebar({ workspaceName, role, userEmail, userName }: Mobi
       {/* Drawer */}
       <div
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex h-full flex-col bg-card shadow-xl lg:hidden',
+          'fixed inset-y-0 left-0 z-50 flex h-full flex-col bg-background shadow-card lg:hidden',
           'animate-in slide-in-from-left duration-200',
           'w-[var(--sidebar-width)]'
         )}

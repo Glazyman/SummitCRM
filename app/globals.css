@@ -38,74 +38,74 @@
   --font-sans: var(--font-sans, -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", ui-sans-serif, system-ui, sans-serif);
 }
 
-/* ── Light mode CSS variables ──────────────────────────────────────────────── */
+/* ── Light-only CSS variables ──────────────────────────────────────────────── */
 :root {
-  /* Surfaces — Apple-inspired warm gray system */
-  --background: 240 4% 95%;         /* #F2F2F4 */
-  --foreground: 240 14% 6%;         /* #0B0B0F */
+  /* Surfaces — Acme-style neutral dashboard system */
+  --background: 0 0% 96%;           /* #F5F5F5 */
+  --foreground: 0 0% 7%;            /* #111111 */
 
   --card: 0 0% 100%;                /* #FFFFFF */
-  --card-foreground: 240 14% 6%;
+  --card-foreground: 0 0% 7%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 240 14% 6%;
+  --popover-foreground: 0 0% 7%;
 
-  /* Brand blue — #0A6CFF */
-  --primary: 218 100% 52%;
+  /* Monochrome primary — black actions, no saturated brand color */
+  --primary: 0 0% 7%;
   --primary-foreground: 0 0% 100%;
 
   /* Subtle surface for hover states / secondary elements */
-  --secondary: 240 5% 97%;          /* #F7F7F9 */
-  --secondary-foreground: 240 14% 6%;
+  --secondary: 0 0% 94%;            /* #F0F0F0 */
+  --secondary-foreground: 0 0% 7%;
 
-  --muted: 240 5% 97%;
-  --muted-foreground: 240 2% 58%;   /* #8E8E97 */
+  --muted: 0 0% 94%;
+  --muted-foreground: 0 0% 45%;     /* #737373 */
 
-  --accent: 240 5% 97%;
-  --accent-foreground: 240 14% 6%;
+  --accent: 0 0% 92%;
+  --accent-foreground: 0 0% 7%;
 
-  --destructive: 358 75% 58%;       /* #E5484D */
+  --destructive: 0 0% 13%;
   --destructive-foreground: 0 0% 100%;
 
   /* Hairline borders */
-  --border: 220 8% 91%;
-  --input: 220 8% 91%;
-  --ring: 218 100% 52%;
+  --border: 0 0% 88%;
+  --input: 0 0% 86%;
+  --ring: 0 0% 15%;
 
-  --border-radius: 0.875rem;         /* 14px */
-  --sidebar-width: 260px;
-  --header-height: 60px;
+  --border-radius: 1rem;            /* 16px */
+  --sidebar-width: 236px;
+  --header-height: 54px;
 }
 
-/* ── Dark mode CSS variables ───────────────────────────────────────────────── */
+/* Light-only app: dark class intentionally maps back to the same neutral theme. */
 .dark {
-  --background: 240 7% 6%;          /* #0E0E11 */
-  --foreground: 240 5% 96%;         /* #F4F4F6 */
+  --background: 0 0% 96%;
+  --foreground: 0 0% 7%;
 
-  --card: 240 7% 12%;               /* #1C1C22 */
-  --card-foreground: 240 5% 96%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 7%;
 
-  --popover: 240 7% 12%;
-  --popover-foreground: 240 5% 96%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 7%;
 
-  --primary: 218 100% 52%;
+  --primary: 0 0% 7%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 240 6% 15%;          /* #23232B */
-  --secondary-foreground: 240 5% 96%;
+  --secondary: 0 0% 94%;
+  --secondary-foreground: 0 0% 7%;
 
-  --muted: 240 6% 15%;
-  --muted-foreground: 240 4% 68%;   /* #ADADB8 */
+  --muted: 0 0% 94%;
+  --muted-foreground: 0 0% 45%;
 
-  --accent: 240 6% 15%;
-  --accent-foreground: 240 5% 96%;
+  --accent: 0 0% 92%;
+  --accent-foreground: 0 0% 7%;
 
-  --destructive: 358 75% 58%;
+  --destructive: 0 0% 13%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 240 5% 18%;
-  --input: 240 5% 18%;
-  --ring: 218 100% 52%;
+  --border: 0 0% 88%;
+  --input: 0 0% 86%;
+  --ring: 0 0% 15%;
 }
 
 /* ── Base styles ───────────────────────────────────────────────────────────── */
@@ -161,11 +161,11 @@
 
   /* Card-style shadow used in sidebar active items */
   .shadow-card {
-    box-shadow: 0 1px 2px rgba(15,15,30,0.04), 0 0 0 0.5px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.035);
   }
 
-  /* Primary button glow */
+  /* Primary button lift */
   .shadow-primary-glow {
-    box-shadow: 0 6px 18px color-mix(in oklab, hsl(var(--primary)) 35%, transparent);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.18);
   }
 }

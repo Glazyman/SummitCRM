@@ -18,14 +18,14 @@ const EMAIL_STATUS_META: Record<EmailHistoryStatus, {
   badge:  string
   Icon:   React.ComponentType<{ className?: string }>
 }> = {
-  queued:   { label: 'Queued',  badge: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',           Icon: Mail },
-  sending:  { label: 'Sending', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',         Icon: Send },
-  sent:     { label: 'Sent',    badge: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',            Icon: Mail },
-  failed:   { label: 'Failed',  badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',             Icon: AlertTriangle },
-  bounced:  { label: 'Bounced', badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',             Icon: AlertTriangle },
-  opened:   { label: 'Opened',  badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',         Icon: Eye },
-  clicked:  { label: 'Clicked', badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',         Icon: MousePointer },
-  replied:  { label: 'Replied', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', Icon: Reply },
+  queued:   { label: 'Queued',  badge: 'bg-gray-100 text-gray-600',           Icon: Mail },
+  sending:  { label: 'Sending', badge: 'bg-secondary text-foreground',         Icon: Send },
+  sent:     { label: 'Sent',    badge: 'bg-gray-100 text-gray-600',            Icon: Mail },
+  failed:   { label: 'Failed',  badge: 'bg-secondary text-foreground',             Icon: AlertTriangle },
+  bounced:  { label: 'Bounced', badge: 'bg-secondary text-foreground',             Icon: AlertTriangle },
+  opened:   { label: 'Opened',  badge: 'bg-secondary text-foreground',         Icon: Eye },
+  clicked:  { label: 'Clicked', badge: 'bg-secondary text-foreground',         Icon: MousePointer },
+  replied:  { label: 'Replied', badge: 'bg-secondary text-foreground', Icon: Reply },
 }
 
 export function EmailHistory({ emails }: EmailHistoryProps) {
@@ -103,17 +103,17 @@ export function EmailHistory({ emails }: EmailHistoryProps) {
                 <div className="mt-1.5 flex gap-3 pl-10">
                   {email.opened_at && (
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Eye className="h-3 w-3 text-blue-500" /> Opened
+                      <Eye className="h-3 w-3 text-foreground" /> Opened
                     </span>
                   )}
                   {email.clicked_at && (
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MousePointer className="h-3 w-3 text-teal-500" /> Clicked
+                      <MousePointer className="h-3 w-3 text-foreground" /> Clicked
                     </span>
                   )}
                   {email.replied_at && (
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Reply className="h-3 w-3 text-emerald-500" /> Replied
+                      <Reply className="h-3 w-3 text-foreground" /> Replied
                     </span>
                   )}
                 </div>
@@ -134,19 +134,19 @@ export function EmailHistory({ emails }: EmailHistoryProps) {
                   )}
                   {email.opened_at && (
                     <span className="flex items-center gap-1.5">
-                      <Eye className="h-3 w-3 text-blue-500" />
+                      <Eye className="h-3 w-3 text-foreground" />
                       Opened {longDate(email.opened_at)}
                     </span>
                   )}
                   {email.clicked_at && (
                     <span className="flex items-center gap-1.5">
-                      <MousePointer className="h-3 w-3 text-teal-500" />
+                      <MousePointer className="h-3 w-3 text-foreground" />
                       Clicked {longDate(email.clicked_at)}
                     </span>
                   )}
                   {email.replied_at && (
                     <span className="flex items-center gap-1.5">
-                      <Reply className="h-3 w-3 text-emerald-500" />
+                      <Reply className="h-3 w-3 text-foreground" />
                       Replied {longDate(email.replied_at)}
                     </span>
                   )}
@@ -156,7 +156,7 @@ export function EmailHistory({ emails }: EmailHistoryProps) {
                 {email.body_html && (
                   <div className="rounded-lg border border-border bg-background p-4">
                     <div
-                      className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
+                      className="prose prose-sm max-w-none text-sm leading-relaxed"
                       dangerouslySetInnerHTML={{ __html: sanitiseHtml(email.body_html) }}
                     />
                   </div>

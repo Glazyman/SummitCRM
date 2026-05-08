@@ -130,7 +130,7 @@ function DropdownMenuContent({
       role="menu"
       style={{ minWidth }}
       className={cn(
-        'absolute z-50 rounded-xl border border-border bg-popover p-1 shadow-lg',
+        'absolute z-50 rounded-xl border border-border bg-popover p-1 shadow-card',
         'animate-in fade-in-0 zoom-in-95 duration-100',
         sideClass,
         alignClass,
@@ -170,8 +170,8 @@ function DropdownMenuItem({
         'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm',
         'text-left transition-colors',
         destructive
-          ? 'text-destructive hover:bg-destructive/10 focus:bg-destructive/10'
-          : 'text-foreground hover:bg-accent focus:bg-accent',
+          ? 'text-foreground hover:bg-secondary focus:bg-secondary'
+          : 'text-foreground hover:bg-secondary focus:bg-secondary',
         'focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
         className
       )}

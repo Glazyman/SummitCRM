@@ -65,7 +65,7 @@ export function SubjectLineHelper({
           size="sm"
           onClick={fetch3}
           disabled={loading}
-          className="h-7 px-2 text-xs gap-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+          className="h-7 px-2 text-xs gap-1 text-foreground hover:text-foreground hover:bg-secondary"
         >
           {loading ? (
             <RefreshCw className="h-3 w-3 animate-spin" />
@@ -80,9 +80,9 @@ export function SubjectLineHelper({
   }
 
   return (
-    <div className={cn('border border-purple-200 dark:border-purple-800 rounded-lg p-3 bg-purple-50 dark:bg-purple-950/30 space-y-2', className)}>
+    <div className={cn('border border-border rounded-lg p-3 bg-secondary space-y-2', className)}>
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-purple-700 dark:text-purple-300 flex items-center gap-1">
+        <span className="text-xs font-medium text-foreground flex items-center gap-1">
           <Sparkles className="h-3 w-3" />
           AI suggestions — click to use
         </span>
@@ -115,7 +115,7 @@ export function SubjectLineHelper({
             key={i}
             type="button"
             onClick={() => handleSelect(s)}
-            className="w-full text-left text-sm px-3 py-2 rounded-md bg-white dark:bg-gray-900 border border-transparent hover:border-purple-300 dark:hover:border-purple-700 transition-colors"
+            className="w-full text-left text-sm px-3 py-2 rounded-md bg-white border border-transparent hover:border-border transition-colors"
           >
             {s}
           </button>

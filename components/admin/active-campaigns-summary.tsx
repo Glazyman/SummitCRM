@@ -20,9 +20,9 @@ import { cn } from '@/lib/utils'
 import type { CampaignSummary } from './types'
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode; dot?: boolean }> = {
-  running:   { label: 'Running',   color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',   icon: <Play  className="h-3 w-3" />, dot: true },
-  scheduled: { label: 'Scheduled', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',       icon: <Play  className="h-3 w-3" /> },
-  paused:    { label: 'Paused',    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300', icon: <Pause className="h-3 w-3" /> },
+  running:   { label: 'Running',   color: 'bg-secondary text-foreground',   icon: <Play  className="h-3 w-3" />, dot: true },
+  scheduled: { label: 'Scheduled', color: 'bg-secondary text-foreground',       icon: <Play  className="h-3 w-3" /> },
+  paused:    { label: 'Paused',    color: 'bg-secondary text-foreground', icon: <Pause className="h-3 w-3" /> },
 }
 
 interface Props {
@@ -50,7 +50,7 @@ export function ActiveCampaignsSummary({ campaigns, isAdmin, loading }: Props) {
       <Card>
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Megaphone className="h-5 w-5 text-green-500" />
+            <Megaphone className="h-5 w-5 text-foreground" />
             Active campaigns
           </CardTitle>
         </CardHeader>
@@ -73,7 +73,7 @@ export function ActiveCampaignsSummary({ campaigns, isAdmin, loading }: Props) {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Megaphone className="h-5 w-5 text-green-500" />
+          <Megaphone className="h-5 w-5 text-foreground" />
           Active campaigns
           <Badge variant="secondary" className="ml-auto text-xs">{campaigns.length}</Badge>
         </CardTitle>
@@ -134,7 +134,7 @@ export function ActiveCampaignsSummary({ campaigns, isAdmin, loading }: Props) {
                   <TrendingUp className="h-3.5 w-3.5" />
                   <span className={cn(
                     'font-semibold',
-                    campaign.open_rate >= 25 ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground',
+                    campaign.open_rate >= 25 ? 'text-foreground' : 'text-foreground',
                   )}>
                     {campaign.open_rate}%
                   </span>

@@ -18,13 +18,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
       >
-        {/* Top-right glow */}
-        <div className="absolute -top-40 right-0 h-[500px] w-[500px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/10" />
-        {/* Bottom-left glow */}
-        <div className="absolute -bottom-40 -left-20 h-[400px] w-[400px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/10" />
+        {/* Soft neutral panels */}
+        <div className="absolute -top-40 right-0 h-[500px] w-[500px] rounded-full bg-secondary blur-3xl" />
+        <div className="absolute -bottom-40 -left-20 h-[400px] w-[400px] rounded-full bg-secondary blur-3xl" />
         {/* Dot grid */}
         <svg
-          className="absolute inset-0 h-full w-full opacity-[0.03] dark:opacity-[0.06]"
+          className="absolute inset-0 h-full w-full opacity-[0.03]"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
@@ -38,9 +37,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       {/* Brand */}
       <Link href="/" className="mb-8 flex flex-col items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg p-1">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/25">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-card shadow-card">
           <svg
-            className="h-6 w-6 text-primary-foreground"
+            className="h-6 w-6 text-foreground"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

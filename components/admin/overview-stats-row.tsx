@@ -28,38 +28,23 @@ interface StatCardProps {
 }
 
 function StatCard({ icon, label, value, sub, alert, highlight, loading }: StatCardProps) {
-  const colorMap = {
-    green:  'text-emerald-600 dark:text-emerald-400',
-    orange: 'text-orange-500 dark:text-orange-400',
-    red:    'text-red-500 dark:text-red-400',
-    blue:   'text-blue-600 dark:text-blue-400',
-    purple: 'text-purple-600 dark:text-purple-400',
-  }
-  const bgMap = {
-    green:  'bg-emerald-50 dark:bg-emerald-950/30',
-    orange: 'bg-orange-50 dark:bg-orange-950/30',
-    red:    'bg-red-50 dark:bg-red-950/30',
-    blue:   'bg-blue-50 dark:bg-blue-950/30',
-    purple: 'bg-purple-50 dark:bg-purple-950/30',
-  }
-
   return (
     <Card className={cn(
-      'relative overflow-hidden transition-shadow hover:shadow-md',
-      alert && 'border-orange-300 dark:border-orange-700',
+      'relative overflow-hidden transition-shadow hover:shadow-card',
+      alert && 'border-foreground/30',
     )}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div className={cn(
             'flex h-10 w-10 items-center justify-center rounded-lg',
-            highlight ? bgMap[highlight] : 'bg-muted',
+            highlight ? 'border border-border bg-secondary' : 'bg-muted',
           )}>
-            <div className={cn('h-5 w-5', highlight ? colorMap[highlight] : 'text-muted-foreground')}>
+            <div className={cn('h-5 w-5', highlight ? 'text-foreground' : 'text-muted-foreground')}>
               {icon}
             </div>
           </div>
           {alert && (
-            <Badge variant="secondary" className="text-xs border-orange-300 text-orange-700 bg-orange-50 dark:bg-orange-950/30">
+            <Badge variant="secondary" className="text-xs">
               Alert
             </Badge>
           )}
@@ -75,7 +60,7 @@ function StatCard({ icon, label, value, sub, alert, highlight, loading }: StatCa
             <>
               <p className={cn(
                 'text-2xl font-bold tracking-tight',
-                highlight ? colorMap[highlight] : '',
+                highlight ? 'text-foreground' : '',
               )}>
                 {value}
               </p>

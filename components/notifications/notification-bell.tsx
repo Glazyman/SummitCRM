@@ -45,7 +45,7 @@ export function NotificationBell() {
               'absolute -top-0.5 -right-0.5',
               'min-w-[18px] h-[18px] px-1',
               'flex items-center justify-center',
-              'rounded-full bg-red-500 text-white',
+              'rounded-full bg-primary text-primary-foreground',
               'text-[10px] font-bold leading-none',
               'ring-2 ring-background',
               'transition-transform',

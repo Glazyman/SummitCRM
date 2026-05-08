@@ -26,11 +26,11 @@ export default async function DashboardPage() {
   const role = member?.role
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {getGreeting()}, {firstName ?? 'there'} 👋
+        <h1 className="text-2xl font-semibold tracking-[-0.02em]">
+          {getGreeting()}, {firstName ?? 'there'}
         </h1>
         <p className="mt-1 text-muted-foreground">
           {role === 'viewer'
@@ -195,7 +195,6 @@ function StatCard({
   value,
   description,
   icon: Icon,
-  color,
 }: {
   title: string
   value: string
@@ -203,23 +202,16 @@ function StatCard({
   icon: React.ComponentType<{ className?: string }>
   color: 'blue' | 'green' | 'purple' | 'amber'
 }) {
-  const colorMap = {
-    blue:   'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    green:  'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
-    purple: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
-    amber:  'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-  }
-
   return (
     <Card>
-      <CardContent className="pt-6">
+      <CardContent className="pt-5">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="mt-1 text-3xl font-bold tracking-tight">{value}</p>
+            <p className="text-[13px] font-medium text-muted-foreground">{title}</p>
+            <p className="mt-1 text-3xl font-semibold tracking-[-0.03em]">{value}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
           </div>
-          <div className={`shrink-0 rounded-xl p-3 ${colorMap[color]}`}>
+          <div className="shrink-0 rounded-xl border border-border bg-secondary p-3 text-foreground">
             <Icon className="h-5 w-5" />
           </div>
         </div>
@@ -245,7 +237,7 @@ function SetupStep({
     <li className="flex items-start gap-4">
       <div className="mt-0.5 shrink-0">
         {done
-          ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+          ? <CheckCircle2 className="h-5 w-5 text-foreground" />
           : <Circle className="h-5 w-5 text-muted-foreground/40" />
         }
       </div>
@@ -272,7 +264,6 @@ function QuickActionCard({
   description,
   href,
   icon: Icon,
-  color,
 }: {
   title: string
   description: string
@@ -280,19 +271,12 @@ function QuickActionCard({
   icon: React.ComponentType<{ className?: string }>
   color: 'blue' | 'green' | 'purple' | 'amber'
 }) {
-  const colorMap = {
-    blue:   'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    green:  'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
-    purple: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
-    amber:  'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-  }
-
   return (
     <Link href={href}>
-      <Card className="transition-colors hover:border-primary/40 hover:bg-accent/30">
-        <CardContent className="pt-6">
+      <Card className="transition-colors hover:border-foreground/30 hover:bg-secondary/40">
+        <CardContent className="pt-5">
           <div className="flex items-start gap-4">
-            <div className={`shrink-0 rounded-xl p-3 ${colorMap[color]}`}>
+            <div className="shrink-0 rounded-xl border border-border bg-secondary p-3 text-foreground">
               <Icon className="h-5 w-5" />
             </div>
             <div>

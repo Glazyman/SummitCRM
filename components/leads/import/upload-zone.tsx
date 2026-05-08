@@ -132,10 +132,10 @@ export function UploadZone({ onFileParsed }: UploadZoneProps) {
   // ── Parsed success state ─────────────────────────────────────────────
   if (parsed) {
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 dark:border-emerald-800/40 dark:bg-emerald-900/10">
+      <div className="rounded-xl border border-border bg-secondary p-6">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
-            <FileSpreadsheet className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-secondary">
+            <FileSpreadsheet className="h-6 w-6 text-foreground" />
           </div>
 
           <div className="min-w-0 flex-1">
@@ -157,8 +157,8 @@ export function UploadZone({ onFileParsed }: UploadZoneProps) {
             </div>
 
             <div className="mt-3 flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4 text-foreground" />
+              <span className="text-sm font-medium text-foreground">
                 {parsed.rowCount.toLocaleString()} rows ready to import
               </span>
             </div>
@@ -275,8 +275,7 @@ export function UploadZone({ onFileParsed }: UploadZoneProps) {
 // ── CSV template download ─────────────────────────────────────────────────
 function downloadTemplate() {
   const headers = ['first_name', 'last_name', 'email', 'company', 'title', 'phone', 'website', 'linkedin_url']
-  const sample = ['Jane', 'Smith', 'jane@acme.com', 'Acme Corp', 'CEO', '+1 555 0100', 'https://acme.com', 'https://linkedin.com/in/janesmith']
-  const csv = [headers.join(','), sample.join(',')].join('\n')
+  const csv = `${headers.join(',')}\n`
   const blob = new Blob([csv], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

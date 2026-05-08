@@ -13,12 +13,12 @@ interface StatusConfig {
 }
 
 const STATUS_CONFIG: Record<CampaignStatus, StatusConfig> = {
-  draft:     { label: 'Draft',     icon: Circle,       badge: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',     dot: 'bg-gray-400'    },
-  scheduled: { label: 'Scheduled', icon: Clock,        badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',  dot: 'bg-blue-500'    },
-  running:   { label: 'Running',   icon: Play,         badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', dot: 'bg-green-500' },
-  paused:    { label: 'Paused',    icon: Pause,        badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', dot: 'bg-amber-500' },
-  completed: { label: 'Completed', icon: CheckCircle2, badge: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',     dot: 'bg-gray-400'    },
-  cancelled: { label: 'Cancelled', icon: XCircle,      badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',     dot: 'bg-red-500'     },
+  draft:     { label: 'Draft',     icon: Circle,       badge: 'border-border bg-card text-muted-foreground', dot: 'bg-muted-foreground/50' },
+  scheduled: { label: 'Scheduled', icon: Clock,        badge: 'border-border bg-secondary text-foreground',  dot: 'bg-foreground/50' },
+  running:   { label: 'Running',   icon: Play,         badge: 'border-border bg-primary text-primary-foreground', dot: 'bg-primary-foreground' },
+  paused:    { label: 'Paused',    icon: Pause,        badge: 'border-border bg-secondary text-foreground', dot: 'bg-foreground/50' },
+  completed: { label: 'Completed', icon: CheckCircle2, badge: 'border-border bg-card text-foreground', dot: 'bg-foreground/60' },
+  cancelled: { label: 'Cancelled', icon: XCircle,      badge: 'border-border bg-secondary text-foreground', dot: 'bg-foreground/50' },
 }
 
 interface CampaignStatusBadgeProps {
@@ -33,7 +33,7 @@ export function CampaignStatusBadge({ status, size = 'md', dot = false }: Campai
 
   return (
     <span className={cn(
-      'inline-flex items-center gap-1 rounded-full font-medium',
+      'inline-flex items-center gap-1 rounded-full border font-medium',
       size === 'sm' ? 'px-2 py-px text-[10px]' : 'px-2.5 py-0.5 text-xs',
       cfg.badge
     )}>

@@ -35,13 +35,13 @@ const STATUS_CONFIG = {
     label: 'Processing',
     variant: 'secondary' as const,
     icon: Clock,
-    iconClass: 'text-blue-500 animate-spin',
+    iconClass: 'text-foreground animate-spin',
   },
   complete: {
     label: 'Complete',
     variant: 'default' as const,
     icon: CheckCircle2,
-    iconClass: 'text-emerald-500',
+    iconClass: 'text-foreground',
   },
   failed: {
     label: 'Failed',
@@ -110,9 +110,9 @@ export function ImportHistory({ records, loading, onRefresh }: ImportHistoryProp
               <div className="flex items-center gap-3 min-w-0">
                 <div className={cn(
                   'shrink-0 rounded-lg p-2',
-                  rec.status === 'complete' ? 'bg-emerald-100 dark:bg-emerald-900/20'
+                  rec.status === 'complete' ? 'bg-secondary'
                     : rec.status === 'failed' ? 'bg-destructive/10'
-                    : 'bg-blue-100 dark:bg-blue-900/20'
+                    : 'bg-secondary'
                 )}>
                   <StatusIcon className={cn('h-4 w-4', cfg.iconClass)} />
                 </div>
@@ -139,7 +139,7 @@ export function ImportHistory({ records, loading, onRefresh }: ImportHistoryProp
 
               <p className={cn(
                 'text-sm font-medium tabular-nums',
-                rec.importedRows > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
+                rec.importedRows > 0 ? 'text-foreground' : 'text-muted-foreground'
               )}>
                 {rec.importedRows.toLocaleString()}
               </p>
@@ -206,7 +206,7 @@ export function ImportHistory({ records, loading, onRefresh }: ImportHistoryProp
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                       <div
-                        className="h-full rounded-full bg-emerald-500 transition-all"
+                        className="h-full rounded-full bg-secondary transition-all"
                         style={{ width: `${successRate}%` }}
                       />
                     </div>

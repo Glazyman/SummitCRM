@@ -44,7 +44,7 @@ export default async function DashboardLayout({
 
   return (
     <NotificationProviderWrapper userId={user.id}>
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div className="flex h-screen overflow-hidden bg-background text-foreground">
         {/* Desktop sidebar */}
         <div className="hidden lg:flex lg:shrink-0">
           <Sidebar workspaceName={workspaceName} role={role} userEmail={userEmail} userName={userName} />
@@ -58,7 +58,7 @@ export default async function DashboardLayout({
           <Header user={user} role={role} workspaceName={workspaceName} />
 
           <main className="flex-1 overflow-y-auto scrollbar-thin">
-            <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-6">
+            <div className="mx-auto w-full max-w-[1400px] px-4 py-5 lg:px-6">
               {children}
             </div>
           </main>

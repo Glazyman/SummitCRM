@@ -34,7 +34,7 @@ export function AccountPicker({
   if (accounts.length === 0) {
     return (
       <div className={cn(
-        'flex items-center gap-2 rounded-xl border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2.5 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/10 dark:text-amber-400',
+        'flex items-center gap-2 rounded-xl border border-dashed border-border bg-secondary px-3 py-2.5 text-xs text-foreground',
         className
       )}>
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -61,8 +61,8 @@ export function AccountPicker({
             <div className={cn(
               'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px]',
               selected.type === 'resend'
-                ? 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400'
-                : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                ? 'bg-secondary text-foreground'
+                : 'bg-secondary text-foreground'
             )}>
               {selected.type === 'resend'
                 ? <Key className="h-3 w-3" />
@@ -87,7 +87,7 @@ export function AccountPicker({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full overflow-hidden rounded-xl border border-border bg-popover shadow-lg">
+        <div className="absolute left-0 top-full z-50 mt-1 w-full overflow-hidden rounded-xl border border-border bg-popover shadow-card">
           <div className="p-1 space-y-0.5">
             {accounts.map((acct) => {
               const q      = quotas[acct.id]
@@ -110,8 +110,8 @@ export function AccountPicker({
                   <div className={cn(
                     'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
                     acct.type === 'resend'
-                      ? 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400'
-                      : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                      ? 'bg-secondary text-foreground'
+                      : 'bg-secondary text-foreground'
                   )}>
                     {acct.type === 'resend'
                       ? <Key className="h-3.5 w-3.5" />
@@ -126,7 +126,7 @@ export function AccountPicker({
                   <div className="flex shrink-0 flex-col items-end gap-0.5">
                     {q && <QuotaMicroBadge quota={q} />}
                     {isUsed && (
-                      <span className="text-[9px] text-red-500">Resets midnight UTC</span>
+                      <span className="text-[9px] text-foreground">Resets midnight UTC</span>
                     )}
                   </div>
                 </button>
@@ -158,14 +158,14 @@ function QuotaMicroBadge({ quota }: { quota: QuotaStatus }) {
         <div
           className={cn(
             'h-full rounded-full',
-            at_limit ? 'bg-red-500' : percent_used >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+            at_limit ? 'bg-secondary' : percent_used >= 80 ? 'bg-secondary' : 'bg-secondary'
           )}
           style={{ width: `${Math.min(100, percent_used)}%` }}
         />
       </div>
       <span className={cn(
         'text-[10px] tabular-nums font-medium',
-        at_limit ? 'text-red-500' : percent_used >= 80 ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-400'
+        at_limit ? 'text-foreground' : percent_used >= 80 ? 'text-foreground' : 'text-foreground'
       )}>
         {at_limit ? 'Full' : `${remaining} left`}
       </span>

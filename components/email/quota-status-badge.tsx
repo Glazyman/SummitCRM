@@ -17,16 +17,16 @@ export function QuotaStatusBadge({
   const { sent_today, daily_limit, remaining, percent_used, at_limit } = quota
 
   const barColor = at_limit
-    ? 'bg-red-500'
+    ? 'bg-foreground'
     : percent_used >= 80
-      ? 'bg-amber-500'
-      : 'bg-emerald-500'
+      ? 'bg-foreground/70'
+      : 'bg-foreground/50'
 
   const textColor = at_limit
-    ? 'text-red-600 dark:text-red-400'
+    ? 'text-foreground'
     : percent_used >= 80
-      ? 'text-amber-600 dark:text-amber-400'
-      : 'text-emerald-600 dark:text-emerald-400'
+      ? 'text-foreground'
+      : 'text-muted-foreground'
 
   return (
     <div className={cn('space-y-1', size === 'sm' ? 'text-xs' : 'text-sm')}>
@@ -58,12 +58,12 @@ export function QuotaChip({ quota }: { quota: QuotaStatus }) {
 
   return (
     <span className={cn(
-      'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums',
+      'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium tabular-nums',
       at_limit
-        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+        ? 'border-border bg-primary text-primary-foreground'
         : percent_used >= 80
-          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-          : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          ? 'border-border bg-secondary text-foreground'
+          : 'border-border bg-card text-muted-foreground'
     )}>
       {at_limit ? 'Full' : `${remaining} left`}
     </span>

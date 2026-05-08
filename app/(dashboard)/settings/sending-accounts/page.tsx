@@ -20,10 +20,10 @@ import type { SendingAccountPublic, QuotaStatus } from '@/lib/email/types'
 
 // ── Status display config ──────────────────────────────────────────────────
 const STATUS_META: Record<string, { label: string; badge: string; Icon: React.ComponentType<{ className?: string }> }> = {
-  active:         { label: 'Active',         badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',   Icon: CheckCircle2 },
-  paused:         { label: 'Paused',         badge: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',          Icon: XCircle },
-  error:          { label: 'Error',          badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',           Icon: XCircle },
-  quota_exceeded: { label: 'Quota exceeded', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',   Icon: AlertTriangle },
+  active:         { label: 'Active',         badge: 'bg-secondary text-foreground',   Icon: CheckCircle2 },
+  paused:         { label: 'Paused',         badge: 'bg-gray-100 text-gray-600',          Icon: XCircle },
+  error:          { label: 'Error',          badge: 'bg-secondary text-foreground',           Icon: XCircle },
+  quota_exceeded: { label: 'Quota exceeded', badge: 'bg-secondary text-foreground',   Icon: AlertTriangle },
 }
 
 export default function SendingAccountsPage() {
@@ -135,7 +135,7 @@ export default function SendingAccountsPage() {
       </div>
 
       {/* ── Info banner ── */}
-      <div className="mb-6 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-blue-300">
+      <div className="mb-6 flex items-start gap-3 rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-foreground">
         <Activity className="h-4 w-4 mt-0.5 shrink-0" />
         <div>
           <strong>Email compliance:</strong> All emails include an unsubscribe link and respect suppression lists.
@@ -176,8 +176,8 @@ export default function SendingAccountsPage() {
                     <div className={cn(
                       'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
                       account.type === 'resend'
-                        ? 'bg-violet-100 text-violet-600 dark:bg-violet-900/20 dark:text-violet-400'
-                        : 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                        ? 'bg-secondary text-foreground'
+                        : 'bg-secondary text-foreground'
                     )}>
                       {account.type === 'resend'
                         ? <Key className="h-5 w-5" />
@@ -260,7 +260,7 @@ export default function SendingAccountsPage() {
 
                 {/* ── Error / test result ── */}
                 {account.last_error && (
-                  <div className="flex items-start gap-2 border-t border-red-200/50 bg-red-50/50 px-5 py-2.5 text-xs text-red-700 dark:border-red-800/30 dark:bg-red-900/10 dark:text-red-400">
+                  <div className="flex items-start gap-2 border-t border-border bg-secondary px-5 py-2.5 text-xs text-foreground">
                     <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                     <span className="line-clamp-2">{account.last_error}</span>
                   </div>
@@ -269,8 +269,8 @@ export default function SendingAccountsPage() {
                   <div className={cn(
                     'flex items-start gap-2 border-t px-5 py-2.5 text-xs',
                     testRes.success
-                      ? 'border-green-200/50 bg-green-50/50 text-green-700 dark:border-green-800/30 dark:bg-green-900/10 dark:text-green-400'
-                      : 'border-red-200/50 bg-red-50/50 text-red-700 dark:border-red-800/30 dark:bg-red-900/10 dark:text-red-400'
+                      ? 'border-border bg-secondary text-foreground'
+                      : 'border-border bg-secondary text-foreground'
                   )}>
                     {testRes.success
                       ? <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />

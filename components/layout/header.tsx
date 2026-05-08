@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { Moon, Sun, LogOut, User, Menu, Settings, ChevronDown, Shield, Search } from 'lucide-react'
-import { useTheme } from 'next-themes'
+import { LogOut, User, Menu, Settings, ChevronDown, Shield, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -33,11 +32,11 @@ function getPageTitle(pathname: string): string {
 
 // ── Role badge ────────────────────────────────────────────────────────────
 const ROLE_STYLES: Record<WorkspaceRole, string> = {
-  super_admin: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  admin:       'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  manager:     'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
-  rep:         'bg-secondary text-secondary-foreground',
-  viewer:      'bg-muted text-muted-foreground',
+  super_admin: 'border-border bg-secondary text-foreground',
+  admin:       'border-border bg-secondary text-foreground',
+  manager:     'border-border bg-secondary text-foreground',
+  rep:         'border-border bg-secondary text-foreground',
+  viewer:      'border-border bg-muted text-muted-foreground',
 }
 
 const ROLE_LABELS: Record<WorkspaceRole, string> = {
@@ -51,7 +50,7 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
 function RoleBadge({ role }: { role: WorkspaceRole }) {
   return (
     <span className={cn(
-      'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+      'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
       ROLE_STYLES[role]
     )}>
       {ROLE_LABELS[role]}
@@ -70,7 +69,6 @@ interface HeaderProps {
 export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const { theme, setTheme } = useTheme()
   const supabase = createClient()
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -104,6 +102,14 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
     router.push(path)
   }
 
+  function handleMobileMenu() {
+    if (onMenuClick) {
+      onMenuClick()
+      return
+    }
+    window.dispatchEvent(new Event('open-mobile-sidebar'))
+  }
+
   const fullName = user?.user_metadata?.full_name as string | undefined
   const email = user?.email ?? ''
   const displayName = fullName ?? email
@@ -111,35 +117,28 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
 
   return (
     <header
-      className="flex h-[var(--header-height)] shrink-0 items-center gap-3 border-b border-border px-7"
-      style={{
-        background: 'color-mix(in oklab, hsl(var(--background)) 80%, transparent)',
-        backdropFilter: 'saturate(180%) blur(20px)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-      }}
+      className="sticky top-0 z-10 flex h-[var(--header-height)] shrink-0 items-center gap-3 border-b border-border bg-background/95 px-5 backdrop-blur lg:px-6"
     >
       {/* Mobile menu button */}
       <button
         type="button"
-        onClick={onMenuClick}
-        className="mr-1 rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
+        onClick={handleMobileMenu}
+        className="mr-1 rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground lg:hidden"
         aria-label="Open menu"
       >
         <Menu className="h-5 w-5" />
       </button>
 
       {/* Page title */}
-      <h1 className="text-[22px] font-bold tracking-[-0.025em] leading-none">
+      <h1 className="text-[15px] font-semibold leading-none tracking-[-0.01em]">
         {pageTitle}
       </h1>
 
       {/* Search — pill shaped */}
-      <div className="ml-auto flex w-72 items-center gap-2 rounded-full border border-border bg-secondary px-4 py-2 text-muted-foreground">
+      <div className="ml-auto hidden w-72 items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-muted-foreground shadow-card md:flex">
         <Search className="h-3.5 w-3.5 shrink-0" />
         <input
-          className="flex-1 bg-transparent text-[13.5px] outline-none placeholder:text-muted-foreground"
+          className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
           placeholder="Search leads, campaigns…"
           readOnly
         />
@@ -150,17 +149,6 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
 
       {/* Right actions */}
       <div className="flex items-center gap-1">
-        {/* Theme toggle */}
-        <button
-          type="button"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-          aria-label="Toggle theme"
-        >
-          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-        </button>
-
         {/* Notifications */}
         <div className="flex h-9 w-9 items-center justify-center">
           <NotificationBell />
@@ -172,7 +160,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
             type="button"
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className={cn(
-              'flex items-center gap-2 rounded-full px-2 py-1.5 text-sm transition-colors',
+              'flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm transition-colors',
               'hover:bg-secondary',
               dropdownOpen && 'bg-secondary'
             )}
@@ -193,7 +181,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
           {dropdownOpen && (
             <div
               role="menu"
-              className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-border bg-popover shadow-lg shadow-black/10 dark:shadow-black/30"
+              className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-popover shadow-card"
             >
               {/* User info */}
               <div className="px-3.5 py-3">
@@ -223,7 +211,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
                   role="menuitem"
                   type="button"
                   onClick={() => navigate('/settings')}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-accent"
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary"
                 >
                   <Settings className="h-4 w-4 text-muted-foreground" />
                   Settings
@@ -233,7 +221,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
                   role="menuitem"
                   type="button"
                   onClick={() => navigate('/settings/profile')}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-accent"
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary"
                 >
                   <User className="h-4 w-4 text-muted-foreground" />
                   Profile
@@ -244,7 +232,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
                     role="menuitem"
                     type="button"
                     onClick={() => navigate('/admin')}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-accent"
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary"
                   >
                     <Shield className="h-4 w-4 text-muted-foreground" />
                     Admin Panel
@@ -259,7 +247,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
                   role="menuitem"
                   type="button"
                   onClick={handleSignOut}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-destructive hover:bg-destructive/10"
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary"
                 >
                   <LogOut className="h-4 w-4" />
                   Sign Out

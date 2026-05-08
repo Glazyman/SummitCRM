@@ -17,57 +17,6 @@ import type {
 } from '@/components/leads/detail/types'
 import type { SendingAccountPublic, QuotaStatus } from '@/lib/email/types'
 
-// ── Mock sending accounts (replace with real API fetch) ───────────────────
-const MOCK_ACCOUNTS: SendingAccountPublic[] = [
-  {
-    id:              'acct-1',
-    workspace_id:    'ws-1',
-    name:            'Primary outreach',
-    from_name:       'Alex from Summits',
-    from_email:      'alex@summits.io',
-    type:            'resend',
-    is_active:       true,
-    daily_limit:     50,
-    emails_sent_today: 12,
-    quota_remaining: 38,
-    quota_percent:   24,
-    quota_reset_at:  null,
-    last_error:      null,
-    last_tested_at:  null,
-    created_at:      '2025-01-01T00:00:00Z',
-    smtp_host:       null,
-    smtp_port:       null,
-    smtp_user:       null,
-    smtp_secure:     false,
-  },
-  {
-    id:              'acct-2',
-    workspace_id:    'ws-1',
-    name:            'Follow-up account',
-    from_name:       'Support — Summits',
-    from_email:      'support@summits.io',
-    type:            'smtp',
-    is_active:       true,
-    daily_limit:     50,
-    emails_sent_today: 44,
-    quota_remaining: 6,
-    quota_percent:   88,
-    quota_reset_at:  null,
-    last_error:      null,
-    last_tested_at:  null,
-    created_at:      '2025-01-01T00:00:00Z',
-    smtp_host:       'smtp.example.com',
-    smtp_port:       587,
-    smtp_user:       'support@summits.io',
-    smtp_secure:     false,
-  },
-]
-
-const MOCK_QUOTAS: Record<string, QuotaStatus> = {
-  'acct-1': { account_id: 'acct-1', account_name: 'Primary outreach',   daily_limit: 50, sent_today: 12, remaining: 38, percent_used: 24, at_limit: false, reset_at: null },
-  'acct-2': { account_id: 'acct-2', account_name: 'Follow-up account',  daily_limit: 50, sent_today: 44, remaining: 6,  percent_used: 88, at_limit: false, reset_at: null },
-}
-
 // ── Tab config ────────────────────────────────────────────────────────────
 const TABS = [
   { id: 'activity',  label: 'Activity',   Icon: Activity    },
@@ -84,6 +33,8 @@ interface LeadDetailClientProps {
   emails:       EmailHistoryItem[]
   followUps:    FollowUp[]
   teamMembers:  TeamMember[]
+  accounts:     SendingAccountPublic[]
+  quotas:       Record<string, QuotaStatus>
   currentUserId:string
   isAdmin:      boolean
 }
@@ -94,6 +45,8 @@ export default function LeadDetailClient({
   emails:       initialEmails,
   followUps:    initialFollowUps,
   teamMembers,
+  accounts,
+  quotas,
   currentUserId,
   isAdmin,
 }: LeadDetailClientProps) {
@@ -243,7 +196,7 @@ export default function LeadDetailClient({
       subject:     '(sending…)',
       sent_at:     new Date().toISOString(),
       status:      'sending',
-      sender_name: MOCK_ACCOUNTS[0]?.from_name ?? null,
+      sender_name: accounts[0]?.from_name ?? null,
       body_html:   null,
       opened_at:   null,
       clicked_at:  null,
@@ -263,7 +216,7 @@ export default function LeadDetailClient({
         open={aiDraftOpen}
         onClose={() => setAiDraftOpen(false)}
         leadId={lead.id}
-        sendingAccountId={MOCK_ACCOUNTS[0]?.id ?? ''}
+        sendingAccountId={accounts[0]?.id ?? ''}
         leadName={[lead.first_name, lead.last_name].filter(Boolean).join(' ')}
         onUse={(draft) => {
           setPendingAiDraft(draft)
@@ -284,8 +237,8 @@ export default function LeadDetailClient({
           company:    lead.company,
           title:      lead.title,
         }}
-        accounts={MOCK_ACCOUNTS}
-        quotas={MOCK_QUOTAS}
+        accounts={accounts}
+        quotas={quotas}
         emails={emails}
         onSent={handleEmailSent}
         initialSubject={pendingAiDraft?.subject}
@@ -338,7 +291,7 @@ export default function LeadDetailClient({
                   <Icon className="h-3.5 w-3.5" />
                   {label}
                   {id === 'followups' && pendingFollowUps > 0 && (
-                    <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white">
+                    <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
                       {pendingFollowUps}
                     </span>
                   )}
@@ -431,8 +384,8 @@ function Section({
         <h2 className="text-sm font-semibold">{title}</h2>
         {count !== undefined && count > 0 && (
           <span className={cn(
-            'ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white',
-            countColor === 'orange' ? 'bg-orange-500' : 'bg-primary'
+            'ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-primary-foreground',
+            countColor === 'orange' ? 'bg-secondary' : 'bg-primary'
           )}>
             {count}
           </span>

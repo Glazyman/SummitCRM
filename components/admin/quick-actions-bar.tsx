@@ -34,8 +34,8 @@ function InviteModal({ onClose }: InviteModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="w-full max-w-md rounded-xl border bg-background shadow-xl p-6 space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
+      <div className="w-full max-w-md rounded-xl border bg-background shadow-card p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Invite team member</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
@@ -79,8 +79,8 @@ function InviteModal({ onClose }: InviteModalProps) {
           </>
         ) : (
           <div className="py-4 text-center space-y-3">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-              <Check className="h-6 w-6 text-green-600" />
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
+              <Check className="h-6 w-6 text-foreground" />
             </div>
             <p className="font-medium">Invite sent to {email}</p>
             <p className="text-sm text-muted-foreground">
@@ -125,7 +125,7 @@ export function QuickActionsBar({ isAdmin, quotaAlerts = 0 }: QuickActionsBarPro
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Sending accounts</span>
               {quotaAlerts > 0 && (
-                <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white">
+                <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                   {quotaAlerts}
                 </span>
               )}
@@ -141,7 +141,7 @@ export function QuickActionsBar({ isAdmin, quotaAlerts = 0 }: QuickActionsBarPro
         </Button>
 
         {quotaAlerts > 0 && (
-          <div className="flex items-center gap-1.5 rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 px-3 py-1.5 text-sm text-orange-700 dark:text-orange-300">
+          <div className="flex items-center gap-1.5 rounded-md bg-secondary border border-border px-3 py-1.5 text-sm text-foreground">
             <AlertCircle className="h-4 w-4 shrink-0" />
             {quotaAlerts} account{quotaAlerts > 1 ? 's' : ''} near quota limit
           </div>

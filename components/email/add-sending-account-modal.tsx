@@ -329,7 +329,7 @@ export function AddSendingAccountModal({ open, onClose, onSaved }: AddSendingAcc
             <div className={cn(
               'flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm',
               testResult.success
-                ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-800/40 dark:bg-green-900/20 dark:text-green-400'
+                ? 'border-border bg-secondary text-foreground'
                 : 'border-destructive/30 bg-destructive/5 text-destructive'
             )}>
               {testResult.success

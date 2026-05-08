@@ -25,19 +25,19 @@ interface EventConfig {
 }
 
 const EVENT_CONFIGS: Record<string, EventConfig> = {
-  email_sent:          { icon: <Mail         className="h-3.5 w-3.5" />, color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',       label: (e) => `Sent email: "${String(e.metadata.subject ?? '')?.slice(0, 50)}"` },
-  email_opened:        { icon: <TrendingUp   className="h-3.5 w-3.5" />, color: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',     label: (e) => `Email opened: "${String(e.metadata.subject ?? '')?.slice(0, 40)}"` },
-  email_replied:       { icon: <MessageSquare className="h-3.5 w-3.5" />, color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400', label: (e) => `Got a reply: "${String(e.metadata.subject ?? '')?.slice(0, 40)}"` },
-  email_bounced:       { icon: <AlertCircle  className="h-3.5 w-3.5" />, color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',             label: (e) => `Email bounced${e.metadata.reason ? `: ${e.metadata.reason}` : ''}` },
-  lead_created:        { icon: <UserPlus     className="h-3.5 w-3.5" />, color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',  label: (e) => `Added ${e.metadata.count ? `${e.metadata.count} leads` : 'a lead'}${e.metadata.source ? ` via ${e.metadata.source}` : ''}` },
-  lead_status_changed: { icon: <Activity     className="h-3.5 w-3.5" />, color: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',  label: (e) => `Updated lead status: ${e.metadata.from} → ${e.metadata.to}` },
-  note_added:          { icon: <FileText     className="h-3.5 w-3.5" />, color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',             label: () => 'Added a note to a lead' },
-  follow_up_created:   { icon: <Bell        className="h-3.5 w-3.5" />, color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',   label: () => 'Created a follow-up reminder' },
-  follow_up_completed: { icon: <Bell        className="h-3.5 w-3.5" />, color: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',       label: () => 'Completed a follow-up' },
-  campaign_started:    { icon: <Megaphone   className="h-3.5 w-3.5" />, color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',          label: (e) => `Started campaign: "${e.metadata.campaign_name ?? ''}"` },
-  campaign_paused:     { icon: <Megaphone   className="h-3.5 w-3.5" />, color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',   label: (e) => `Paused campaign: "${e.metadata.campaign_name ?? ''}"` },
-  campaign_completed:  { icon: <Megaphone   className="h-3.5 w-3.5" />, color: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',       label: (e) => `Campaign completed: "${e.metadata.campaign_name ?? ''}"` },
-  member_invited:      { icon: <UserPlus     className="h-3.5 w-3.5" />, color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',  label: (e) => `Invited ${e.metadata.email ?? 'a member'}` },
+  email_sent:          { icon: <Mail         className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',       label: (e) => `Sent email: "${String(e.metadata.subject ?? '')?.slice(0, 50)}"` },
+  email_opened:        { icon: <TrendingUp   className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',     label: (e) => `Email opened: "${String(e.metadata.subject ?? '')?.slice(0, 40)}"` },
+  email_replied:       { icon: <MessageSquare className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground', label: (e) => `Got a reply: "${String(e.metadata.subject ?? '')?.slice(0, 40)}"` },
+  email_bounced:       { icon: <AlertCircle  className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',             label: (e) => `Email bounced${e.metadata.reason ? `: ${e.metadata.reason}` : ''}` },
+  lead_created:        { icon: <UserPlus     className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',  label: (e) => `Added ${e.metadata.count ? `${e.metadata.count} leads` : 'a lead'}${e.metadata.source ? ` via ${e.metadata.source}` : ''}` },
+  lead_status_changed: { icon: <Activity     className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',  label: (e) => `Updated lead status: ${e.metadata.from} → ${e.metadata.to}` },
+  note_added:          { icon: <FileText     className="h-3.5 w-3.5" />, color: 'bg-gray-100 text-gray-600',             label: () => 'Added a note to a lead' },
+  follow_up_created:   { icon: <Bell        className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',   label: () => 'Created a follow-up reminder' },
+  follow_up_completed: { icon: <Bell        className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',       label: () => 'Completed a follow-up' },
+  campaign_started:    { icon: <Megaphone   className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',          label: (e) => `Started campaign: "${e.metadata.campaign_name ?? ''}"` },
+  campaign_paused:     { icon: <Megaphone   className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',   label: (e) => `Paused campaign: "${e.metadata.campaign_name ?? ''}"` },
+  campaign_completed:  { icon: <Megaphone   className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',       label: (e) => `Campaign completed: "${e.metadata.campaign_name ?? ''}"` },
+  member_invited:      { icon: <UserPlus     className="h-3.5 w-3.5" />, color: 'bg-secondary text-foreground',  label: (e) => `Invited ${e.metadata.email ?? 'a member'}` },
 }
 
 const TYPE_OPTIONS = [
@@ -68,8 +68,8 @@ function initials(name: string | null, email: string): string {
 }
 
 const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-purple-500', 'bg-green-500',
-  'bg-orange-500', 'bg-pink-500', 'bg-teal-500',
+  'bg-primary', 'bg-primary', 'bg-primary',
+  'bg-primary', 'bg-primary', 'bg-primary',
 ]
 function avatarColor(userId: string): string {
   let hash = 0
@@ -100,7 +100,7 @@ export function WorkspaceActivityFeed({ events, loading }: WorkspaceActivityFeed
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Activity className="h-5 w-5 text-orange-500" />
+            <Activity className="h-5 w-5 text-foreground" />
             Activity feed
             <Badge variant="secondary" className="text-xs">{filtered.length}</Badge>
           </CardTitle>
@@ -156,7 +156,7 @@ export function WorkspaceActivityFeed({ events, loading }: WorkspaceActivityFeed
                 <div key={event.id} className="flex items-start gap-3 py-3 hover:bg-muted/20 -mx-2 px-2 rounded-md transition-colors">
                   {/* User avatar */}
                   <div className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-full text-white text-xs font-semibold shrink-0',
+                    'flex h-8 w-8 items-center justify-center rounded-full text-primary-foreground text-xs font-semibold shrink-0',
                     avatarColor(event.user_id),
                   )}>
                     {initials(event.user_name, event.user_email)}

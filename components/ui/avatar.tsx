@@ -14,33 +14,8 @@ const sizeClasses = {
   xl: 'h-16 w-16 text-xl',
 }
 
-// Deterministic color from name so the same user always gets the same colour
-const PALETTE = [
-  'bg-blue-500',
-  'bg-violet-500',
-  'bg-teal-500',
-  'bg-rose-500',
-  'bg-amber-500',
-  'bg-emerald-500',
-  'bg-indigo-500',
-  'bg-pink-500',
-  'bg-orange-500',
-  'bg-cyan-500',
-]
-
-function avatarColor(name?: string | null): string {
-  if (!name) return 'bg-primary'
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-    hash |= 0
-  }
-  return PALETTE[Math.abs(hash) % PALETTE.length]
-}
-
 export function Avatar({ src, name, size = 'md', className, ...props }: AvatarProps) {
   const initials = getInitials(name)
-  const color = avatarColor(name)
 
   if (src) {
     return (
@@ -57,9 +32,8 @@ export function Avatar({ src, name, size = 'md', className, ...props }: AvatarPr
   return (
     <div
       className={cn(
-        'flex select-none items-center justify-center rounded-full font-semibold text-white',
+        'flex select-none items-center justify-center rounded-full border border-border bg-card font-semibold text-foreground',
         sizeClasses[size],
-        color,
         className
       )}
       aria-label={name ?? undefined}

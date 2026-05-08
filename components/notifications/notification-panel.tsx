@@ -45,7 +45,7 @@ export function NotificationPanel({ open, onClose }: Props) {
       className={cn(
         'absolute right-0 top-full mt-2 z-50',
         'w-[380px] max-w-[calc(100vw-2rem)]',
-        'rounded-xl border bg-popover shadow-xl',
+        'rounded-xl border bg-popover shadow-card',
         'flex flex-col overflow-hidden',
         'animate-in fade-in slide-in-from-top-2 duration-150'
       )}
@@ -58,7 +58,7 @@ export function NotificationPanel({ open, onClose }: Props) {
           <Bell className="w-4 h-4 text-foreground" />
           <span className="font-semibold text-sm">Notifications</span>
           {unreadCount > 0 && (
-            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}

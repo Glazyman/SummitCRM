@@ -106,12 +106,12 @@ export function BatchPersonalisationStatus({
   if (!jobId) {
     return (
       <div className={cn(
-        'rounded-lg border border-purple-200 dark:border-purple-800 p-4',
-        'bg-purple-50/50 dark:bg-purple-950/20 space-y-3',
+        'rounded-lg border border-border p-4',
+        'bg-secondary space-y-3',
         className,
       )}>
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-purple-500" />
+          <Sparkles className="h-4 w-4 text-foreground" />
           <span className="text-sm font-medium">AI Personalisation</span>
           <Badge variant="outline" className="text-xs ml-auto">
             Step {stepNumber}
@@ -163,18 +163,18 @@ export function BatchPersonalisationStatus({
   return (
     <div className={cn(
       'rounded-lg border p-4 space-y-3',
-      isDone  ? 'border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/20' :
-      isFail  ? 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' :
-                'border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20',
+      isDone  ? 'border-border bg-secondary' :
+      isFail  ? 'border-border bg-secondary' :
+                'border-border bg-secondary',
       className,
     )}>
       <div className="flex items-center gap-2">
         {isDone ? (
-          <CheckCircle className="h-4 w-4 text-green-500" />
+          <CheckCircle className="h-4 w-4 text-foreground" />
         ) : isFail ? (
-          <XCircle className="h-4 w-4 text-red-500" />
+          <XCircle className="h-4 w-4 text-foreground" />
         ) : (
-          <Sparkles className="h-4 w-4 text-purple-500" />
+          <Sparkles className="h-4 w-4 text-foreground" />
         )}
         <span className="text-sm font-medium">
           {isDone ? 'Personalisation complete' :
@@ -196,10 +196,10 @@ export function BatchPersonalisationStatus({
       )}
 
       {isDone && (
-        <p className="text-sm text-green-700 dark:text-green-300">
+        <p className="text-sm text-foreground">
           {status?.processed} emails personalised.
           {(status?.failed_count ?? 0) > 0 && (
-            <span className="text-orange-600 dark:text-orange-400 ml-1">
+            <span className="text-foreground ml-1">
               {status?.failed_count} failed.
             </span>
           )}
@@ -208,7 +208,7 @@ export function BatchPersonalisationStatus({
 
       {isFail && (
         <div className="space-y-2">
-          <p className="text-sm text-red-600 dark:text-red-400">
+          <p className="text-sm text-foreground">
             {status?.error ?? 'Unknown error'}
           </p>
           <Button

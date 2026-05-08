@@ -132,7 +132,7 @@ export function CampaignsClient({ initialCampaigns }: CampaignsClientProps) {
             return (
               <div
                 key={c.id}
-                className="group overflow-hidden rounded-2xl border border-border bg-card transition-shadow hover:shadow-md"
+                className="group overflow-hidden rounded-2xl border border-border bg-card transition-shadow hover:shadow-card"
               >
                 <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
                   {/* Main info */}
@@ -156,9 +156,9 @@ export function CampaignsClient({ initialCampaigns }: CampaignsClientProps) {
                       <span className="flex items-center gap-1"><Send className="h-3 w-3" /> {c.emails_sent.toLocaleString()} sent</span>
                       <span>Open {pct(c.emails_opened, c.emails_sent)}</span>
                       <span>Click {pct(c.emails_clicked, c.emails_sent)}</span>
-                      <span className="text-emerald-600 dark:text-emerald-400">Reply {pct(c.emails_replied, c.emails_sent)}</span>
+                      <span className="text-foreground">Reply {pct(c.emails_replied, c.emails_sent)}</span>
                       {c.emails_bounced > 0 && (
-                        <span className="text-red-500">Bounce {pct(c.emails_bounced, c.emails_sent)}</span>
+                        <span className="text-foreground">Bounce {pct(c.emails_bounced, c.emails_sent)}</span>
                       )}
                     </div>
 
@@ -169,7 +169,7 @@ export function CampaignsClient({ initialCampaigns }: CampaignsClientProps) {
                           <div
                             className={cn(
                               'h-full rounded-full transition-all',
-                              sentPct === 100 ? 'bg-emerald-500' : c.status === 'paused' ? 'bg-amber-500' : 'bg-primary'
+                              sentPct === 100 ? 'bg-secondary' : c.status === 'paused' ? 'bg-secondary' : 'bg-primary'
                             )}
                             style={{ width: `${sentPct}%` }}
                           />
@@ -192,7 +192,7 @@ export function CampaignsClient({ initialCampaigns }: CampaignsClientProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 gap-1.5 text-xs text-amber-600 hover:text-amber-700"
+                        className="h-8 gap-1.5 text-xs text-foreground hover:text-foreground"
                         onClick={() => handleAction(c.id, 'pause')}
                         disabled={isLoading}
                       >
@@ -205,7 +205,7 @@ export function CampaignsClient({ initialCampaigns }: CampaignsClientProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 gap-1.5 text-xs text-emerald-600 hover:text-emerald-700"
+                        className="h-8 gap-1.5 text-xs text-foreground hover:text-foreground"
                         onClick={() => handleAction(c.id, 'resume')}
                         disabled={isLoading}
                       >

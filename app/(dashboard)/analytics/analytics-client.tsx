@@ -8,10 +8,6 @@ import {
   AnalyticsExportButton,
 } from '@/components/analytics'
 import type { EmailMetrics, TimeSeriesPoint, FunnelData, CampaignRow, RepRow, BatchRow, AnalyticsTab } from '@/components/analytics'
-import {
-  MOCK_EMAIL_METRICS, MOCK_TIME_SERIES, MOCK_FUNNEL,
-  MOCK_CAMPAIGNS, MOCK_REPS, MOCK_BATCHES,
-} from '@/components/analytics/mock-data'
 import { DateRangePicker } from '@/components/admin/date-range-picker'
 import type { DateRangePreset } from '@/components/admin/types'
 import { Button }  from '@/components/ui/button'
@@ -37,6 +33,27 @@ const TABS: TabConfig[] = [
 const ROLE_RANK: Record<string, number> = { viewer: 0, rep: 1, manager: 2, admin: 3, super_admin: 4 }
 function canSee(tabRole: string, userRole: string) {
   return (ROLE_RANK[userRole] ?? 0) >= (ROLE_RANK[tabRole] ?? 0)
+}
+
+const EMPTY_EMAIL_METRICS: EmailMetrics = {
+  period: { start: '', end: '' },
+  totals: {
+    sent: 0,
+    opened: 0,
+    clicked: 0,
+    replied: 0,
+    bounced: 0,
+    open_rate: 0,
+    click_rate: 0,
+    reply_rate: 0,
+    bounce_rate: 0,
+  },
+}
+
+const EMPTY_FUNNEL: FunnelData = {
+  funnel: [],
+  breakdown: [],
+  total: 0,
 }
 
 interface Props {
@@ -73,12 +90,12 @@ function AnalyticsContent({ userRole, userId }: Props) {
   const { start, end } = dateRangeForPreset(range)
 
   // ── State ─────────────────────────────────────────────────────────────────
-  const [metrics,   setMetrics]   = useState<EmailMetrics>(MOCK_EMAIL_METRICS)
-  const [series,    setSeries]    = useState<TimeSeriesPoint[]>(MOCK_TIME_SERIES)
-  const [funnel,    setFunnel]    = useState<FunnelData>(MOCK_FUNNEL)
-  const [campaigns, setCampaigns] = useState<CampaignRow[]>(MOCK_CAMPAIGNS)
-  const [reps,      setReps]      = useState<RepRow[]>(MOCK_REPS)
-  const [batches,   setBatches]   = useState<BatchRow[]>(MOCK_BATCHES)
+  const [metrics,   setMetrics]   = useState<EmailMetrics>(EMPTY_EMAIL_METRICS)
+  const [series,    setSeries]    = useState<TimeSeriesPoint[]>([])
+  const [funnel,    setFunnel]    = useState<FunnelData>(EMPTY_FUNNEL)
+  const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
+  const [reps,      setReps]      = useState<RepRow[]>([])
+  const [batches,   setBatches]   = useState<BatchRow[]>([])
 
   const [loadingMetrics,   setLM] = useState(false)
   const [loadingSeries,    setLS] = useState(false)
@@ -238,7 +255,7 @@ function AnalyticsContent({ userRole, userId }: Props) {
                 const prev   = funnel.funnel[i]
                 const drop   = prev?.count > 0 ? Math.round((1 - stage.count / prev.count) * 1000) / 10 : 0
                 const kept   = 100 - drop
-                const colors  = ['bg-purple-500','bg-cyan-500','bg-emerald-500','bg-green-500']
+                const colors  = ['bg-secondary','bg-secondary','bg-secondary','bg-secondary']
                 return (
                   <div key={stage.status} className="rounded-xl border p-4 space-y-2">
                     <div className="flex items-center justify-between">

@@ -66,8 +66,8 @@ export function FieldMappingStep({ file, mapping, onChange }: FieldMappingStepPr
       <div className={cn(
         'flex items-start gap-3 rounded-xl p-4',
         emailMapped
-          ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-900/15 dark:text-emerald-300'
-          : 'bg-amber-50 text-amber-800 dark:bg-amber-900/15 dark:text-amber-300'
+          ? 'bg-secondary text-foreground'
+          : 'bg-secondary text-foreground'
       )}>
         {emailMapped
           ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
@@ -91,7 +91,7 @@ export function FieldMappingStep({ file, mapping, onChange }: FieldMappingStepPr
 
       {/* Duplicate field warning */}
       {duplicateFields.length > 0 && (
-        <div className="flex items-start gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-900/15 dark:text-amber-300">
+        <div className="flex items-start gap-3 rounded-xl bg-secondary p-4 text-sm text-foreground">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
             <span className="font-semibold">Duplicate mapping:</span>{' '}
@@ -158,7 +158,7 @@ export function FieldMappingStep({ file, mapping, onChange }: FieldMappingStepPr
                     onChange={(e) => setField(header, e.target.value as CrmField)}
                     className={cn(
                       'text-sm',
-                      currentValue === 'email' && 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10',
+                      currentValue === 'email' && 'border-border bg-secondary',
                       currentValue === 'ignore' && 'text-muted-foreground',
                     )}
                   >

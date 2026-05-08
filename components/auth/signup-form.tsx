@@ -28,10 +28,10 @@ function getPasswordStrength(password: string): {
 
   const map: Record<number, { label: string; color: string }> = {
     0: { label: '', color: '' },
-    1: { label: 'Weak', color: 'bg-red-500' },
-    2: { label: 'Fair', color: 'bg-amber-500' },
-    3: { label: 'Good', color: 'bg-blue-500' },
-    4: { label: 'Strong', color: 'bg-emerald-500' },
+    1: { label: 'Weak', color: 'bg-secondary' },
+    2: { label: 'Fair', color: 'bg-secondary' },
+    3: { label: 'Good', color: 'bg-secondary' },
+    4: { label: 'Strong', color: 'bg-secondary' },
   }
 
   return { score: capped, ...map[capped] }
@@ -57,10 +57,10 @@ function PasswordStrengthBar({ password }: { password: string }) {
       {label && (
         <p className={cn(
           'text-xs font-medium',
-          score === 1 && 'text-red-500',
-          score === 2 && 'text-amber-500',
-          score === 3 && 'text-blue-500',
-          score === 4 && 'text-emerald-500',
+          score === 1 && 'text-foreground',
+          score === 2 && 'text-foreground',
+          score === 3 && 'text-foreground',
+          score === 4 && 'text-foreground',
         )}>
           {label} password
         </p>
@@ -219,7 +219,7 @@ export function SignupForm() {
               <Input
                 id="signup-workspace"
                 type="text"
-                placeholder="Acme Corp"
+                placeholder="Summit Mergers"
                 value={form.workspaceName}
                 onChange={update('workspaceName')}
                 required

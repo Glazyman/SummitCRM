@@ -35,18 +35,18 @@ export function AiUsageWidget({ usage, loading }: AiUsageWidgetProps) {
   const isCrit = pct >= 100
 
   return (
-    <Card className={cn(isCrit && 'border-red-300 dark:border-red-700')}>
+    <Card className={cn(isCrit && 'border-border')}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Sparkles className="h-5 w-5 text-purple-500" />
+          <Sparkles className="h-5 w-5 text-foreground" />
           AI usage
           <span className="ml-auto">
             {isCrit ? (
-              <Badge className="text-xs bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border-red-300">
+              <Badge className="text-xs bg-secondary text-foreground border-border">
                 Budget reached
               </Badge>
             ) : isWarn ? (
-              <Badge className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 border-orange-300">
+              <Badge className="text-xs bg-secondary text-foreground border-border">
                 {pct}% used
               </Badge>
             ) : (
@@ -81,8 +81,8 @@ export function AiUsageWidget({ usage, loading }: AiUsageWidgetProps) {
                 value={Math.min(pct, 100)}
                 className={cn(
                   'h-2.5',
-                  isCrit  ? '[&>div]:bg-red-500'    :
-                  isWarn  ? '[&>div]:bg-orange-500'  : '',
+                  isCrit  ? '[&>div]:bg-foreground'    :
+                  isWarn  ? '[&>div]:bg-foreground'  : '',
                 )}
               />
               <div className="flex justify-between text-xs text-muted-foreground">
@@ -95,8 +95,8 @@ export function AiUsageWidget({ usage, loading }: AiUsageWidgetProps) {
               <div className={cn(
                 'flex items-start gap-2 rounded-md p-2.5 text-xs',
                 isCrit
-                  ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300'
-                  : 'bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300',
+                  ? 'bg-secondary text-foreground'
+                  : 'bg-secondary text-foreground',
               )}>
                 <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                 {isCrit

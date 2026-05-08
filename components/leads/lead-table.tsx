@@ -203,7 +203,7 @@ function LeadTableRow({
       className={cn(
         'group transition-colors',
         selected
-          ? 'bg-primary/5 dark:bg-primary/10'
+          ? 'bg-primary/5'
           : 'hover:bg-muted/40'
       )}
     >

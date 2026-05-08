@@ -39,11 +39,11 @@ function relativeTime(iso: string | null): string {
 }
 
 const ROLE_COLORS: Record<string, string> = {
-  super_admin: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-  admin:       'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  manager:     'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  rep:         'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-  viewer:      'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  super_admin: 'bg-secondary text-foreground',
+  admin:       'bg-secondary text-foreground',
+  manager:     'bg-secondary text-foreground',
+  rep:         'bg-secondary text-foreground',
+  viewer:      'bg-gray-100 text-gray-600',
 }
 
 function SortIcon({ field, sort }: { field: SortField; sort: { field: SortField; dir: SortDir } }) {
@@ -87,7 +87,7 @@ export function TeamPerformanceTable({ stats, loading }: TeamPerformanceTablePro
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Users className="h-5 w-5 text-blue-500" />
+          <Users className="h-5 w-5 text-foreground" />
           Team performance
           <Badge variant="secondary" className="ml-auto text-xs">{stats.length} members</Badge>
         </CardTitle>
@@ -168,9 +168,9 @@ export function TeamPerformanceTable({ stats, loading }: TeamPerformanceTablePro
                     <td className="px-4 py-3">
                       <span className={cn(
                         'font-semibold',
-                        rep.open_rate >= 30 ? 'text-emerald-600 dark:text-emerald-400' :
+                        rep.open_rate >= 30 ? 'text-foreground' :
                         rep.open_rate >= 20 ? '' :
-                        'text-orange-500',
+                        'text-foreground',
                       )}>
                         {rep.open_rate}%
                       </span>
@@ -180,9 +180,9 @@ export function TeamPerformanceTable({ stats, loading }: TeamPerformanceTablePro
                     <td className="px-4 py-3">
                       <span className={cn(
                         'font-semibold',
-                        rep.reply_rate >= 6 ? 'text-emerald-600 dark:text-emerald-400' :
+                        rep.reply_rate >= 6 ? 'text-foreground' :
                         rep.reply_rate >= 3 ? '' :
-                        'text-orange-500',
+                        'text-foreground',
                       )}>
                         {rep.reply_rate}%
                       </span>

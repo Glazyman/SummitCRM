@@ -51,10 +51,10 @@ interface AIDraftModalProps {
 
 // ── Tone config ───────────────────────────────────────────────────────────
 const TONES: Array<{ value: AiTone; label: string; description: string; color: string }> = [
-  { value: 'professional', label: 'Professional', description: 'Formal, concise, respectful',    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'   },
-  { value: 'casual',       label: 'Casual',       description: 'Conversational, like a colleague', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
-  { value: 'direct',       label: 'Direct',       description: 'No fluff, value first',          color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'},
-  { value: 'friendly',     label: 'Friendly',     description: 'Warm, genuine curiosity',        color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'},
+  { value: 'professional', label: 'Professional', description: 'Formal, concise, respectful',    color: 'bg-secondary text-foreground'   },
+  { value: 'casual',       label: 'Casual',       description: 'Conversational, like a colleague', color: 'bg-secondary text-foreground' },
+  { value: 'direct',       label: 'Direct',       description: 'No fluff, value first',          color: 'bg-secondary text-foreground'},
+  { value: 'friendly',     label: 'Friendly',     description: 'Warm, genuine curiosity',        color: 'bg-secondary text-foreground'},
 ]
 
 export function AIDraftModal({
@@ -139,7 +139,7 @@ export function AIDraftModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-500" />
+            <Sparkles className="h-5 w-5 text-foreground" />
             AI Email Draft
             {leadName && (
               <span className="text-muted-foreground font-normal text-sm">
@@ -289,7 +289,7 @@ export function AIDraftModal({
                   onClick={handleCopy}
                   title="Copy to clipboard"
                 >
-                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                  {copied ? <Check className="h-4 w-4 text-foreground" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
             </div>

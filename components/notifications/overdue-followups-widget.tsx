@@ -15,34 +15,6 @@ interface FollowUp {
   company:    string | null
 }
 
-// Mock data for frontend development
-const MOCK_FOLLOWUPS: FollowUp[] = [
-  {
-    id: 'f1', lead_id: 'l1',
-    due_at: new Date(Date.now() - 2 * 3600_000).toISOString(),
-    notes: 'Send pricing deck',
-    lead_name: 'Sarah Chen', company: 'Stripe',
-  },
-  {
-    id: 'f2', lead_id: 'l2',
-    due_at: new Date(Date.now() - 26 * 3600_000).toISOString(),
-    notes: 'Follow up on trial',
-    lead_name: 'Marcus Rodriguez', company: 'Notion',
-  },
-  {
-    id: 'f3', lead_id: 'l3',
-    due_at: new Date(Date.now() + 1800_000).toISOString(),
-    notes: 'Intro call scheduled',
-    lead_name: 'Emma Wilson', company: 'Linear',
-  },
-  {
-    id: 'f4', lead_id: 'l4',
-    due_at: new Date(Date.now() - 5 * 3600_000).toISOString(),
-    notes: null,
-    lead_name: 'Jake Thompson', company: 'Figma',
-  },
-]
-
 function getDueLabel(due_at: string): { label: string; urgent: boolean; overdue: boolean } {
   const date = new Date(due_at)
   const overdue = isPast(date) && !isToday(date)
@@ -67,12 +39,27 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
   const [loading,   setLoading]   = useState(true)
 
   useEffect(() => {
-    // Replace with real API call:
-    // fetch('/api/follow-ups?overdue=1&limit=' + limit).then(...)
-    setTimeout(() => {
-      setFollowUps(MOCK_FOLLOWUPS.slice(0, limit))
-      setLoading(false)
-    }, 400)
+    let cancelled = false
+
+    async function loadFollowUps() {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/notifications?type=follow_up_due&limit=${limit}`)
+        if (!cancelled && res.ok) {
+          const data = await res.json()
+          setFollowUps(data.follow_ups ?? data.followUps ?? [])
+        }
+      } catch {
+        if (!cancelled) setFollowUps([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void loadFollowUps()
+    return () => {
+      cancelled = true
+    }
   }, [limit])
 
   const overdueCount = followUps.filter(f => getDueLabel(f.due_at).overdue).length
@@ -85,7 +72,7 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
           <CalendarClock className="w-4 h-4 text-muted-foreground" />
           <span className="font-semibold text-sm">Follow-ups</span>
           {overdueCount > 0 && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-[10px] font-semibold">
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary text-foreground text-[10px] font-semibold">
               <AlertCircle className="w-3 h-3" />
               {overdueCount} overdue
             </span>
@@ -107,8 +94,8 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
           </div>
         ) : followUps.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
-            <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
-              <CalendarClock className="w-5 h-5 text-emerald-600" />
+            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+              <CalendarClock className="w-5 h-5 text-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">No follow-ups due</p>
           </div>
@@ -128,8 +115,8 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
                     {/* Urgency indicator */}
                     <div className={cn(
                       'w-2 h-2 rounded-full flex-shrink-0 mt-0.5',
-                      due.overdue  ? 'bg-red-500'    :
-                      due.urgent   ? 'bg-orange-400' : 'bg-emerald-400'
+                      due.overdue  ? 'bg-secondary'    :
+                      due.urgent   ? 'bg-secondary' : 'bg-secondary'
                     )} />
 
                     <div className="flex-1 min-w-0">
@@ -137,8 +124,8 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
                         <span className="text-sm font-medium truncate">{f.lead_name}</span>
                         <span className={cn(
                           'text-[11px] flex-shrink-0',
-                          due.overdue  ? 'text-red-500 font-semibold' :
-                          due.urgent   ? 'text-orange-500 font-medium' : 'text-muted-foreground'
+                          due.overdue  ? 'text-foreground font-semibold' :
+                          due.urgent   ? 'text-foreground font-medium' : 'text-muted-foreground'
                         )}>
                           {due.label}
                         </span>

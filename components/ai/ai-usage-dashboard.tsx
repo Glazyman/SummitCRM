@@ -104,7 +104,7 @@ export function AIUsageDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-500" />
+            <Sparkles className="h-5 w-5 text-foreground" />
             AI Usage
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -204,7 +204,7 @@ export function AIUsageDashboard() {
                   value={Math.min(budgetPct, 100)}
                   className={cn(
                     'h-3',
-                    budgetPct >= 100 ? '[&>div]:bg-red-500' : budgetPct >= 80 ? '[&>div]:bg-orange-500' : '',
+                    budgetPct >= 100 ? '[&>div]:bg-foreground' : budgetPct >= 80 ? '[&>div]:bg-foreground' : '',
                   )}
                 />
                 <p className="text-xs text-muted-foreground mt-1.5">
@@ -228,7 +228,7 @@ export function AIUsageDashboard() {
                       <div key={d.date} className="flex flex-col items-center gap-1 group min-w-[20px]">
                         <div className="relative flex-1 flex items-end w-4">
                           <div
-                            className="w-full bg-purple-400 dark:bg-purple-600 rounded-sm group-hover:bg-purple-500 transition-colors"
+                            className="w-full bg-secondary rounded-sm group-hover:bg-secondary transition-colors"
                             style={{ height: `${Math.max(pct, 4)}%` }}
                             title={`${d.date}: ${formatTokens(d.tokens)} tokens ($${d.cost.toFixed(4)})`}
                           />

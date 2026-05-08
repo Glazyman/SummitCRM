@@ -12,10 +12,10 @@ import type { TimeSeriesPoint } from './types'
 
 // ── Series config ─────────────────────────────────────────────────────────
 const SERIES = [
-  { key: 'sent',    label: 'Sent',    color: '#3b82f6', fillOpacity: 0.08 },
-  { key: 'opened',  label: 'Opened',  color: '#10b981', fillOpacity: 0.08 },
-  { key: 'replied', label: 'Replied', color: '#8b5cf6', fillOpacity: 0.08 },
-  { key: 'bounced', label: 'Bounced', color: '#ef4444', fillOpacity: 0.08 },
+  { key: 'sent',    label: 'Sent',    color: '#111111', fillOpacity: 0.08 },
+  { key: 'opened',  label: 'Opened',  color: '#444444', fillOpacity: 0.07 },
+  { key: 'replied', label: 'Replied', color: '#777777', fillOpacity: 0.06 },
+  { key: 'bounced', label: 'Bounced', color: '#aaaaaa', fillOpacity: 0.05 },
 ] as const
 
 type SeriesKey = typeof SERIES[number]['key']
@@ -24,7 +24,7 @@ type SeriesKey = typeof SERIES[number]['key']
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number }>; label?: string }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl border bg-background/95 backdrop-blur p-3 shadow-xl text-sm min-w-[140px]">
+    <div className="min-w-[140px] rounded-xl border border-border bg-card/95 p-3 text-sm shadow-card backdrop-blur">
       <p className="font-semibold mb-2 text-foreground">{label}</p>
       {payload.map(p => (
         <div key={p.name} className="flex items-center justify-between gap-4">
@@ -75,7 +75,7 @@ export function EmailTimeSeriesChart({ data, loading }: Props) {
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <TrendingUp className="h-5 w-5 text-blue-500" />
+            <TrendingUp className="h-5 w-5 text-muted-foreground" />
             Email activity over time
           </CardTitle>
 
@@ -90,10 +90,10 @@ export function EmailTimeSeriesChart({ data, loading }: Props) {
                     'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-all border',
                     hidden.has(s.key)
                       ? 'border-border text-muted-foreground bg-transparent opacity-50'
-                      : 'border-transparent text-white',
+                      : 'border-border bg-secondary text-foreground',
                   )}
-                  style={hidden.has(s.key) ? {} : { background: s.color }}
                 >
+                  <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
                   {s.label}
                 </button>
               ))}
@@ -106,7 +106,7 @@ export function EmailTimeSeriesChart({ data, loading }: Props) {
                   onClick={() => setChartType(t)}
                   className={cn(
                     'px-2.5 py-1 font-medium capitalize transition-colors',
-                    chartType === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                    chartType === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary',
                   )}
                 >
                   {t}

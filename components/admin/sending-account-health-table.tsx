@@ -25,9 +25,9 @@ interface Props {
 }
 
 function quotaColor(pct: number) {
-  if (pct >= 80) return { bar: '[&>div]:bg-red-500',    text: 'text-red-600 dark:text-red-400',    badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' }
-  if (pct >= 60) return { bar: '[&>div]:bg-orange-400', text: 'text-orange-500',                   badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' }
-  return           { bar: '',                            text: 'text-foreground',                   badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' }
+  if (pct >= 80) return { bar: '[&>div]:bg-foreground',    text: 'text-foreground',    badge: 'bg-secondary text-foreground' }
+  if (pct >= 60) return { bar: '[&>div]:bg-foreground', text: 'text-foreground',                   badge: 'bg-secondary text-foreground' }
+  return           { bar: '',                            text: 'text-foreground',                   badge: 'bg-secondary text-foreground' }
 }
 
 function bounceLevel(n: number): 'ok' | 'warn' | 'danger' {
@@ -56,7 +56,7 @@ export function SendingAccountHealthTable({ accounts, isAdmin, loading }: Props)
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Server className="h-5 w-5 text-purple-500" />
+          <Server className="h-5 w-5 text-foreground" />
           Sending account health
           <Badge variant="secondary" className="ml-auto text-xs">{accounts.length} accounts</Badge>
         </CardTitle>
@@ -93,7 +93,7 @@ export function SendingAccountHealthTable({ accounts, isAdmin, loading }: Props)
                     key={acct.id}
                     className={cn(
                       'border-b last:border-0 transition-colors',
-                      isWarn ? 'bg-red-50/30 dark:bg-red-950/10 hover:bg-red-50/50 dark:hover:bg-red-950/20' : 'hover:bg-muted/30',
+                      isWarn ? 'bg-secondary hover:bg-secondary' : 'hover:bg-muted/30',
                     )}
                   >
                     {/* Account */}
@@ -137,8 +137,8 @@ export function SendingAccountHealthTable({ accounts, isAdmin, loading }: Props)
                     <td className="px-4 py-3">
                       <span className={cn(
                         'font-semibold',
-                        bounce === 'danger' ? 'text-red-600 dark:text-red-400' :
-                        bounce === 'warn'   ? 'text-orange-500' : '',
+                        bounce === 'danger' ? 'text-foreground' :
+                        bounce === 'warn'   ? 'text-foreground' : '',
                       )}>
                         {acct.bounces_7d}
                         {bounce !== 'ok' && (
@@ -151,8 +151,8 @@ export function SendingAccountHealthTable({ accounts, isAdmin, loading }: Props)
                     <td className="px-4 py-3">
                       <span className={cn(
                         'font-semibold',
-                        acct.failures_7d > 3 ? 'text-red-600 dark:text-red-400' :
-                        acct.failures_7d > 1 ? 'text-orange-500' : '',
+                        acct.failures_7d > 3 ? 'text-foreground' :
+                        acct.failures_7d > 1 ? 'text-foreground' : '',
                       )}>
                         {acct.failures_7d}
                       </span>
@@ -161,7 +161,7 @@ export function SendingAccountHealthTable({ accounts, isAdmin, loading }: Props)
                     {/* Status */}
                     <td className="px-4 py-3">
                       {acct.is_active ? (
-                        <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                        <span className="flex items-center gap-1.5 text-foreground text-xs font-medium">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Active
                         </span>
@@ -182,7 +182,7 @@ export function SendingAccountHealthTable({ accounts, isAdmin, loading }: Props)
                             size="sm"
                             onClick={() => handlePause(acct.id)}
                             disabled={pausing.has(acct.id)}
-                            className="h-7 px-2 text-xs gap-1 border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400"
+                            className="h-7 px-2 text-xs gap-1 border-border text-foreground hover:bg-secondary"
                           >
                             <Pause className="h-3 w-3" />
                             {pausing.has(acct.id) ? 'Pausing…' : 'Pause'}

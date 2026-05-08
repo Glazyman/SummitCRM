@@ -17,15 +17,15 @@ const STATUS_LABELS: Record<string, string> = {
   unsubscribed:   'Unsubscribed',
 }
 
-// Funnel stage colours: saturated blue → vibrant green
-const STAGE_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#22c55e']
+// Funnel stage colors: monochrome scale for the light Acme-style UI.
+const STAGE_COLORS = ['#111111', '#343434', '#595959', '#7a7a7a', '#9a9a9a']
 
 // ── Custom tooltip ────────────────────────────────────────────────────────
 function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; value: number; percentage: number } }> }) {
   if (!active || !payload?.[0]) return null
   const d = payload[0].payload
   return (
-    <div className="rounded-xl border bg-background/95 backdrop-blur p-3 shadow-xl text-sm">
+    <div className="rounded-xl border border-border bg-card/95 p-3 text-sm shadow-card backdrop-blur">
       <p className="font-semibold mb-1">{d.name}</p>
       <p className="text-muted-foreground">{d.value.toLocaleString()} leads</p>
       <p className="text-muted-foreground">{d.percentage}% of total</p>
@@ -59,7 +59,7 @@ export function LeadFunnelChart({ data, loading }: Props) {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Users className="h-5 w-5 text-purple-500" />
+          <Users className="h-5 w-5 text-muted-foreground" />
           Lead conversion funnel
           <Badge variant="secondary" className="ml-auto text-xs">
             {data.total.toLocaleString()} total leads
@@ -85,7 +85,7 @@ export function LeadFunnelChart({ data, loading }: Props) {
                   {drop !== null && (
                     <div className="flex items-center justify-center py-1 gap-1.5 text-xs text-muted-foreground">
                       <ArrowDown className="h-3 w-3" />
-                      <span className={cn('font-medium', drop > 60 ? 'text-red-500' : drop > 30 ? 'text-orange-500' : 'text-muted-foreground')}>
+                      <span className={cn('font-medium', drop > 60 ? 'text-foreground' : drop > 30 ? 'text-muted-foreground' : 'text-muted-foreground')}>
                         −{drop}% drop-off
                       </span>
                     </div>
@@ -95,7 +95,7 @@ export function LeadFunnelChart({ data, loading }: Props) {
                   <div className="flex items-center gap-3">
                     <div className="flex-1">
                       <div
-                        className="flex items-center justify-between rounded-lg px-4 py-3 text-white transition-all hover:opacity-90"
+                        className="flex items-center justify-between rounded-lg px-4 py-3 text-primary-foreground transition-all hover:opacity-90"
                         style={{
                           background:  color,
                           marginLeft:  `${(maxWidth - width) / 2}%`,

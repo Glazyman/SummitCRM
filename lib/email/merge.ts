@@ -89,14 +89,14 @@ export function validateMergeVars(template: string): string[] {
  * Unknown variables are shown as [variable_name] so the user can spot them.
  */
 const PREVIEW_PLACEHOLDERS: MergeVariableContext = {
-  first_name:   'James',
-  last_name:    'Harrington',
-  full_name:    'James Harrington',
-  company:      'Vertex Software',
-  title:        'CEO',
-  email:        'james.h@vertexsoftware.io',
-  sender_name:  'Your Name',
-  sender_email: 'you@company.com',
+  first_name:   '[first_name]',
+  last_name:    '[last_name]',
+  full_name:    '[full_name]',
+  company:      '[company]',
+  title:        '[title]',
+  email:        '[email]',
+  sender_name:  '[sender_name]',
+  sender_email: '[sender_email]',
 }
 
 export function previewMergeVars(template: string): string {

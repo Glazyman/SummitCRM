@@ -84,7 +84,7 @@ export function FollowUpSuggestionCard({
           variant="outline"
           onClick={generate}
           disabled={loading}
-          className="w-full gap-2 border-purple-200 text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-900/20"
+          className="w-full gap-2 border-border text-foreground hover:bg-secondary"
         >
           {loading ? (
             <RefreshCw className="h-4 w-4 animate-spin" />
@@ -107,14 +107,14 @@ export function FollowUpSuggestionCard({
   return (
     <div className={cn(
       'rounded-lg border p-4 space-y-3',
-      'border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20',
+      'border-border bg-secondary',
       className,
     )}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-purple-500" />
-          <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+          <Sparkles className="h-4 w-4 text-foreground" />
+          <span className="text-sm font-medium text-foreground">
             AI Suggestion
           </span>
           {suggestion.cached && (
@@ -137,12 +137,12 @@ export function FollowUpSuggestionCard({
       {/* Timing */}
       {isNoFollowUp ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Check className="h-4 w-4 text-green-500" />
+          <Check className="h-4 w-4 text-foreground" />
           This lead has already replied — no follow-up needed.
         </div>
       ) : (
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-md px-3 py-2 border">
+          <div className="flex items-center gap-2 bg-white rounded-md px-3 py-2 border">
             <Clock className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-semibold">
               {suggestion.suggested_days} day{suggestion.suggested_days !== 1 ? 's' : ''} from now
@@ -167,7 +167,7 @@ export function FollowUpSuggestionCard({
           </button>
 
           {expanded && (
-            <div className="rounded-md bg-white dark:bg-gray-900 border p-3 space-y-2 text-sm">
+            <div className="rounded-md bg-white border p-3 space-y-2 text-sm">
               <div>
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Subject

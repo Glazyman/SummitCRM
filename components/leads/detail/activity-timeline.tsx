@@ -27,24 +27,24 @@ type ActivityMeta = {
 }
 
 const ACTIVITY_META: Record<ActivityType, ActivityMeta> = {
-  lead_created:        { icon: UserPlus,       ring: 'ring-blue-200 dark:ring-blue-800',     bg: 'bg-blue-100 dark:bg-blue-900/40',     color: 'text-blue-600 dark:text-blue-400',    label: 'Lead created' },
-  lead_imported:       { icon: FileDown,        ring: 'ring-blue-200 dark:ring-blue-800',     bg: 'bg-blue-100 dark:bg-blue-900/40',     color: 'text-blue-600 dark:text-blue-400',    label: 'Lead imported' },
-  lead_status_changed: { icon: RefreshCw,       ring: 'ring-violet-200 dark:ring-violet-800', bg: 'bg-violet-100 dark:bg-violet-900/40', color: 'text-violet-600 dark:text-violet-400',label: 'Status changed' },
-  note_added:          { icon: StickyNote,      ring: 'ring-amber-200 dark:ring-amber-800',   bg: 'bg-amber-100 dark:bg-amber-900/40',   color: 'text-amber-600 dark:text-amber-400',  label: 'Note added' },
-  note_edited:         { icon: StickyNote,      ring: 'ring-amber-200 dark:ring-amber-800',   bg: 'bg-amber-100 dark:bg-amber-900/40',   color: 'text-amber-600 dark:text-amber-400',  label: 'Note edited' },
-  note_deleted:        { icon: Trash2,          ring: 'ring-gray-200 dark:ring-gray-700',     bg: 'bg-gray-100 dark:bg-gray-800',        color: 'text-gray-500',                       label: 'Note deleted' },
-  email_sent:          { icon: Mail,            ring: 'ring-sky-200 dark:ring-sky-800',       bg: 'bg-sky-100 dark:bg-sky-900/40',       color: 'text-sky-600 dark:text-sky-400',      label: 'Email sent' },
-  email_opened:        { icon: Eye,             ring: 'ring-green-200 dark:ring-green-800',   bg: 'bg-green-100 dark:bg-green-900/40',   color: 'text-green-600 dark:text-green-400',  label: 'Email opened' },
-  email_clicked:       { icon: MousePointer,    ring: 'ring-teal-200 dark:ring-teal-800',     bg: 'bg-teal-100 dark:bg-teal-900/40',     color: 'text-teal-600 dark:text-teal-400',    label: 'Link clicked' },
-  email_replied:       { icon: Reply,           ring: 'ring-emerald-200 dark:ring-emerald-800',bg: 'bg-emerald-100 dark:bg-emerald-900/40',color: 'text-emerald-600 dark:text-emerald-400',label: 'Email replied' },
-  email_bounced:       { icon: AlertTriangle,   ring: 'ring-red-200 dark:ring-red-800',       bg: 'bg-red-100 dark:bg-red-900/40',       color: 'text-red-600 dark:text-red-400',      label: 'Email bounced' },
-  ai_draft_generated:  { icon: Sparkles,        ring: 'ring-violet-200 dark:ring-violet-800', bg: 'bg-violet-100 dark:bg-violet-900/40', color: 'text-violet-600 dark:text-violet-400',label: 'AI draft generated' },
-  follow_up_scheduled: { icon: Calendar,        ring: 'ring-orange-200 dark:ring-orange-800', bg: 'bg-orange-100 dark:bg-orange-900/40', color: 'text-orange-600 dark:text-orange-400',label: 'Follow-up scheduled' },
-  follow_up_sent:      { icon: Send,            ring: 'ring-sky-200 dark:ring-sky-800',       bg: 'bg-sky-100 dark:bg-sky-900/40',       color: 'text-sky-600 dark:text-sky-400',      label: 'Follow-up sent' },
-  follow_up_completed: { icon: CheckCircle2,    ring: 'ring-green-200 dark:ring-green-800',   bg: 'bg-green-100 dark:bg-green-900/40',   color: 'text-green-600 dark:text-green-400',  label: 'Follow-up completed' },
-  unsubscribed:        { icon: BellOff,         ring: 'ring-red-200 dark:ring-red-800',       bg: 'bg-red-100 dark:bg-red-900/40',       color: 'text-red-600 dark:text-red-400',      label: 'Unsubscribed' },
-  member_invited:      { icon: UserPlus,        ring: 'ring-blue-200 dark:ring-blue-800',     bg: 'bg-blue-100 dark:bg-blue-900/40',     color: 'text-blue-600 dark:text-blue-400',    label: 'Member invited' },
-  role_changed:        { icon: RefreshCw,       ring: 'ring-gray-200 dark:ring-gray-700',     bg: 'bg-gray-100 dark:bg-gray-800',        color: 'text-gray-500',                       label: 'Role changed' },
+  lead_created:        { icon: UserPlus,       ring: 'ring-border',     bg: 'bg-secondary',     color: 'text-foreground',    label: 'Lead created' },
+  lead_imported:       { icon: FileDown,        ring: 'ring-border',     bg: 'bg-secondary',     color: 'text-foreground',    label: 'Lead imported' },
+  lead_status_changed: { icon: RefreshCw,       ring: 'ring-border', bg: 'bg-secondary', color: 'text-foreground',label: 'Status changed' },
+  note_added:          { icon: StickyNote,      ring: 'ring-border',   bg: 'bg-secondary',   color: 'text-foreground',  label: 'Note added' },
+  note_edited:         { icon: StickyNote,      ring: 'ring-border',   bg: 'bg-secondary',   color: 'text-foreground',  label: 'Note edited' },
+  note_deleted:        { icon: Trash2,          ring: 'ring-gray-200',     bg: 'bg-gray-100',        color: 'text-gray-500',                       label: 'Note deleted' },
+  email_sent:          { icon: Mail,            ring: 'ring-border',       bg: 'bg-secondary',       color: 'text-foreground',      label: 'Email sent' },
+  email_opened:        { icon: Eye,             ring: 'ring-border',   bg: 'bg-secondary',   color: 'text-foreground',  label: 'Email opened' },
+  email_clicked:       { icon: MousePointer,    ring: 'ring-border',     bg: 'bg-secondary',     color: 'text-foreground',    label: 'Link clicked' },
+  email_replied:       { icon: Reply,           ring: 'ring-border',bg: 'bg-secondary',color: 'text-foreground',label: 'Email replied' },
+  email_bounced:       { icon: AlertTriangle,   ring: 'ring-border',       bg: 'bg-secondary',       color: 'text-foreground',      label: 'Email bounced' },
+  ai_draft_generated:  { icon: Sparkles,        ring: 'ring-border', bg: 'bg-secondary', color: 'text-foreground',label: 'AI draft generated' },
+  follow_up_scheduled: { icon: Calendar,        ring: 'ring-border', bg: 'bg-secondary', color: 'text-foreground',label: 'Follow-up scheduled' },
+  follow_up_sent:      { icon: Send,            ring: 'ring-border',       bg: 'bg-secondary',       color: 'text-foreground',      label: 'Follow-up sent' },
+  follow_up_completed: { icon: CheckCircle2,    ring: 'ring-border',   bg: 'bg-secondary',   color: 'text-foreground',  label: 'Follow-up completed' },
+  unsubscribed:        { icon: BellOff,         ring: 'ring-border',       bg: 'bg-secondary',       color: 'text-foreground',      label: 'Unsubscribed' },
+  member_invited:      { icon: UserPlus,        ring: 'ring-border',     bg: 'bg-secondary',     color: 'text-foreground',    label: 'Member invited' },
+  role_changed:        { icon: RefreshCw,       ring: 'ring-gray-200',     bg: 'bg-gray-100',        color: 'text-gray-500',                       label: 'Role changed' },
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -93,8 +93,8 @@ function TimelineEntry({
 }) {
   const FALLBACK_META: ActivityMeta = {
     icon:  Activity,
-    ring:  'ring-gray-200 dark:ring-gray-700',
-    bg:    'bg-gray-100 dark:bg-gray-800',
+    ring:  'ring-gray-200',
+    bg:    'bg-gray-100',
     color: 'text-gray-500',
     label: 'Activity',
   }
@@ -222,7 +222,7 @@ function EntryBody({ entry }: { entry: ActivityEntry }) {
     case 'email_replied':
       return (
         <span className="text-sm">
-          <span className="font-medium text-emerald-600 dark:text-emerald-400">Replied</span>
+          <span className="font-medium text-foreground">Replied</span>
           {!!m.subject && <span className="text-muted-foreground"> to &ldquo;{m.subject as string}&rdquo;</span>}
         </span>
       )
@@ -257,7 +257,7 @@ function EntryBody({ entry }: { entry: ActivityEntry }) {
     case 'follow_up_completed':
       return (
         <span className="text-sm">
-          <span className="font-medium text-green-600 dark:text-green-400">Follow-up completed: </span>
+          <span className="font-medium text-foreground">Follow-up completed: </span>
           <span className="text-muted-foreground">{m.title as string}</span>
         </span>
       )
@@ -291,7 +291,7 @@ function NoteContent({
   }
 
   return (
-    <div className="group/note mt-2 rounded-xl border border-amber-200/60 bg-amber-50/50 p-3 dark:border-amber-800/40 dark:bg-amber-900/10">
+    <div className="group/note mt-2 rounded-xl border border-border bg-secondary p-3">
       {editing ? (
         <div className="space-y-2">
           <textarea

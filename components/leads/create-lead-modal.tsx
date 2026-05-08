@@ -104,7 +104,7 @@ export function CreateLeadModal({ open, batches, onClose, onCreate }: CreateLead
                 icon={<User className="h-3.5 w-3.5" />}
               >
                 <Input
-                  placeholder="James"
+                  placeholder="First name"
                   value={form.first_name}
                   onChange={(e) => patch('first_name', e.target.value)}
                   autoComplete="given-name"
@@ -129,7 +129,7 @@ export function CreateLeadModal({ open, batches, onClose, onCreate }: CreateLead
               <Input
                 ref={emailRef}
                 type="email"
-                placeholder="james@example.com"
+                placeholder="email@company.com"
                 value={form.email}
                 onChange={(e) => patch('email', e.target.value)}
                 autoComplete="email"
@@ -141,7 +141,7 @@ export function CreateLeadModal({ open, batches, onClose, onCreate }: CreateLead
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Company" icon={<Building2 className="h-3.5 w-3.5" />}>
                 <Input
-                  placeholder="Acme Corp"
+                  placeholder="Company name"
                   value={form.company}
                   onChange={(e) => patch('company', e.target.value)}
                 />

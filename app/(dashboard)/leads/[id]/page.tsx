@@ -2,14 +2,9 @@ import { Suspense }      from 'react'
 import { notFound }      from 'next/navigation'
 import { Spinner }       from '@/components/ui/spinner'
 import LeadDetailClient  from './lead-detail-client'
-import {
-  MOCK_LEAD,
-  MOCK_ACTIVITY,
-  MOCK_EMAILS,
-  MOCK_FOLLOW_UPS,
-  MOCK_TEAM,
-} from '@/components/leads/detail/mock-detail-data'
-import type { LeadDetail } from '@/components/leads/detail/types'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
+import type { ActivityEntry, EmailHistoryItem, FollowUp, LeadDetail, TeamMember } from '@/components/leads/detail/types'
+import type { QuotaStatus, SendingAccountPublic } from '@/lib/email/types'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -18,25 +13,171 @@ interface PageProps {
 export default async function LeadDetailPage({ params }: PageProps) {
   const { id } = await params
 
-  // ── Data fetching (replace with real Supabase queries) ──────────────
-  //
-  // const supabase = await createServerClient(cookies())
-  // const [{ data: lead }, { data: activity }, { data: emails }, { data: followUps }] =
-  //   await Promise.all([
-  //     supabase.from('leads').select('*, batch:batches(name), assigned:workspace_members(name)').eq('id', id).single(),
-  //     supabase.from('activity_logs').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
-  //     supabase.from('emails').select('*').eq('lead_id', id).order('sent_at', { ascending: false }),
-  //     supabase.from('follow_ups').select('*').eq('lead_id', id).order('due_at', { ascending: true }),
-  //   ])
-  // if (!lead) notFound()
+  const supabase = (await createClient()) as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) notFound()
 
-  // ── Use mock data for frontend dev ───────────────────────────────────
-  // When the id is not the mock id, still render the page (demo mode).
-  const lead: LeadDetail = { ...MOCK_LEAD, id }
+  const { data: member } = await supabase
+    .from('workspace_members')
+    .select('workspace_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
 
-  // Mock: current user context (would come from Supabase session in production)
-  const currentUserId = 'u1'
-  const isAdmin       = true
+  const workspaceId = member?.workspace_id
+  if (!workspaceId) notFound()
+
+  const [leadResult, batchesResult, activityResult, notesResult, emailsResult, followUpsResult, accountsResult, membersResult] = await Promise.all([
+    supabase
+      .from('leads')
+      .select('id, workspace_id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, is_unsubscribed, batch_id, assigned_to, source, ai_summary, custom_fields, created_at, updated_at')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .single(),
+    supabase.from('lead_batches').select('id, name').eq('workspace_id', workspaceId),
+    supabase.from('activity_logs').select('id, lead_id, user_id, type, metadata, created_at').eq('lead_id', id).order('created_at', { ascending: false }),
+    supabase.from('notes').select('id, lead_id, author_id, content, created_at, updated_at').eq('lead_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
+    supabase.from('emails').select('id, subject, body_html, sent_by, status, sent_at, opened_at, clicked_at, replied_at, bounced_at, created_at').eq('lead_id', id).order('created_at', { ascending: false }),
+    supabase.from('follow_ups').select('id, title, notes, due_at, completed_at, assigned_to').eq('lead_id', id).order('due_at', { ascending: true }),
+    supabase.from('sending_accounts_safe').select('*').eq('workspace_id', workspaceId).eq('is_active', true),
+    supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('is_active', true),
+  ])
+
+  if (!leadResult.data) notFound()
+
+  const memberIds = ((membersResult.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
+  const adminClient = createAdminClient()
+  const { data: usersData } = await adminClient.auth.admin.listUsers()
+  const usersById = new Map(
+    (usersData.users ?? [])
+      .filter((u) => memberIds.includes(u.id))
+      .map((u) => [
+        u.id,
+        (u.user_metadata?.full_name as string | undefined) ?? u.email ?? u.id,
+      ])
+  )
+
+  const batchNames = new Map(((batchesResult.data ?? []) as Array<{ id: string; name: string }>).map((b) => [b.id, b.name]))
+  const rawLead = leadResult.data as {
+    id: string
+    workspace_id: string
+    first_name: string | null
+    last_name: string | null
+    email: string
+    phone: string | null
+    title: string | null
+    company: string | null
+    website: string | null
+    linkedin_url: string | null
+    status: LeadDetail['status']
+    is_unsubscribed: boolean
+    batch_id: string | null
+    assigned_to: string | null
+    source: string | null
+    ai_summary: string | null
+    custom_fields: Record<string, string> | null
+    created_at: string
+    updated_at: string
+  }
+
+  const lead: LeadDetail = {
+    ...rawLead,
+    batch_name: rawLead.batch_id ? batchNames.get(rawLead.batch_id) ?? null : null,
+    assigned_name: rawLead.assigned_to ? usersById.get(rawLead.assigned_to) ?? null : null,
+    assigned_avatar: null,
+    custom_fields: rawLead.custom_fields ?? {},
+  }
+
+  const currentUserId = user.id
+  const isAdmin = ['super_admin', 'admin', 'manager'].includes(member?.role ?? '')
+  const teamMembers: TeamMember[] = memberIds.map((userId) => ({ id: userId, name: usersById.get(userId) ?? userId }))
+
+  const activity: ActivityEntry[] = ((activityResult.data ?? []) as Array<{
+    id: string
+    user_id: string | null
+    type: ActivityEntry['type']
+    metadata: Record<string, unknown>
+    created_at: string
+  }>).map((entry) => ({
+    id: entry.id,
+    source: 'activity',
+    type: entry.type,
+    user_id: entry.user_id,
+    user_name: entry.user_id ? usersById.get(entry.user_id) ?? null : null,
+    user_initials: null,
+    created_at: entry.created_at,
+    metadata: entry.metadata ?? {},
+  }))
+
+  const notes: ActivityEntry[] = ((notesResult.data ?? []) as Array<{
+    id: string
+    author_id: string
+    content: string
+    created_at: string
+  }>).map((note) => ({
+    id: `note-${note.id}`,
+    source: 'note',
+    type: 'note_added',
+    user_id: note.author_id,
+    user_name: usersById.get(note.author_id) ?? null,
+    user_initials: null,
+    created_at: note.created_at,
+    metadata: {},
+    note_id: note.id,
+    note_content: note.content,
+    note_editable: note.author_id === currentUserId || isAdmin,
+  }))
+
+  const emails: EmailHistoryItem[] = ((emailsResult.data ?? []) as Array<{
+    id: string
+    subject: string
+    body_html: string | null
+    sent_by: string | null
+    status: EmailHistoryItem['status']
+    sent_at: string | null
+    opened_at: string | null
+    clicked_at: string | null
+    replied_at: string | null
+    bounced_at: string | null
+  }>).map((email) => ({
+    ...email,
+    sender_name: email.sent_by ? usersById.get(email.sent_by) ?? null : null,
+  }))
+
+  const followUps: FollowUp[] = ((followUpsResult.data ?? []) as Array<{
+    id: string
+    title: string
+    notes: string | null
+    due_at: string
+    completed_at: string | null
+    assigned_to: string | null
+  }>).map((followUp) => ({
+    ...followUp,
+    is_completed: Boolean(followUp.completed_at),
+    assigned_name: followUp.assigned_to ? usersById.get(followUp.assigned_to) ?? null : null,
+  }))
+
+  const accounts: SendingAccountPublic[] = ((accountsResult.data ?? []) as SendingAccountPublic[]).map((account) => ({
+    ...account,
+    quota_remaining: Math.max((account.daily_limit ?? 0) - (account.emails_sent_today ?? 0), 0),
+    quota_percent: account.daily_limit > 0 ? Math.round(((account.emails_sent_today ?? 0) / account.daily_limit) * 100) : 0,
+  }))
+
+  const quotas: Record<string, QuotaStatus> = Object.fromEntries(accounts.map((account) => {
+    const percent = account.daily_limit > 0 ? Math.round((account.emails_sent_today / account.daily_limit) * 100) : 0
+    const remaining = Math.max(account.daily_limit - account.emails_sent_today, 0)
+    return [account.id, {
+      account_id: account.id,
+      account_name: account.name,
+      daily_limit: account.daily_limit,
+      sent_today: account.emails_sent_today,
+      remaining,
+      percent_used: percent,
+      at_limit: remaining <= 0,
+      reset_at: account.quota_reset_at,
+    }]
+  }))
 
   return (
     <Suspense
@@ -48,10 +189,12 @@ export default async function LeadDetailPage({ params }: PageProps) {
     >
       <LeadDetailClient
         lead={lead}
-        activity={MOCK_ACTIVITY}
-        emails={MOCK_EMAILS}
-        followUps={MOCK_FOLLOW_UPS}
-        teamMembers={MOCK_TEAM}
+        activity={[...activity, ...notes].sort((a, b) => b.created_at.localeCompare(a.created_at))}
+        emails={emails}
+        followUps={followUps}
+        teamMembers={teamMembers}
+        accounts={accounts}
+        quotas={quotas}
         currentUserId={currentUserId}
         isAdmin={isAdmin}
       />
@@ -62,9 +205,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
 // Generate metadata
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params
-  const lead = MOCK_LEAD
-  const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
   return {
-    title: `${name} · Lead Detail`,
+    title: `Lead ${id} · Lead Detail`,
   }
 }

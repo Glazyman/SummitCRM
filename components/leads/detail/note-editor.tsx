@@ -61,7 +61,7 @@ export function NoteEditor({ onSave }: NoteEditorProps) {
         : 'border-border hover:border-muted-foreground/30'
     )}>
       <div className="flex items-start gap-2.5 px-3 pt-3">
-        <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+        <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
         <textarea
           ref={textareaRef}
           value={content}
@@ -90,7 +90,7 @@ export function NoteEditor({ onSave }: NoteEditorProps) {
           isOverflow
             ? 'text-destructive font-medium'
             : remaining < 200
-              ? 'text-amber-600 dark:text-amber-400'
+              ? 'text-foreground'
               : 'text-muted-foreground'
         )}>
           {remaining.toLocaleString()} characters remaining

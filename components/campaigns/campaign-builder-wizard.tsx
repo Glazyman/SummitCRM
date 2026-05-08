@@ -13,7 +13,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SequenceBuilder } from './sequence-builder'
 import { estimateCompletion } from '@/lib/campaigns/scheduler'
-import { MOCK_BATCHES, MOCK_ACCOUNT_OPTIONS } from './mock-data'
 import type { BuilderStep, WizardStep, BatchOption, AccountOption } from './types'
 
 // ── Wizard step config ────────────────────────────────────────────────────
@@ -35,7 +34,12 @@ const DEFAULT_STEP: BuilderStep = {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
-export function CampaignBuilderWizard() {
+interface CampaignBuilderWizardProps {
+  batches: BatchOption[]
+  accounts: AccountOption[]
+}
+
+export function CampaignBuilderWizard({ batches, accounts }: CampaignBuilderWizardProps) {
   const router = useRouter()
 
   // ── Wizard state ──────────────────────────────────────────────────────
@@ -60,10 +64,6 @@ export function CampaignBuilderWizard() {
     subject: string; body_html: string; to_name: string; to_email: string
   } | null>(null)
 
-  // ── Derived data ──────────────────────────────────────────────────────
-  const batches:  BatchOption[]   = MOCK_BATCHES
-  const accounts: AccountOption[] = MOCK_ACCOUNT_OPTIONS
-
   const selectedBatch   = batches.find((b) => b.id === batchId)
   const selectedAccount = accounts.find((a) => a.id === accountId)
 
@@ -86,20 +86,15 @@ export function CampaignBuilderWizard() {
   function goTo(step: WizardStep) { setWizardStep(step); setError(null) }
 
   async function loadPreview() {
-    // In production: POST /api/campaigns/preview with draft data
     setPreviewLoading(true)
-    await new Promise((r) => setTimeout(r, 600))
     const step1 = steps[0]
     setPreviewData({
-      subject:  step1.subject_template.replace('{{company}}', 'Acme Corp').replace('{{first_name}}', 'James'),
-      body_html:`<p>${step1.body_template
-        .replace('{{first_name}}', 'James')
-        .replace('{{company}}', 'Acme Corp')
-        .replace('{{title}}', 'CTO')
+      subject: step1.subject_template || '(No subject yet)',
+      body_html: `<p>${(step1.body_template || 'Add email body content before launch.')
         .replace(/\n/g, '</p><p>')
       }</p>`,
-      to_name:  'James Holloway',
-      to_email: 'james@acmecorp.io',
+      to_name: 'Real lead preview',
+      to_email: 'selected from your batch',
     })
     setPreviewLoading(false)
   }
@@ -273,7 +268,7 @@ export function CampaignBuilderWizard() {
                         <div className="text-right">
                           <div className="h-1 w-16 rounded-full bg-muted">
                             <div
-                              className={cn('h-full rounded-full', a.quota_percent >= 80 ? 'bg-amber-500' : 'bg-emerald-500')}
+                              className={cn('h-full rounded-full', a.quota_percent >= 80 ? 'bg-secondary' : 'bg-secondary')}
                               style={{ width: `${a.quota_percent}%` }}
                             />
                           </div>
@@ -300,7 +295,7 @@ export function CampaignBuilderWizard() {
                         startMode === m ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:bg-muted/30'
                       )}
                     >
-                      {m === 'now' ? '🚀 Launch now' : '📅 Schedule'}
+                      {m === 'now' ? 'Launch now' : 'Schedule'}
                     </button>
                   ))}
                 </div>
@@ -334,7 +329,7 @@ export function CampaignBuilderWizard() {
           <>
             <div>
               <h2 className="text-lg font-semibold">Preview email</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Step 1 rendered for a sample lead from your batch.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Step 1 preview using your template. Merge variables resolve against real leads at send time.</p>
             </div>
 
             {previewLoading ? (
@@ -347,7 +342,7 @@ export function CampaignBuilderWizard() {
                 <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3 text-sm">
                   <div className="flex gap-2 text-muted-foreground">
                     <span className="w-10 shrink-0 font-medium">To:</span>
-                    <span>{previewData.to_name} &lt;{previewData.to_email}&gt;</span>
+                  <span>{previewData.to_name} ({previewData.to_email})</span>
                   </div>
                   <div className="flex gap-2 text-muted-foreground">
                     <span className="w-10 shrink-0 font-medium">From:</span>
@@ -365,7 +360,7 @@ export function CampaignBuilderWizard() {
                 />
 
                 <p className="text-xs text-muted-foreground">
-                  Merge variables have been filled with sample data. Actual content will vary per lead.
+                  No demo contact data is used. Actual merged content will vary per real lead in the selected batch.
                 </p>
               </div>
             ) : (
@@ -387,10 +382,10 @@ export function CampaignBuilderWizard() {
             <div className="space-y-3">
               {/* Summary cards */}
               {[
-                { icon: <Users className="h-4 w-4 text-blue-500" />,   label: 'Target leads',   value: selectedBatch?.lead_count.toLocaleString() ?? '—' },
-                { icon: <Mail className="h-4 w-4 text-violet-500" />,  label: 'Total emails',   value: totalEmails.toLocaleString() },
-                { icon: <Clock className="h-4 w-4 text-amber-500" />,  label: 'Sequence steps', value: `${steps.length} step${steps.length > 1 ? 's' : ''}` },
-                { icon: <Rocket className="h-4 w-4 text-green-500" />, label: 'Sending account', value: selectedAccount?.from_email ?? '—' },
+                { icon: <Users className="h-4 w-4 text-foreground" />,   label: 'Target leads',   value: selectedBatch?.lead_count.toLocaleString() ?? '—' },
+                { icon: <Mail className="h-4 w-4 text-foreground" />,  label: 'Total emails',   value: totalEmails.toLocaleString() },
+                { icon: <Clock className="h-4 w-4 text-foreground" />,  label: 'Sequence steps', value: `${steps.length} step${steps.length > 1 ? 's' : ''}` },
+                { icon: <Rocket className="h-4 w-4 text-foreground" />, label: 'Sending account', value: selectedAccount?.from_email ?? '—' },
                 { icon: <Calendar className="h-4 w-4 text-gray-500" />, label: 'Est. completion',
                   value: estimatedEnd ? estimatedEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—' },
               ].map(({ icon, label, value }) => (
@@ -405,9 +400,9 @@ export function CampaignBuilderWizard() {
             </div>
 
             {/* Anti-spam notice */}
-            <div className="rounded-xl border border-blue-200/50 bg-blue-50/50 px-4 py-3 text-xs text-blue-700 dark:border-blue-800/30 dark:bg-blue-900/10 dark:text-blue-400 space-y-1">
+            <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-xs text-foreground space-y-1">
               <p className="font-semibold">Anti-spam safeguards active</p>
-              <ul className="space-y-0.5 list-disc list-inside text-blue-600/80 dark:text-blue-400/80">
+              <ul className="space-y-0.5 list-disc list-inside text-foreground">
                 <li>Max 50 emails/day per account — overflow queued to next day</li>
                 <li>Sends spread 08:00–18:00 UTC with random timing jitter</li>
                 <li>3–8 second delay between consecutive sends</li>
@@ -416,7 +411,7 @@ export function CampaignBuilderWizard() {
             </div>
 
             {error && (
-              <div className="flex items-start gap-2 rounded-xl border border-red-200/50 bg-red-50/80 px-4 py-3 text-sm text-red-700 dark:border-red-800/30 dark:bg-red-900/10 dark:text-red-400">
+              <div className="flex items-start gap-2 rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-foreground">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 {error}
               </div>

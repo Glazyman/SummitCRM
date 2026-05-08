@@ -9,13 +9,13 @@ const STATUS_CONFIG: Record<string, {
   label: string; icon: React.ComponentType<{ className?: string }>; color: string
 }> = {
   queued:  { label: 'Queued',   icon: Clock,         color: 'text-gray-400'    },
-  sending: { label: 'Sending',  icon: Send,          color: 'text-blue-500'    },
+  sending: { label: 'Sending',  icon: Send,          color: 'text-foreground'    },
   sent:    { label: 'Sent',     icon: CheckCircle2,  color: 'text-gray-400'    },
-  failed:  { label: 'Failed',   icon: XCircle,       color: 'text-red-500'     },
-  bounced: { label: 'Bounced',  icon: AlertTriangle, color: 'text-red-500'     },
-  opened:  { label: 'Opened',   icon: Eye,           color: 'text-blue-500'    },
-  clicked: { label: 'Clicked',  icon: MousePointer,  color: 'text-teal-500'    },
-  replied: { label: 'Replied',  icon: Reply,         color: 'text-emerald-500' },
+  failed:  { label: 'Failed',   icon: XCircle,       color: 'text-foreground'     },
+  bounced: { label: 'Bounced',  icon: AlertTriangle, color: 'text-foreground'     },
+  opened:  { label: 'Opened',   icon: Eye,           color: 'text-foreground'    },
+  clicked: { label: 'Clicked',  icon: MousePointer,  color: 'text-foreground'    },
+  replied: { label: 'Replied',  icon: Reply,         color: 'text-foreground' },
   cancelled:{ label:'Cancelled',icon: XCircle,       color: 'text-muted-foreground' },
 }
 
@@ -87,21 +87,21 @@ export function CampaignEmailsTable({ emails, loading }: CampaignEmailsTableProp
                 </td>
                 <td className="py-3 pr-4 text-xs">
                   {row.opened_at ? (
-                    <span className="flex items-center gap-1 text-blue-500">
+                    <span className="flex items-center gap-1 text-foreground">
                       <Eye className="h-3 w-3" /> {shortDate(row.opened_at)}
                     </span>
                   ) : <span className="text-muted-foreground">—</span>}
                 </td>
                 <td className="py-3 pr-4 text-xs">
                   {row.clicked_at ? (
-                    <span className="flex items-center gap-1 text-teal-500">
+                    <span className="flex items-center gap-1 text-foreground">
                       <MousePointer className="h-3 w-3" /> {shortDate(row.clicked_at)}
                     </span>
                   ) : <span className="text-muted-foreground">—</span>}
                 </td>
                 <td className="py-3 text-xs">
                   {row.replied_at ? (
-                    <span className="flex items-center gap-1 text-emerald-500">
+                    <span className="flex items-center gap-1 text-foreground">
                       <Reply className="h-3 w-3" /> {shortDate(row.replied_at)}
                     </span>
                   ) : <span className="text-muted-foreground">—</span>}

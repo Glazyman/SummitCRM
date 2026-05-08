@@ -19,14 +19,14 @@ const STATUS: Record<EmailHistoryStatus, {
   dot:   string
   badge: string
 }> = {
-  queued:  { Icon: Clock,         label: 'Queued',  dot: 'bg-gray-400',     badge: 'text-gray-500 bg-gray-100 dark:bg-gray-800' },
-  sending: { Icon: Send,          label: 'Sending', dot: 'bg-blue-500',     badge: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30' },
-  sent:    { Icon: Mail,          label: 'Sent',    dot: 'bg-gray-400',     badge: 'text-gray-500 bg-gray-100 dark:bg-gray-800' },
-  failed:  { Icon: AlertTriangle, label: 'Failed',  dot: 'bg-red-500',      badge: 'text-red-600 bg-red-100 dark:bg-red-900/30' },
-  bounced: { Icon: AlertTriangle, label: 'Bounced', dot: 'bg-red-500',      badge: 'text-red-600 bg-red-100 dark:bg-red-900/30' },
-  opened:  { Icon: Eye,           label: 'Opened',  dot: 'bg-blue-500',     badge: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30' },
-  clicked: { Icon: MousePointer,  label: 'Clicked', dot: 'bg-teal-500',     badge: 'text-teal-600 bg-teal-100 dark:bg-teal-900/30' },
-  replied: { Icon: Reply,         label: 'Replied', dot: 'bg-emerald-500',  badge: 'text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30' },
+  queued:  { Icon: Clock,         label: 'Queued',  dot: 'bg-gray-400',     badge: 'text-gray-500 bg-gray-100' },
+  sending: { Icon: Send,          label: 'Sending', dot: 'bg-secondary',     badge: 'text-foreground bg-secondary' },
+  sent:    { Icon: Mail,          label: 'Sent',    dot: 'bg-gray-400',     badge: 'text-gray-500 bg-gray-100' },
+  failed:  { Icon: AlertTriangle, label: 'Failed',  dot: 'bg-secondary',      badge: 'text-foreground bg-secondary' },
+  bounced: { Icon: AlertTriangle, label: 'Bounced', dot: 'bg-secondary',      badge: 'text-foreground bg-secondary' },
+  opened:  { Icon: Eye,           label: 'Opened',  dot: 'bg-secondary',     badge: 'text-foreground bg-secondary' },
+  clicked: { Icon: MousePointer,  label: 'Clicked', dot: 'bg-secondary',     badge: 'text-foreground bg-secondary' },
+  replied: { Icon: Reply,         label: 'Replied', dot: 'bg-secondary',  badge: 'text-foreground bg-secondary' },
 }
 
 export function EmailHistoryPanel({ emails }: EmailHistoryPanelProps) {
@@ -108,9 +108,9 @@ export function EmailHistoryPanel({ emails }: EmailHistoryPanelProps) {
                 {/* Engagement indicators */}
                 <div className="flex flex-wrap gap-2">
                   {([
-                    { label: 'Opened',  ts: email.opened_at,  Icon: Eye,          color: 'text-blue-500' },
-                    { label: 'Clicked', ts: email.clicked_at, Icon: MousePointer, color: 'text-teal-500' },
-                    { label: 'Replied', ts: email.replied_at, Icon: Reply,        color: 'text-emerald-500' },
+                    { label: 'Opened',  ts: email.opened_at,  Icon: Eye,          color: 'text-foreground' },
+                    { label: 'Clicked', ts: email.clicked_at, Icon: MousePointer, color: 'text-foreground' },
+                    { label: 'Replied', ts: email.replied_at, Icon: Reply,        color: 'text-foreground' },
                   ] as const).filter((e) => e.ts).map(({ label, ts, Icon: I, color }) => (
                     <span key={label} className="flex items-center gap-1 text-[10px] text-muted-foreground">
                       <I className={cn('h-3 w-3', color)} />
@@ -118,7 +118,7 @@ export function EmailHistoryPanel({ emails }: EmailHistoryPanelProps) {
                     </span>
                   ))}
                   {email.bounced_at && (
-                    <span className="flex items-center gap-1 text-[10px] text-red-500">
+                    <span className="flex items-center gap-1 text-[10px] text-foreground">
                       <AlertTriangle className="h-3 w-3" />
                       Bounced · {shortDate(email.bounced_at)}
                     </span>

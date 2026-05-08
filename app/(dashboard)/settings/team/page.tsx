@@ -17,9 +17,9 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
 }
 
 const ROLE_COLORS: Record<WorkspaceRole, string> = {
-  super_admin: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  admin:       'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  manager:     'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+  super_admin: 'bg-secondary text-foreground',
+  admin:       'bg-secondary text-foreground',
+  manager:     'bg-secondary text-foreground',
   rep:         'bg-muted text-muted-foreground',
   viewer:      'bg-muted/50 text-muted-foreground',
 }

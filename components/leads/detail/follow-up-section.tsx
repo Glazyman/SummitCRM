@@ -104,7 +104,7 @@ function FollowUpItem({
     <div className={cn(
       'group flex items-start gap-3 rounded-xl border p-3 transition-colors',
       isOverdue
-        ? 'border-red-200 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10'
+        ? 'border-border bg-secondary'
         : 'border-border hover:bg-muted/30'
     )}>
       <Checkbox
@@ -125,7 +125,7 @@ function FollowUpItem({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className={cn(
             'flex items-center gap-1 text-xs',
-            isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'
+            isOverdue ? 'text-foreground font-medium' : 'text-muted-foreground'
           )}>
             <Clock className="h-3 w-3 shrink-0" />
             {isOverdue ? 'Overdue · ' : ''}{formatDue(followUp.due_at)}
@@ -175,7 +175,7 @@ function CompletedSection({
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
-        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+        <CheckCircle2 className="h-3.5 w-3.5 text-foreground" />
         {open ? 'Hide' : 'Show'} {items.length} completed
       </button>
 
@@ -186,7 +186,7 @@ function CompletedSection({
               key={f.id}
               className="group flex items-start gap-3 rounded-xl border border-border/50 p-3 opacity-60"
             >
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm line-through text-muted-foreground">{f.title}</p>
                 {f.completed_at && (
@@ -254,7 +254,7 @@ function AddFollowUpModal({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-orange-500" />
+            <Calendar className="h-4 w-4 text-foreground" />
             Add Follow-up
           </DialogTitle>
         </DialogHeader>
@@ -313,7 +313,7 @@ function AddFollowUpModal({
           {/* AI suggestion */}
           <button
             type="button"
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-violet-300 py-2 text-xs text-violet-600 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/20 transition-colors"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs text-foreground hover:bg-secondary transition-colors"
           >
             <Sparkles className="h-3.5 w-3.5" />
             Suggest timing with AI

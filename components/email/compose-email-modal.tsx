@@ -144,8 +144,8 @@ export function ComposeEmailModal({
       <Dialog open={open} onClose={onClose}>
         <DialogContent size="sm">
           <div className="flex flex-col items-center gap-4 px-6 py-8 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
-              <CheckCircle2 className="h-7 w-7 text-green-600 dark:text-green-400" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
+              <CheckCircle2 className="h-7 w-7 text-foreground" />
             </div>
             <div>
               <h2 className="text-lg font-semibold">Email sent!</h2>
@@ -190,7 +190,7 @@ export function ComposeEmailModal({
             <Label>From</Label>
             <div className="space-y-2">
               {accounts.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/10 dark:text-amber-400">
+                <div className="rounded-xl border border-dashed border-border bg-secondary px-3 py-2.5 text-sm text-foreground">
                   No sending accounts configured. Ask your admin to add one in Settings.
                 </div>
               ) : (
@@ -221,8 +221,8 @@ export function ComposeEmailModal({
                       <div
                         className={cn(
                           'h-full rounded-full',
-                          selectedQuota.at_limit ? 'bg-red-500' :
-                          selectedQuota.percent_used >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+                          selectedQuota.at_limit ? 'bg-secondary' :
+                          selectedQuota.percent_used >= 80 ? 'bg-secondary' : 'bg-secondary'
                         )}
                         style={{ width: `${Math.min(100, selectedQuota.percent_used)}%` }}
                       />
@@ -271,7 +271,7 @@ export function ComposeEmailModal({
                     key={v.value}
                     type="button"
                     onClick={() => insertMergeVar(v.value)}
-                    className="rounded-md border border-dashed border-violet-300 bg-violet-50 px-2 py-0.5 text-xs text-violet-700 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-900/10 dark:text-violet-400"
+                    className="rounded-md border border-dashed border-border bg-secondary px-2 py-0.5 text-xs text-foreground hover:bg-secondary"
                   >
                     {v.label}
                   </button>
@@ -296,7 +296,7 @@ export function ComposeEmailModal({
             )}
 
             {unknownVars.length > 0 && (
-              <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+              <div className="flex items-center gap-1.5 text-xs text-foreground">
                 <Info className="h-3.5 w-3.5 shrink-0" />
                 Unknown merge variables: {unknownVars.map((v) => `{{${v}}}`).join(', ')}
               </div>
@@ -336,7 +336,7 @@ export function ComposeEmailModal({
           <button
             type="button"
             onClick={() => { /* TODO: open AI draft modal */ }}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-violet-300 py-2.5 text-sm text-violet-600 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/20 transition-colors"
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2.5 text-sm text-foreground hover:bg-secondary transition-colors"
           >
             <Sparkles className="h-4 w-4" />
             Generate with AI

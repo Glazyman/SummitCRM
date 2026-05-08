@@ -123,7 +123,7 @@ export function OptionsStep({ file, mapping, options, batches, onChange }: Optio
             title="Skip duplicates"
             description="Keep the existing lead. The duplicate row is logged in the error report."
             icon={CheckCircle2}
-            iconColor="text-emerald-500"
+            iconColor="text-foreground"
             onClick={() => onChange({ ...options, duplicateMode: 'skip' })}
           />
           <DuplicateOption
@@ -132,7 +132,7 @@ export function OptionsStep({ file, mapping, options, batches, onChange }: Optio
             title="Update existing"
             description="Overwrite the existing lead's fields with data from the import file."
             icon={AlertCircle}
-            iconColor="text-amber-500"
+            iconColor="text-foreground"
             onClick={() => onChange({ ...options, duplicateMode: 'update' })}
           />
         </div>
@@ -260,9 +260,9 @@ function SummaryCard({
   color: 'blue' | 'green' | 'purple'
 }) {
   const colors = {
-    blue:   'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    green:  'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
-    purple: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+    blue:   'bg-secondary text-foreground',
+    green:  'bg-secondary text-foreground',
+    purple: 'bg-secondary text-foreground',
   }
 
   return (

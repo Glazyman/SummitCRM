@@ -27,10 +27,10 @@ function getPasswordStrength(password: string): {
   const capped = Math.min(score, 4) as 0 | 1 | 2 | 3 | 4
   const map: Record<number, { label: string; color: string }> = {
     0: { label: '', color: '' },
-    1: { label: 'Weak', color: 'bg-red-500' },
-    2: { label: 'Fair', color: 'bg-amber-500' },
-    3: { label: 'Good', color: 'bg-blue-500' },
-    4: { label: 'Strong', color: 'bg-emerald-500' },
+    1: { label: 'Weak', color: 'bg-secondary' },
+    2: { label: 'Fair', color: 'bg-secondary' },
+    3: { label: 'Good', color: 'bg-secondary' },
+    4: { label: 'Strong', color: 'bg-secondary' },
   }
   return { score: capped, ...map[capped] }
 }
@@ -82,8 +82,8 @@ export function ResetPasswordForm() {
     return (
       <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
         <div className="flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-            <CheckCircle className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
+            <CheckCircle className="h-7 w-7 text-foreground" />
           </div>
           <h2 className="text-xl font-semibold">Password updated</h2>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -160,10 +160,10 @@ export function ResetPasswordForm() {
                 {label && (
                   <p className={cn(
                     'text-xs font-medium',
-                    score === 1 && 'text-red-500',
-                    score === 2 && 'text-amber-500',
-                    score === 3 && 'text-blue-500',
-                    score === 4 && 'text-emerald-500',
+                    score === 1 && 'text-foreground',
+                    score === 2 && 'text-foreground',
+                    score === 3 && 'text-foreground',
+                    score === 4 && 'text-foreground',
                   )}>
                     {label} password
                   </p>
@@ -188,7 +188,7 @@ export function ResetPasswordForm() {
                 className={cn(
                   'pl-9 pr-10',
                   confirm.length > 0 && (passwordsMatch
-                    ? 'border-emerald-500 focus-visible:ring-emerald-500'
+                    ? 'border-border focus-visible:ring-border'
                     : 'border-destructive focus-visible:ring-destructive')
                 )}
               />
@@ -206,7 +206,7 @@ export function ResetPasswordForm() {
               <p className="text-xs text-destructive">Passwords don&apos;t match</p>
             )}
             {passwordsMatch && (
-              <p className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+              <p className="flex items-center gap-1 text-xs text-foreground">
                 <CheckCircle className="h-3.5 w-3.5" />
                 Passwords match
               </p>

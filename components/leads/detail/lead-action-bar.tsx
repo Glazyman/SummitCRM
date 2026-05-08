@@ -89,7 +89,7 @@ export function LeadActionBar({
           <Button
             size="sm"
             variant="outline"
-            className="h-8 gap-1.5 text-xs border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-400 dark:hover:bg-violet-900/20"
+            className="h-8 gap-1.5 text-xs border-border text-foreground hover:bg-secondary"
             onClick={onAIDraft}
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -186,7 +186,7 @@ export function LeadActionBar({
 
       {/* Unsubscribe warning banner */}
       {lead.is_unsubscribed && (
-        <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-400 sm:px-6">
+        <div className="flex items-center gap-2 bg-secondary px-4 py-2 text-xs text-foreground sm:px-6">
           <BellOff className="h-3.5 w-3.5 shrink-0" />
           <span>
             <strong>Unsubscribed</strong> — this lead has opted out. Do not send marketing emails.
@@ -196,7 +196,7 @@ export function LeadActionBar({
 
       {/* Do Not Contact banner */}
       {lead.status === 'do_not_contact' && !lead.is_unsubscribed && (
-        <div className="flex items-center gap-2 bg-red-50 px-4 py-2 text-xs text-red-800 dark:bg-red-900/20 dark:text-red-400 sm:px-6">
+        <div className="flex items-center gap-2 bg-secondary px-4 py-2 text-xs text-foreground sm:px-6">
           <BellOff className="h-3.5 w-3.5 shrink-0" />
           <span>
             <strong>Do Not Contact</strong> — all outreach to this lead is blocked.

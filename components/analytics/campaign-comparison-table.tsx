@@ -12,11 +12,11 @@ import type { CampaignRow } from './types'
 type SortKey = 'name' | 'emails_sent' | 'open_rate' | 'click_rate' | 'reply_rate' | 'bounce_rate'
 
 const STATUS_COLORS: Record<string, string> = {
-  running:   'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-  scheduled: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  paused:    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-  completed: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-  cancelled: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+  running:   'bg-secondary text-foreground',
+  scheduled: 'bg-secondary text-foreground',
+  paused:    'bg-secondary text-foreground',
+  completed: 'bg-gray-100 text-gray-600',
+  cancelled: 'bg-secondary text-foreground',
 }
 
 function RateCell({ value, good = 25, warn = 15 }: { value: number; good?: number; warn?: number }) {
@@ -24,8 +24,8 @@ function RateCell({ value, good = 25, warn = 15 }: { value: number; good?: numbe
     <div className="space-y-1">
       <span className={cn(
         'font-semibold text-sm',
-        value >= good ? 'text-emerald-600 dark:text-emerald-400' :
-        value >= warn ? '' : 'text-orange-500',
+        value >= good ? 'text-foreground' :
+        value >= warn ? '' : 'text-foreground',
       )}>
         {value}%
       </span>
@@ -33,8 +33,8 @@ function RateCell({ value, good = 25, warn = 15 }: { value: number; good?: numbe
         value={Math.min(value * 2, 100)}
         className={cn(
           'h-1 w-16',
-          value >= good ? '[&>div]:bg-emerald-500' :
-          value >= warn ? '' : '[&>div]:bg-orange-400',
+          value >= good ? '[&>div]:bg-foreground' :
+          value >= warn ? '' : '[&>div]:bg-foreground',
         )}
       />
     </div>
@@ -84,7 +84,7 @@ export function CampaignComparisonTable({ campaigns, loading }: Props) {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Megaphone className="h-5 w-5 text-green-500" />
+          <Megaphone className="h-5 w-5 text-foreground" />
           Campaign comparison
           <Badge variant="secondary" className="ml-auto text-xs">{campaigns.length} campaigns</Badge>
         </CardTitle>
@@ -138,7 +138,7 @@ export function CampaignComparisonTable({ campaigns, loading }: Props) {
                   <td className="px-4 py-3"><RateCell value={c.click_rate}  good={5}  warn={2}  /></td>
                   <td className="px-4 py-3"><RateCell value={c.reply_rate}  good={5}  warn={2}  /></td>
                   <td className="px-4 py-3">
-                    <span className={cn('font-semibold', c.bounce_rate > 5 ? 'text-red-500' : c.bounce_rate > 2 ? 'text-orange-500' : '')}>
+                    <span className={cn('font-semibold', c.bounce_rate > 5 ? 'text-foreground' : c.bounce_rate > 2 ? 'text-foreground' : '')}>
                       {c.bounce_rate}%
                     </span>
                   </td>

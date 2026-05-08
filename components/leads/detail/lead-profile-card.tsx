@@ -81,13 +81,13 @@ export function LeadProfileCard({ lead, teamMembers, onSave }: LeadProfileCardPr
     setDraft((d) => ({ ...d, [f]: v }))
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
 
       {/* ── Avatar + name header ── */}
-      <div className="relative bg-gradient-to-br from-primary/5 to-primary/10 px-5 pt-6 pb-4">
+      <div className="relative border-b border-border bg-secondary/50 px-5 pb-4 pt-6">
         <div className="flex items-start gap-4">
           {/* Avatar */}
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-lg font-bold text-primary ring-2 ring-primary/20">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-card text-lg font-bold text-foreground">
             {initials}
           </div>
 
@@ -306,12 +306,12 @@ export function LeadProfileCard({ lead, teamMembers, onSave }: LeadProfileCardPr
 
       {/* ── AI Summary ── */}
       {lead.ai_summary && (
-        <div className="mx-5 my-4 rounded-xl border border-violet-200 bg-violet-50/50 p-3 dark:border-violet-800/40 dark:bg-violet-900/10">
-          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-violet-700 dark:text-violet-400">
+        <div className="mx-5 my-4 rounded-xl border border-border bg-secondary p-3">
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
             <Sparkles className="h-3.5 w-3.5" />
             AI Summary
           </div>
-          <p className="text-xs leading-relaxed text-violet-900/80 dark:text-violet-300/80">
+          <p className="text-xs leading-relaxed text-foreground">
             {lead.ai_summary}
           </p>
         </div>

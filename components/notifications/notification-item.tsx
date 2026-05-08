@@ -65,7 +65,7 @@ export function NotificationItem({ notification: n, onRead, onDismiss, compact }
 
       {/* Unread dot */}
       {!n.is_read && (
-        <span className="flex-shrink-0 mt-2 w-2 h-2 rounded-full bg-blue-500" aria-label="Unread" />
+        <span className="flex-shrink-0 mt-2 w-2 h-2 rounded-full bg-secondary" aria-label="Unread" />
       )}
 
       {/* Dismiss button */}

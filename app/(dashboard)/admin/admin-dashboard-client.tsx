@@ -27,10 +27,6 @@ import type {
   OverviewData, RepStat, SendingAccountHealth,
   CampaignSummary, AiUsageSummary, ActivityEvent,
 } from '@/components/admin'
-import {
-  MOCK_OVERVIEW, MOCK_TEAM_STATS, MOCK_ACCOUNT_HEALTH,
-  MOCK_CAMPAIGNS, MOCK_AI_USAGE, MOCK_ACTIVITY,
-} from '@/components/admin/mock-data'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, LayoutDashboard } from 'lucide-react'
@@ -42,6 +38,30 @@ interface AdminDashboardClientProps {
   userRole:  string
 }
 
+const EMPTY_OVERVIEW: OverviewData = {
+  date_range: { start: '', end: '' },
+  totals: {
+    emails_sent: 0,
+    open_rate: 0,
+    reply_rate: 0,
+    bounce_rate: 0,
+    active_leads: 0,
+    new_leads_period: 0,
+  },
+  quota_warnings: [],
+  active_campaigns: 0,
+  ai_tokens_month: 0,
+  ai_cost_usd: 0,
+}
+
+const EMPTY_AI_USAGE: AiUsageSummary = {
+  total_tokens: 0,
+  total_cost_usd: 0,
+  total_calls: 0,
+  budget: 0,
+  budget_used_pct: 0,
+}
+
 function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardClientProps) {
   const router       = useRouter()
   const pathname     = usePathname()
@@ -49,12 +69,12 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
   const range        = (searchParams.get('range') as DateRangePreset) ?? '30d'
 
   // ── Data state ────────────────────────────────────────────────────────────
-  const [overview,  setOverview]  = useState<OverviewData>(MOCK_OVERVIEW)
-  const [teamStats, setTeamStats] = useState<RepStat[]>(MOCK_TEAM_STATS)
-  const [accounts,  setAccounts]  = useState<SendingAccountHealth[]>(MOCK_ACCOUNT_HEALTH)
-  const [campaigns, setCampaigns] = useState<CampaignSummary[]>(MOCK_CAMPAIGNS)
-  const [aiUsage,   setAiUsage]   = useState<AiUsageSummary>(MOCK_AI_USAGE)
-  const [activity,  setActivity]  = useState<ActivityEvent[]>(MOCK_ACTIVITY)
+  const [overview,  setOverview]  = useState<OverviewData>(EMPTY_OVERVIEW)
+  const [teamStats, setTeamStats] = useState<RepStat[]>([])
+  const [accounts,  setAccounts]  = useState<SendingAccountHealth[]>([])
+  const [campaigns, setCampaigns] = useState<CampaignSummary[]>([])
+  const [aiUsage,   setAiUsage]   = useState<AiUsageSummary>(EMPTY_AI_USAGE)
+  const [activity,  setActivity]  = useState<ActivityEvent[]>([])
 
   // Per-section loading
   const [loadingOverview,  setLoadingOverview]  = useState(false)

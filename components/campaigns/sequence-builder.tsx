@@ -112,7 +112,7 @@ export function SequenceBuilder({ steps, onChange }: SequenceBuilderProps) {
                     </span>
                   )}
                   {step.use_ai && (
-                    <span className="flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-px text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                    <span className="flex items-center gap-1 rounded-full bg-secondary px-1.5 py-px text-[10px] font-medium text-foreground">
                       <Sparkles className="h-2.5 w-2.5" />
                       AI
                     </span>
@@ -197,7 +197,7 @@ export function SequenceBuilder({ steps, onChange }: SequenceBuilderProps) {
                     disabled={step.use_ai}
                   />
                   {step.use_ai && (
-                    <p className="flex items-center gap-1 text-xs text-violet-600 dark:text-violet-400">
+                    <p className="flex items-center gap-1 text-xs text-foreground">
                       <Sparkles className="h-3 w-3" />
                       Body will be AI-generated per lead. Template above is used as a guide.
                     </p>
@@ -207,7 +207,7 @@ export function SequenceBuilder({ steps, onChange }: SequenceBuilderProps) {
                 {/* AI personalisation toggle */}
                 <div className="flex items-center justify-between rounded-xl border border-border bg-background p-3">
                   <div className="flex items-center gap-2.5">
-                    <Sparkles className="h-4 w-4 text-violet-500" />
+                    <Sparkles className="h-4 w-4 text-foreground" />
                     <div>
                       <p className="text-sm font-medium">AI personalisation</p>
                       <p className="text-xs text-muted-foreground">Generate unique body per lead using GPT-4o-mini</p>
@@ -220,7 +220,7 @@ export function SequenceBuilder({ steps, onChange }: SequenceBuilderProps) {
                     onClick={() => updateStep(step.id, { use_ai: !step.use_ai })}
                     className={cn(
                       'relative h-5 w-9 rounded-full transition-colors',
-                      step.use_ai ? 'bg-violet-500' : 'bg-input'
+                      step.use_ai ? 'bg-secondary' : 'bg-input'
                     )}
                   >
                     <span className={cn(
@@ -243,7 +243,7 @@ export function SequenceBuilder({ steps, onChange }: SequenceBuilderProps) {
                           className={cn(
                             'rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
                             step.ai_tone === t.value
-                              ? 'border-violet-400 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
+                              ? 'border-border bg-secondary text-foreground'
                               : 'border-border text-muted-foreground hover:bg-muted'
                           )}
                         >
