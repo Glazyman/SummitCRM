@@ -214,13 +214,26 @@ export default function LeadDetailClient({
   }
 
   async function handleDeleteActivity(activityId: string) {
-    setActivity((prev) => prev.filter((e) => e.id !== activityId))
+    const removed = activity.find((e) => e.id === activityId)
+    let removedIndex = -1
+    setActivity((prev) => {
+      removedIndex = prev.findIndex((e) => e.id === activityId)
+      return prev.filter((e) => e.id !== activityId)
+    })
+    // Optimistic-only rows (never inserted into activity_logs)
+    if (activityId.startsWith('act-')) return
+    if (!removed) return
+
     try {
       await requestJson<{ success: boolean }>(`/api/leads/${lead.id}/activity/${activityId}`, {
         method: 'DELETE',
       })
     } catch (err) {
       console.error('Could not delete activity entry', err)
+      setActivity((prev) => {
+        const idx = removedIndex >= 0 ? Math.min(removedIndex, prev.length) : prev.length
+        return [...prev.slice(0, idx), removed, ...prev.slice(idx)]
+      })
     }
   }
 
