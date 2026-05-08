@@ -11,6 +11,15 @@ export default async function NotificationSettingsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const { data: member } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single() as { data: { role: string } | null; error: unknown }
+
+  if (!['admin', 'super_admin'].includes(member?.role ?? '')) redirect('/settings')
+
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-0 py-6">
       <Link href="/settings" className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">

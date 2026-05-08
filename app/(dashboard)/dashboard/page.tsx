@@ -48,13 +48,20 @@ export default async function DashboardPage() {
 
       {/* Stats grid */}
       {role === 'rep' ? (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <StatCard
             title="Total Leads"
             value={formatNumber(metrics.totalLeads)}
             description="assigned to you"
             icon={Users}
             color="blue"
+          />
+          <StatCard
+            title="New Leads"
+            value={formatNumber(metrics.newLeads)}
+            description="not yet contacted"
+            icon={Users}
+            color="green"
           />
           <StatCard
             title="Follow-ups Due"
@@ -195,6 +202,7 @@ function getGreeting() {
 
 type DashboardMetrics = {
   totalLeads: number
+  newLeads: number
   emailsSentThisWeek: number
   openRateLast30Days: number
   unreadNotifications: number
@@ -210,6 +218,7 @@ type DashboardMetrics = {
 function emptyDashboardMetrics(): DashboardMetrics {
   return {
     totalLeads: 0,
+    newLeads: 0,
     emailsSentThisWeek: 0,
     openRateLast30Days: 0,
     unreadNotifications: 0,
@@ -237,6 +246,7 @@ async function getDashboardMetrics(
 
   const [
     leadsResult,
+    newLeadsResult,
     emailsThisWeekResult,
     sentLast30Result,
     openedLast30Result,
@@ -250,6 +260,14 @@ async function getDashboardMetrics(
       .from('leads')
       .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
+      .is('deleted_at', null),
+    // New leads assigned to this user (status = 'new', never contacted)
+    supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('assigned_to', userId)
+      .eq('status', 'new')
       .is('deleted_at', null),
     supabase
       .from('emails')
@@ -301,6 +319,7 @@ async function getDashboardMetrics(
 
   return {
     totalLeads: leadsResult.count ?? 0,
+    newLeads: newLeadsResult.count ?? 0,
     emailsSentThisWeek: emailsThisWeekResult.count ?? 0,
     openRateLast30Days: sentLast30 > 0 ? Math.round((openedLast30 / sentLast30) * 100) : 0,
     unreadNotifications: unreadResult.count ?? 0,

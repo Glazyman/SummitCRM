@@ -75,6 +75,7 @@ export async function GET(req: Request) {
         follow_ups_completed: myFUs.filter(f => f.completed_at && new Date(f.completed_at) >= periodStart).length,
         leads_assigned:       myLeads.length,
         leads_active:         myLeads.filter(l => !terminal.has(l.status)).length,
+        leads_new:            myLeads.filter(l => l.status === 'new').length,
       }
     }).sort((a, b) => b.calls - a.calls)
 

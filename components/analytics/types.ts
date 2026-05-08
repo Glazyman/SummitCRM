@@ -64,6 +64,7 @@ export interface RepRow {
   follow_ups_completed:number
   leads_assigned:      number
   leads_active:        number
+  leads_new:           number
 }
 
 export interface BatchRow {

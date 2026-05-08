@@ -34,7 +34,7 @@ const ALL_SECTIONS = [
     icon:        Bell,
     title:       'Notifications',
     description: 'Configure your notification preferences.',
-    adminOnly:   false,
+    adminOnly:   true,
   },
   {
     href:        '/settings/ai-usage',

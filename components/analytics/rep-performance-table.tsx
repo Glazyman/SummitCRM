@@ -166,8 +166,8 @@ function RepCard({ rep, rank }: { rep: RepRow; rank: number }) {
               <Users className="h-3 w-3" /> Leads
             </p>
             <div className="text-2xl font-bold tabular-nums">{rep.leads_assigned}</div>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Active</span>
                 <span className="font-medium">{rep.leads_active}</span>
               </div>
@@ -175,6 +175,12 @@ function RepCard({ rep, rank }: { rep: RepRow; rank: number }) {
                 <div className="h-full rounded-full bg-primary"
                   style={{ width: rep.leads_assigned > 0 ? `${Math.round(rep.leads_active / rep.leads_assigned * 100)}%` : '0%' }} />
               </div>
+              {rep.leads_new > 0 && (
+                <div className="flex items-center justify-between rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-2 py-1">
+                  <span className="text-blue-600 dark:text-blue-400 font-medium">New (untouched)</span>
+                  <span className="font-bold text-blue-600 dark:text-blue-400">{rep.leads_new}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
