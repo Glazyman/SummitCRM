@@ -39,7 +39,7 @@ export default async function LeadsPage() {
 
       let leadsQuery = supabase
         .from('leads')
-        .select('id, workspace_id, first_name, last_name, email, phone, company, title, website, linkedin_url, status, interest_status, pipeline_stage_id, batch_id, assigned_to, created_at, updated_at')
+        .select('id, workspace_id, first_name, last_name, email, phone, company, title, website, linkedin_url, status, interest_status, pipeline_stage_id, batch_id, assigned_to, custom_fields, created_at, updated_at')
         .eq('workspace_id', workspaceId)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
