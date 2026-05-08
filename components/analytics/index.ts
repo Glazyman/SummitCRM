@@ -7,5 +7,5 @@ export { BatchComparisonTable }    from './batch-comparison-table'
 export { AnalyticsExportButton }   from './analytics-export-button'
 export type {
   EmailMetrics, TimeSeriesPoint, FunnelData, FunnelStage,
-  CampaignRow, RepRow, BatchRow, AnalyticsTab,
+  CampaignRow, RepRow, BatchRow, CallOverview, AnalyticsTab,
 } from './types'

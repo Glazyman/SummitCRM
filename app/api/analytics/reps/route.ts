@@ -1,6 +1,6 @@
 /**
  * GET /api/analytics/reps
- * Per-rep email performance. admin+ access.
+ * Per-rep call, follow-up, and lead performance. admin+ access.
  */
 import { NextResponse } from 'next/server'
 import { cookies }      from 'next/headers'
@@ -13,72 +13,86 @@ export async function GET(req: Request) {
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const adminClient = createAdminClient()
-    const { data: member } = await adminClient
+    const admin = createAdminClient()
+    const { data: member } = await admin
       .from('workspace_members').select('workspace_id, role')
       .eq('user_id', user.id).eq('is_active', true).single() as
       { data: { workspace_id: string; role: string } | null }
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (!['admin','super_admin'].includes(member.role)) {
+    if (!['admin', 'super_admin'].includes(member.role)) {
       return NextResponse.json({ error: 'Admin role required' }, { status: 403 })
     }
 
     const { searchParams } = new URL(req.url)
     const now   = new Date()
     const start = searchParams.get('start') ?? new Date(new Date(now).setDate(now.getDate() - 30)).toISOString()
-    const end   = searchParams.get('end')   ?? new Date().toISOString()
+    const end   = searchParams.get('end')   ?? now.toISOString()
+    const wsId  = member.workspace_id
 
-    const [membersRes, emailsRes, leadsRes] = await Promise.all([
-      adminClient.from('workspace_members')
-        .select('user_id, role, users:user_id(email, raw_user_meta_data)')
-        .eq('workspace_id', member.workspace_id).eq('is_active', true),
-      adminClient.from('emails').select('sent_by, status')
-        .eq('workspace_id', member.workspace_id)
-        .gte('sent_at', start).lte('sent_at', end),
-      adminClient.from('leads').select('assigned_to')
-        .eq('workspace_id', member.workspace_id).is('deleted_at', null),
-    ]) as [
-      { data: Array<{ user_id: string; role: string; users: { email: string; raw_user_meta_data: Record<string,unknown> } | null }> | null },
-      { data: Array<{ sent_by: string | null; status: string }> | null },
-      { data: Array<{ assigned_to: string | null }> | null }
-    ]
+    const [membersRes, usersRes, callsRes, followUpsRes, leadsRes] = await Promise.all([
+      admin.from('workspace_members').select('user_id, role').eq('workspace_id', wsId).eq('is_active', true),
+      admin.auth.admin.listUsers(),
+      admin.from('call_logs').select('logged_by, outcome').eq('workspace_id', wsId).gte('called_at', start).lte('called_at', end),
+      admin.from('follow_ups').select('assigned_to, completed_at, due_at').eq('workspace_id', wsId),
+      admin.from('leads').select('assigned_to, status').eq('workspace_id', wsId).is('deleted_at', null),
+    ])
 
-    const emailMap = new Map<string, { sent: number; opened: number; replied: number; bounced: number }>()
-    for (const e of emailsRes.data ?? []) {
-      if (!e.sent_by) continue
-      const c = emailMap.get(e.sent_by) ?? { sent: 0, opened: 0, replied: 0, bounced: 0 }
-      c.sent++
-      if (['opened','clicked','replied'].includes(e.status)) c.opened++
-      if (e.status === 'replied') c.replied++
-      if (e.status === 'bounced') c.bounced++
-      emailMap.set(e.sent_by, c)
-    }
+    const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
+    const allUsers  = usersRes.data?.users ?? []
+    const calls     = (callsRes.data ?? []) as Array<{ logged_by: string; outcome: string }>
+    const followUps = (followUpsRes.data ?? []) as Array<{ assigned_to: string | null; completed_at: string | null; due_at: string }>
+    const leads     = (leadsRes.data ?? []) as Array<{ assigned_to: string | null; status: string }>
 
-    const leadsMap = new Map<string, number>()
-    for (const l of leadsRes.data ?? []) {
-      if (!l.assigned_to) continue
-      leadsMap.set(l.assigned_to, (leadsMap.get(l.assigned_to) ?? 0) + 1)
-    }
+    const nameById = new Map(
+      allUsers.map(u => [u.id, { name: (u.user_metadata?.full_name as string | undefined) ?? null, email: u.email ?? '' }])
+    )
 
-    const r = (n: number, d: number) => d > 0 ? Math.round((n / d) * 1000) / 10 : 0
+    const nowDate    = new Date()
+    const terminal   = new Set(['do_not_contact', 'wrong_number', 'sold_already'])
+    const periodStart = new Date(start)
 
-    const reps = (membersRes.data ?? []).map(m => {
-      const meta = m.users?.raw_user_meta_data as Record<string,unknown> | undefined
-      const c    = emailMap.get(m.user_id) ?? { sent: 0, opened: 0, replied: 0, bounced: 0 }
+    const reps = members.map(m => {
+      const uid    = m.user_id
+      const user   = nameById.get(uid)
+      const myCalls = calls.filter(c => c.logged_by === uid)
+      const myFUs   = followUps.filter(f => f.assigned_to === uid)
+      const myLeads = leads.filter(l => l.assigned_to === uid)
+
+      const byOutcome = (o: string) => myCalls.filter(c => c.outcome === o).length
+
       return {
-        user_id:        m.user_id,
-        user_email:     m.users?.email ?? '',
-        full_name:      (meta?.full_name as string) ?? (meta?.name as string) ?? null,
-        role:           m.role,
-        emails_sent:    c.sent,
-        open_rate:      r(c.opened,  c.sent),
-        reply_rate:     r(c.replied, c.sent),
-        bounce_rate:    r(c.bounced, c.sent),
-        leads_assigned: leadsMap.get(m.user_id) ?? 0,
+        user_id:              uid,
+        user_email:           user?.email ?? '',
+        full_name:            user?.name ?? null,
+        role:                 m.role,
+        calls:                myCalls.length,
+        calls_answered:       byOutcome('answered'),
+        calls_voicemail:      byOutcome('voicemail'),
+        calls_no_answer:      byOutcome('no_answer'),
+        calls_wrong_number:   byOutcome('wrong_number'),
+        follow_ups_pending:   myFUs.filter(f => !f.completed_at).length,
+        follow_ups_overdue:   myFUs.filter(f => !f.completed_at && new Date(f.due_at) < nowDate).length,
+        follow_ups_completed: myFUs.filter(f => f.completed_at && new Date(f.completed_at) >= periodStart).length,
+        leads_assigned:       myLeads.length,
+        leads_active:         myLeads.filter(l => !terminal.has(l.status)).length,
       }
-    }).sort((a, b) => b.emails_sent - a.emails_sent)
+    }).sort((a, b) => b.calls - a.calls)
 
-    return NextResponse.json({ reps, period: { start, end } })
+    // Overall call overview for the period
+    const overview = {
+      total:              calls.length,
+      answered:           calls.filter(c => c.outcome === 'answered').length,
+      voicemail:          calls.filter(c => c.outcome === 'voicemail').length,
+      no_answer:          calls.filter(c => c.outcome === 'no_answer').length,
+      wrong_number:       calls.filter(c => c.outcome === 'wrong_number').length,
+      callback:           calls.filter(c => c.outcome === 'callback_requested').length,
+      follow_ups_due:     followUps.filter(f => !f.completed_at).length,
+      follow_ups_overdue: followUps.filter(f => !f.completed_at && new Date(f.due_at) < nowDate).length,
+      leads_total:        leads.length,
+      leads_active:       leads.filter(l => !terminal.has(l.status)).length,
+    }
+
+    return NextResponse.json({ reps, overview, period: { start, end } })
   } catch (err) {
     console.error('[GET /api/analytics/reps]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })

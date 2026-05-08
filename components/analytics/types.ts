@@ -50,15 +50,20 @@ export interface CampaignRow {
 }
 
 export interface RepRow {
-  user_id:        string
-  user_email:     string
-  full_name:      string | null
-  role:           string
-  emails_sent:    number
-  open_rate:      number
-  reply_rate:     number
-  bounce_rate:    number
-  leads_assigned: number
+  user_id:             string
+  user_email:          string
+  full_name:           string | null
+  role:                string
+  calls:               number
+  calls_answered:      number
+  calls_voicemail:     number
+  calls_no_answer:     number
+  calls_wrong_number:  number
+  follow_ups_pending:  number
+  follow_ups_overdue:  number
+  follow_ups_completed:number
+  leads_assigned:      number
+  leads_active:        number
 }
 
 export interface BatchRow {
@@ -72,4 +77,17 @@ export interface BatchRow {
   created_at:      string
 }
 
-export type AnalyticsTab = 'overview' | 'campaigns' | 'funnel' | 'reps' | 'batches'
+export interface CallOverview {
+  total:            number
+  answered:         number
+  voicemail:        number
+  no_answer:        number
+  wrong_number:     number
+  callback:         number
+  follow_ups_due:   number
+  follow_ups_overdue: number
+  leads_total:      number
+  leads_active:     number
+}
+
+export type AnalyticsTab = 'overview' | 'reps' | 'funnel' | 'batches'
