@@ -373,6 +373,7 @@ export function LeadFullPanel({
                   followUps={data.followUps}
                   teamMembers={teamMembers}
                   currentUserId={currentUserId}
+                  isAdmin={isAdmin}
                   onAdd={handleAddFollowUp}
                   onComplete={handleCompleteFollowUp}
                   onDelete={handleDeleteFollowUp}

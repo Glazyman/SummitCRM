@@ -3,7 +3,7 @@
 import * as React from 'react'
 import {
   Calendar, Plus, CheckCircle2, Clock,
-  Trash2, User, Sparkles,
+  Trash2, User, Phone, Mail, FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -14,21 +14,18 @@ import { Checkbox } from '@/components/ui/checkbox'
 import type { FollowUp, NewFollowUp, TeamMember } from './types'
 
 interface FollowUpSectionProps {
-  followUps:    FollowUp[]
-  teamMembers:  TeamMember[]
-  currentUserId:string
-  onAdd:        (data: NewFollowUp) => Promise<void>
-  onComplete:   (id: string) => void
-  onDelete:     (id: string) => void
+  followUps:     FollowUp[]
+  teamMembers:   TeamMember[]
+  currentUserId: string
+  isAdmin?:      boolean
+  onAdd:         (data: NewFollowUp) => Promise<void>
+  onComplete:    (id: string) => void
+  onDelete:      (id: string) => void
 }
 
 export function FollowUpSection({
-  followUps,
-  teamMembers,
-  currentUserId,
-  onAdd,
-  onComplete,
-  onDelete,
+  followUps, teamMembers, currentUserId, isAdmin,
+  onAdd, onComplete, onDelete,
 }: FollowUpSectionProps) {
   const [modalOpen, setModalOpen] = React.useState(false)
 
@@ -37,8 +34,6 @@ export function FollowUpSection({
 
   return (
     <div className="space-y-3">
-
-      {/* Pending follow-ups */}
       {pending.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-6 text-center">
           <Calendar className="h-6 w-6 text-muted-foreground/50" />
@@ -47,105 +42,57 @@ export function FollowUpSection({
       ) : (
         <div className="space-y-2">
           {pending.map((f) => (
-            <FollowUpItem
-              key={f.id}
-              followUp={f}
-              onComplete={onComplete}
-              onDelete={onDelete}
-            />
+            <FollowUpItem key={f.id} followUp={f} onComplete={onComplete} onDelete={onDelete} />
           ))}
         </div>
       )}
 
-      {/* Add button */}
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full gap-1.5 border-dashed"
-        onClick={() => setModalOpen(true)}
-      >
-        <Plus className="h-3.5 w-3.5" />
-        Add Follow-up
+      <Button variant="outline" size="sm" className="w-full gap-1.5 border-dashed" onClick={() => setModalOpen(true)}>
+        <Plus className="h-3.5 w-3.5" /> Add Follow-up
       </Button>
 
-      {/* Completed (collapsible) */}
-      {completed.length > 0 && (
-        <CompletedSection items={completed} onDelete={onDelete} />
-      )}
+      {completed.length > 0 && <CompletedSection items={completed} onDelete={onDelete} />}
 
-      {/* Add modal */}
       <AddFollowUpModal
         open={modalOpen}
         teamMembers={teamMembers}
         currentUserId={currentUserId}
+        isAdmin={isAdmin}
         onClose={() => setModalOpen(false)}
-        onSave={async (data) => {
-          await onAdd(data)
-          setModalOpen(false)
-        }}
+        onSave={async (data) => { await onAdd(data); setModalOpen(false) }}
       />
     </div>
   )
 }
 
-// ── Individual follow-up item ──────────────────────────────────────────────
-function FollowUpItem({
-  followUp,
-  onComplete,
-  onDelete,
-}: {
-  followUp:   FollowUp
-  onComplete: (id: string) => void
-  onDelete:   (id: string) => void
+// ── Individual follow-up item ─────────────────────────────────────────────
+function FollowUpItem({ followUp, onComplete, onDelete }: {
+  followUp: FollowUp; onComplete: (id: string) => void; onDelete: (id: string) => void
 }) {
   const isOverdue = !followUp.is_completed && new Date(followUp.due_at) < new Date()
-
   return (
     <div className={cn(
       'group flex items-start gap-3 rounded-xl border p-3 transition-colors',
-      isOverdue
-        ? 'border-border bg-secondary'
-        : 'border-border hover:bg-muted/30'
+      isOverdue ? 'border-border bg-secondary' : 'border-border hover:bg-muted/30'
     )}>
-      <Checkbox
-        checked={followUp.is_completed}
-        onChange={() => onComplete(followUp.id)}
-        className="mt-0.5"
-        aria-label="Mark complete"
-      />
-
+      <Checkbox checked={followUp.is_completed} onChange={() => onComplete(followUp.id)} className="mt-0.5" aria-label="Mark complete" />
       <div className="min-w-0 flex-1 space-y-1">
-        <p className={cn(
-          'text-sm font-medium leading-tight',
-          followUp.is_completed && 'line-through text-muted-foreground'
-        )}>
+        <p className={cn('text-sm font-medium leading-tight', followUp.is_completed && 'line-through text-muted-foreground')}>
           {followUp.title}
         </p>
-
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className={cn(
-            'flex items-center gap-1 text-xs',
-            isOverdue ? 'text-foreground font-medium' : 'text-muted-foreground'
-          )}>
+          <span className={cn('flex items-center gap-1 text-xs', isOverdue ? 'text-foreground font-medium' : 'text-muted-foreground')}>
             <Clock className="h-3 w-3 shrink-0" />
             {isOverdue ? 'Overdue · ' : ''}{formatDue(followUp.due_at)}
           </span>
-
           {followUp.assigned_name && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <User className="h-3 w-3 shrink-0" />
-              {followUp.assigned_name}
+              <User className="h-3 w-3 shrink-0" />{followUp.assigned_name}
             </span>
           )}
         </div>
-
-        {followUp.notes && (
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            {followUp.notes}
-          </p>
-        )}
+        {followUp.notes && <p className="text-xs text-muted-foreground leading-relaxed">{followUp.notes}</p>}
       </div>
-
       <button
         type="button"
         onClick={() => onDelete(followUp.id)}
@@ -158,48 +105,29 @@ function FollowUpItem({
   )
 }
 
-// ── Completed section (collapsible) ───────────────────────────────────────
-function CompletedSection({
-  items,
-  onDelete,
-}: {
-  items:    FollowUp[]
-  onDelete: (id: string) => void
-}) {
+// ── Completed section ─────────────────────────────────────────────────────
+function CompletedSection({ items, onDelete }: { items: FollowUp[]; onDelete: (id: string) => void }) {
   const [open, setOpen] = React.useState(false)
-
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
+      <button type="button" onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
         <CheckCircle2 className="h-3.5 w-3.5 text-foreground" />
         {open ? 'Hide' : 'Show'} {items.length} completed
       </button>
-
       {open && (
         <div className="mt-2 space-y-2">
           {items.map((f) => (
-            <div
-              key={f.id}
-              className="group flex items-start gap-3 rounded-xl border border-border/50 p-3 opacity-60"
-            >
+            <div key={f.id} className="group flex items-start gap-3 rounded-xl border border-border/50 p-3 opacity-60">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm line-through text-muted-foreground">{f.title}</p>
                 {f.completed_at && (
-                  <p className="text-xs text-muted-foreground">
-                    Completed {shortDate(f.completed_at)}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Completed {shortDate(f.completed_at)}</p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => onDelete(f.id)}
-                className="mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              >
+              <button type="button" onClick={() => onDelete(f.id)}
+                className="mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -210,18 +138,27 @@ function CompletedSection({
   )
 }
 
+// ── Follow-up types ───────────────────────────────────────────────────────
+const FOLLOW_UP_TYPES = [
+  { id: 'callback', label: 'Call Back',      icon: Phone,    title: 'Call back' },
+  { id: 'email',    label: 'Email',           icon: Mail,     title: 'Send email follow-up' },
+  { id: 'other',    label: 'Other',           icon: FileText, title: '' },
+] as const
+
+type FollowUpType = typeof FOLLOW_UP_TYPES[number]['id']
+
 // ── Add follow-up modal ────────────────────────────────────────────────────
 interface AddFollowUpModalProps {
   open:          boolean
   teamMembers:   TeamMember[]
   currentUserId: string
+  isAdmin?:      boolean
   onClose:       () => void
   onSave:        (data: NewFollowUp) => Promise<void>
 }
 
-function AddFollowUpModal({
-  open, teamMembers, currentUserId, onClose, onSave,
-}: AddFollowUpModalProps) {
+function AddFollowUpModal({ open, teamMembers, currentUserId, isAdmin, onClose, onSave }: AddFollowUpModalProps) {
+  const [type,       setType]       = React.useState<FollowUpType>('callback')
   const [title,      setTitle]      = React.useState('')
   const [notes,      setNotes]      = React.useState('')
   const [dueAt,      setDueAt]      = React.useState(defaultDueAt())
@@ -231,17 +168,30 @@ function AddFollowUpModal({
 
   React.useEffect(() => {
     if (open) {
-      setTitle(''); setNotes(''); setDueAt(defaultDueAt())
+      setType('callback')
+      setTitle(FOLLOW_UP_TYPES[0].title)
+      setNotes(''); setDueAt(defaultDueAt())
       setAssignedTo(currentUserId); setError(null)
     }
   }, [open, currentUserId])
 
+  function handleTypeChange(t: FollowUpType) {
+    setType(t)
+    const meta = FOLLOW_UP_TYPES.find(f => f.id === t)!
+    if (meta.title) setTitle(meta.title)
+  }
+
   async function handleSave() {
-    if (!title.trim()) { setError('Please enter a title.'); return }
-    if (!dueAt)        { setError('Please set a due date.'); return }
+    const effectiveTitle = title.trim() || FOLLOW_UP_TYPES.find(f => f.id === type)?.label || 'Follow-up'
+    if (!dueAt) { setError('Please set a follow-up date.'); return }
     setSaving(true)
     try {
-      await onSave({ title: title.trim(), notes, due_at: dueAt, assigned_to: assignedTo })
+      await onSave({
+        title:       effectiveTitle,
+        notes,
+        due_at:      dueAt,
+        assigned_to: isAdmin ? assignedTo : currentUserId,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save.')
     } finally {
@@ -259,42 +209,67 @@ function AddFollowUpModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 px-6">
+        <div className="space-y-5 px-6">
+          {/* Type selector */}
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {FOLLOW_UP_TYPES.map((t) => {
+                const Icon = t.icon
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => handleTypeChange(t.id)}
+                    className={cn(
+                      'flex flex-col items-center gap-1.5 rounded-xl border py-3 px-2 text-xs font-medium transition-all',
+                      type === t.id
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {t.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {/* Title */}
           <div className="space-y-1.5">
-            <Label>Title <span className="text-destructive">*</span></Label>
+            <Label>Description</Label>
             <Input
-              placeholder="e.g. Send product overview deck"
+              placeholder="What needs to be done?"
               value={title}
               onChange={(e) => { setTitle(e.target.value); setError(null) }}
-              autoFocus
+            />
+          </div>
+
+          {/* Due date — full width, prominent */}
+          <div className="space-y-1.5">
+            <Label>Follow-up date & time <span className="text-destructive">*</span></Label>
+            <Input
+              type="datetime-local"
+              value={dueAt}
+              onChange={(e) => { setDueAt(e.target.value); setError(null) }}
             />
           </div>
 
           {/* Notes */}
           <div className="space-y-1.5">
-            <Label>Notes</Label>
+            <Label>Notes <span className="text-xs font-normal text-muted-foreground">(optional)</span></Label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional context or reminders…"
+              placeholder="Any context or reminders…"
               rows={2}
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
             />
           </div>
 
-          {/* Due date */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Due date <span className="text-destructive">*</span></Label>
-              <Input
-                type="datetime-local"
-                value={dueAt}
-                onChange={(e) => setDueAt(e.target.value)}
-              />
-            </div>
-
-            {/* Assign to */}
+          {/* Assign to — admins only */}
+          {isAdmin && (
             <div className="space-y-1.5">
               <Label>Assign to</Label>
               <select
@@ -308,16 +283,7 @@ function AddFollowUpModal({
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* AI suggestion */}
-          <button
-            type="button"
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs text-foreground hover:bg-secondary transition-colors"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            Suggest timing with AI
-          </button>
+          )}
 
           {error && (
             <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -328,8 +294,8 @@ function AddFollowUpModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving || !title.trim()}>
-            {saving ? 'Saving…' : 'Add Follow-up'}
+          <Button onClick={handleSave} disabled={saving || !dueAt}>
+            {saving ? 'Saving…' : 'Schedule'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -339,7 +305,7 @@ function AddFollowUpModal({
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function defaultDueAt(): string {
-  const d = new Date(Date.now() + 48 * 3600000)
+  const d = new Date(Date.now() + 24 * 3600000)
   d.setMinutes(0, 0, 0)
   return d.toISOString().slice(0, 16)
 }
@@ -349,11 +315,10 @@ function formatDue(iso: string): string {
   const now  = new Date()
   const diff = d.getTime() - now.getTime()
   const days = Math.round(diff / 86400000)
-
-  if (days < 0)  return `${Math.abs(days)}d overdue`
-  if (days === 0) return 'Due today'
-  if (days === 1) return 'Due tomorrow'
-  if (days < 7)  return `Due in ${days}d`
+  if (days < 0)   return `${Math.abs(days)}d overdue`
+  if (days === 0)  return 'Due today'
+  if (days === 1)  return 'Due tomorrow'
+  if (days < 7)   return `Due in ${days}d`
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
