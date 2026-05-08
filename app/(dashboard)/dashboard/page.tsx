@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { OverdueFollowUpsWidget } from '@/components/notifications/overdue-followups-widget'
+import { RepPerformancePanel } from '@/components/dashboard/rep-performance'
+import { MyActivityPanel }     from '@/components/dashboard/my-activity'
 import { Users, Send, BarChart2, Bell, ArrowRight, CheckCircle2, Circle } from 'lucide-react'
 import type { WorkspaceRole } from '@/types/database'
 
@@ -158,6 +160,12 @@ export default async function DashboardPage() {
           />
         </div>
       )}
+
+      {/* Rep: my activity breakdown */}
+      {role === 'rep' && <MyActivityPanel />}
+
+      {/* Admin: rep performance table */}
+      {(role === 'admin' || role === 'super_admin') && <RepPerformancePanel />}
 
       {/* Overdue follow-ups widget */}
       <div className="grid gap-4 lg:grid-cols-2">
