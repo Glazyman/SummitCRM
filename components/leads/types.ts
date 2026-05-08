@@ -99,19 +99,22 @@ export interface ColumnDef {
 }
 
 export const COLUMNS: ColumnDef[] = [
-  { id: 'name',          label: 'Name',          sortField: 'name',            optional: false, defaultOn: true },
-  { id: 'email',         label: 'Email',          sortField: 'email',           optional: false, defaultOn: true },
-  { id: 'company',       label: 'Company',        sortField: 'company',         optional: false, defaultOn: true },
-  { id: 'status',        label: 'Status',         sortField: 'status',          optional: false, defaultOn: true },
-  { id: 'interest',      label: 'Interest',                                     optional: true,  defaultOn: true },
-  { id: 'tags',          label: 'Tags',                                         optional: true,  defaultOn: true },
-  { id: 'batch',         label: 'Batch',                                        optional: true,  defaultOn: true },
-  { id: 'assigned',      label: 'Assigned To',                                  optional: true,  defaultOn: true },
-  { id: 'last_activity', label: 'Last Activity',  sortField: 'last_activity_at',optional: true,  defaultOn: true },
-  { id: 'phone',         label: 'Phone',                                        optional: true,  defaultOn: true },
+  { id: 'name',          label: 'Name',          sortField: 'name',            optional: false, defaultOn: true  },
+  { id: 'company',       label: 'Company',        sortField: 'company',         optional: true,  defaultOn: true  },
+  { id: 'phone',         label: 'Phone',                                        optional: true,  defaultOn: true  },
+  { id: 'email',         label: 'Email',          sortField: 'email',           optional: true,  defaultOn: true  },
+  { id: 'status',        label: 'Status',         sortField: 'status',          optional: true,  defaultOn: true  },
+  { id: 'interest',      label: 'Interest',                                     optional: true,  defaultOn: true  },
+  { id: 'assigned',      label: 'Assigned To',                                  optional: true,  defaultOn: true  },
+  { id: 'last_activity', label: 'Last Activity',  sortField: 'last_activity_at',optional: true,  defaultOn: true  },
   { id: 'company_phone', label: 'Company Phone',                                optional: true,  defaultOn: false },
   { id: 'title',         label: 'Job Title',                                    optional: true,  defaultOn: false },
+  { id: 'tags',          label: 'Tags',                                         optional: true,  defaultOn: false },
+  { id: 'batch',         label: 'Batch',                                        optional: true,  defaultOn: false },
 ]
+
+/** Default column display order (mirrors COLUMNS order above) */
+export const DEFAULT_COLUMN_ORDER: ColumnId[] = COLUMNS.map(c => c.id)
 
 // ── Status counts (for status bar) ────────────────────────────────────────
 export interface StatusCount {

@@ -15,7 +15,7 @@ import { BulkActionBar }        from '@/components/leads/bulk-action-bar'
 import { ColumnVisibilityMenu } from '@/components/leads/column-visibility-menu'
 import { CreateLeadModal }      from '@/components/leads/create-lead-modal'
 
-import { COLUMNS, DEFAULT_FILTERS }        from '@/components/leads/types'
+import { COLUMNS, DEFAULT_FILTERS, DEFAULT_COLUMN_ORDER } from '@/components/leads/types'
 import type { LeadRow, LeadFilters, LeadStatus, InterestStatus, ColumnId, SortField, StatusCount } from '@/components/leads/types'
 import type { NewLeadData } from '@/components/leads/create-lead-modal'
 
@@ -137,10 +137,25 @@ export function LeadsClient({
   const [visibleColumns, setVisibleCols] = React.useState<Set<ColumnId>>(() => {
     const defaults = new Set(COLUMNS.filter((c) => c.defaultOn).map((c) => c.id))
     if (isRep) {
-      defaults.add('phone')    // reps need phone to call
-      defaults.delete('assigned') // redundant — all leads are theirs
+      defaults.add('phone')
+      defaults.delete('assigned')
     }
     return defaults
+  })
+  const [columnOrder, setColumnOrder] = React.useState<ColumnId[]>(() => {
+    try {
+      const saved = localStorage.getItem('leads_column_order')
+      if (saved) {
+        const parsed: ColumnId[] = JSON.parse(saved)
+        // Validate: must contain all current column IDs (in case new columns were added)
+        const allIds = new Set(DEFAULT_COLUMN_ORDER)
+        const savedIds = new Set(parsed)
+        if (DEFAULT_COLUMN_ORDER.every(id => savedIds.has(id)) && parsed.every(id => allIds.has(id))) {
+          return parsed
+        }
+      }
+    } catch { /* ignore */ }
+    return DEFAULT_COLUMN_ORDER
   })
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
   // Derive the panel lead live from state so status/interest changes reflect instantly
@@ -402,6 +417,11 @@ export function LeadsClient({
     })
   }
 
+  function handleReorderColumns(order: ColumnId[]) {
+    setColumnOrder(order)
+    try { localStorage.setItem('leads_column_order', JSON.stringify(order)) } catch { /* ignore */ }
+  }
+
   function handleExport() {
     const headers = ['Name', 'Email', 'Company', 'Title', 'Status', 'Batch', 'Assigned To', 'Created At']
     const rows    = filtered.map((l) => [
@@ -492,7 +512,9 @@ export function LeadsClient({
         <div className="flex items-center gap-2">
           <ColumnVisibilityMenu
             visibleColumns={visibleColumns}
+            columnOrder={columnOrder}
             onToggle={handleToggleColumn}
+            onReorder={handleReorderColumns}
           />
         </div>
       </div>
@@ -504,6 +526,7 @@ export function LeadsClient({
         sortBy={filters.sortBy}
         sortDir={filters.sortDir}
         visibleColumns={visibleColumns}
+        columnOrder={columnOrder}
         isAdmin={isAdmin}
         onSelectAll={handleSelectAll}
         onSelectRow={handleSelectRow}

@@ -27,6 +27,7 @@ interface LeadTableProps {
   sortBy:           SortField
   sortDir:          SortDir
   visibleColumns:   Set<ColumnId>
+  columnOrder:      ColumnId[]
   isAdmin:          boolean
   onSelectAll:      () => void
   onSelectRow:      (id: string) => void
@@ -46,6 +47,7 @@ export function LeadTable({
   sortBy,
   sortDir,
   visibleColumns,
+  columnOrder,
   isAdmin,
   onSelectAll,
   onSelectRow,
@@ -57,6 +59,8 @@ export function LeadTable({
   onDeleteLead,
   loading,
 }: LeadTableProps) {
+  // Columns to render in order, filtered to visible
+  const orderedVisible = columnOrder.filter(id => visibleColumns.has(id))
   const allSelected     = leads.length > 0 && leads.every((l) => selectedIds.has(l.id))
   const someSelected    = leads.some((l) => selectedIds.has(l.id)) && !allSelected
 
@@ -86,92 +90,12 @@ export function LeadTable({
         {/* ── Header ── */}
         <thead>
           <tr className="border-b border-border bg-muted/40">
-            {/* Checkbox */}
             <th className="w-10 px-4 py-3">
-              <Checkbox
-                checked={allSelected}
-                indeterminate={someSelected}
-                onChange={onSelectAll}
-                aria-label="Select all"
-              />
+              <Checkbox checked={allSelected} indeterminate={someSelected} onChange={onSelectAll} aria-label="Select all" />
             </th>
-
-            {/* Name */}
-            <SortHeader field="name" current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[180px]">
-              Name
-            </SortHeader>
-
-            {/* Email */}
-            {visibleColumns.has('email') && (
-              <SortHeader field="email" current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[200px]">
-                Email
-              </SortHeader>
-            )}
-
-            {/* Company */}
-            {visibleColumns.has('company') && (
-              <SortHeader field="company" current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[140px]">
-                Company
-              </SortHeader>
-            )}
-
-            {/* Title (optional) */}
-            {visibleColumns.has('title') && (
-              <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Title
-              </th>
-            )}
-
-            {/* Status */}
-            {visibleColumns.has('status') && (
-              <SortHeader field="status" current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[140px]">
-                Status
-              </SortHeader>
-            )}
-
-            {/* Interest */}
-            {visibleColumns.has('interest') && (
-              <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-muted-foreground min-w-[130px]">
-                Interest
-              </th>
-            )}
-
-            {/* Batch */}
-            {visibleColumns.has('batch') && (
-              <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Batch
-              </th>
-            )}
-
-            {/* Assigned (admin only) */}
-            {visibleColumns.has('assigned') && isAdmin && (
-              <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Assigned To
-              </th>
-            )}
-
-            {/* Phone (optional) */}
-            {visibleColumns.has('phone') && (
-              <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Phone
-              </th>
-            )}
-
-            {/* Company Phone (optional) */}
-            {visibleColumns.has('company_phone') && (
-              <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Company Phone
-              </th>
-            )}
-
-            {/* Last Activity */}
-            {visibleColumns.has('last_activity') && (
-              <SortHeader field="last_activity_at" current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[120px]">
-                Last Activity
-              </SortHeader>
-            )}
-
-            {/* Actions */}
+            {orderedVisible.map(colId => (
+              <ColumnHeader key={colId} colId={colId} sortBy={sortBy} sortDir={sortDir} onSort={onSort} isAdmin={isAdmin} />
+            ))}
             <th className="w-20 px-4 py-3" />
           </tr>
         </thead>
@@ -183,7 +107,7 @@ export function LeadTable({
               key={lead.id}
               lead={lead}
               selected={selectedIds.has(lead.id)}
-              visibleColumns={visibleColumns}
+              orderedVisible={orderedVisible}
               isAdmin={isAdmin}
               onSelect={() => onSelectRow(lead.id)}
               onStatusChange={(s) => onStatusChange(lead.id, s)}
@@ -203,7 +127,7 @@ export function LeadTable({
 interface RowProps {
   lead:             LeadRow
   selected:         boolean
-  visibleColumns:   Set<ColumnId>
+  orderedVisible:   ColumnId[]
   isAdmin:          boolean
   onSelect:         () => void
   onStatusChange:   (s: LeadRow['status']) => void
@@ -214,7 +138,7 @@ interface RowProps {
 }
 
 function LeadTableRow({
-  lead, selected, visibleColumns, isAdmin,
+  lead, selected, orderedVisible, isAdmin,
   onSelect, onStatusChange, onInterestChange, onRowClick, onSendEmail, onDelete,
 }: RowProps) {
   const router = useRouter()
@@ -225,187 +149,165 @@ function LeadTableRow({
       onClick={onRowClick}
       className={cn(
         'group cursor-pointer transition-colors',
-        selected
-          ? 'bg-primary/5'
-          : 'hover:bg-muted/40'
+        selected ? 'bg-primary/5' : 'hover:bg-muted/40'
       )}
     >
-      {/* Checkbox */}
       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-        <Checkbox
-          checked={selected}
-          onChange={onSelect}
-          aria-label={`Select ${name}`}
+        <Checkbox checked={selected} onChange={onSelect} aria-label={`Select ${name}`} />
+      </td>
+
+      {orderedVisible.map(colId => (
+        <LeadCell
+          key={colId}
+          colId={colId}
+          lead={lead}
+          isAdmin={isAdmin}
+          onStatusChange={onStatusChange}
+          onInterestChange={onInterestChange}
         />
-      </td>
-
-      {/* Name */}
-      <td className="px-4 py-3">
-        <span className="font-medium text-foreground">{name}</span>
-        {lead.title && (
-          <span className="mt-0.5 block text-xs text-muted-foreground truncate max-w-[160px]">
-            {lead.title}
-          </span>
-        )}
-      </td>
-
-      {/* Email */}
-      {visibleColumns.has('email') && (
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-          <MultiContactCell
-            primary={lead.email ?? null}
-            extras={[lead.custom_fields?.email_2, lead.custom_fields?.email_3].filter(Boolean) as string[]}
-            type="email"
-          />
-        </td>
-      )}
-
-      {/* Company */}
-      {visibleColumns.has('company') && (
-        <td className="px-4 py-3">
-          {lead.company ? (
-            <div className="flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-              <span className="truncate max-w-[120px]">{lead.company}</span>
-            </div>
-          ) : (
-            <span className="text-muted-foreground/40">—</span>
-          )}
-        </td>
-      )}
-
-      {/* Title */}
-      {visibleColumns.has('title') && (
-        <td className="px-4 py-3 text-muted-foreground">
-          {lead.title ?? <span className="text-muted-foreground/40">—</span>}
-        </td>
-      )}
-
-      {/* Status — inline dropdown */}
-      {visibleColumns.has('status') && (
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-          <StatusDropdown
-            value={lead.status}
-            onChange={onStatusChange}
-          />
-        </td>
-      )}
-
-      {/* Interest — inline dropdown */}
-      {visibleColumns.has('interest') && (
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-          <InterestDropdown
-            value={lead.interest_status}
-            onChange={onInterestChange}
-          />
-        </td>
-      )}
-
-      {/* Batch */}
-      {visibleColumns.has('batch') && (
-        <td className="px-4 py-3 text-muted-foreground">
-          {lead.batch_name ? (
-            <span className="truncate max-w-[120px] block text-xs">{lead.batch_name}</span>
-          ) : (
-            <span className="text-muted-foreground/40 text-xs">—</span>
-          )}
-        </td>
-      )}
-
-      {/* Assigned */}
-      {visibleColumns.has('assigned') && isAdmin && (
-        <td className="px-4 py-3">
-          {lead.assigned_name ? (
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-bold text-primary">
-                {lead.assigned_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
-              </div>
-              <span className="text-xs">{lead.assigned_name}</span>
-            </div>
-          ) : (
-            <span className="text-xs text-muted-foreground/40">Unassigned</span>
-          )}
-        </td>
-      )}
-
-      {/* Phone */}
-      {visibleColumns.has('phone') && (
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-          <MultiContactCell
-            primary={lead.phone ?? null}
-            extras={[lead.custom_fields?.phone_2, lead.custom_fields?.phone_3].filter(Boolean) as string[]}
-            type="phone"
-          />
-        </td>
-      )}
-
-      {/* Company Phone */}
-      {visibleColumns.has('company_phone') && (
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-          <MultiContactCell
-            primary={lead.custom_fields?.company_phone ?? null}
-            extras={[lead.custom_fields?.company_phone_2].filter(Boolean) as string[]}
-            type="phone"
-          />
-        </td>
-      )}
-
-      {/* Last Activity */}
-      {visibleColumns.has('last_activity') && (
-        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-          {lead.last_activity_at
-            ? relativeTime(lead.last_activity_at)
-            : <span className="text-muted-foreground/40">No activity</span>
-          }
-        </td>
-      )}
+      ))}
 
       {/* Actions */}
       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Tooltip content="Send email">
-            <button
-              type="button"
-              onClick={onSendEmail}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
+            <button type="button" onClick={onSendEmail} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
               <Mail className="h-3.5 w-3.5" />
             </button>
           </Tooltip>
           <Tooltip content="View lead">
-            <Link
-              href={`/leads/${lead.id}`}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
+            <Link href={`/leads/${lead.id}`} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           </Tooltip>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
+              <button type="button" className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" minWidth="160px">
-              <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)} icon={<ExternalLink className="h-3.5 w-3.5" />}>
-                View Lead
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onSendEmail} icon={<Mail className="h-3.5 w-3.5" />}>
-                Send Email
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)} icon={<ExternalLink className="h-3.5 w-3.5" />}>View Lead</DropdownMenuItem>
+              <DropdownMenuItem onClick={onSendEmail} icon={<Mail className="h-3.5 w-3.5" />}>Send Email</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem destructive onClick={onDelete}>
-                Delete Lead
-              </DropdownMenuItem>
+              <DropdownMenuItem destructive onClick={onDelete}>Delete Lead</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </td>
     </tr>
   )
+}
+
+// ── Dynamic column header ─────────────────────────────────────────────────
+function ColumnHeader({ colId, sortBy, sortDir, onSort, isAdmin }: {
+  colId: ColumnId; sortBy: SortField; sortDir: SortDir
+  onSort: (f: SortField) => void; isAdmin: boolean
+}) {
+  const plain = (label: string) => (
+    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-muted-foreground">{label}</th>
+  )
+  switch (colId) {
+    case 'name':          return <SortHeader field="name"            current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[180px]">Name</SortHeader>
+    case 'email':         return <SortHeader field="email"           current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[180px]">Email</SortHeader>
+    case 'company':       return <SortHeader field="company"         current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[130px]">Company</SortHeader>
+    case 'status':        return <SortHeader field="status"          current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[130px]">Status</SortHeader>
+    case 'last_activity': return <SortHeader field="last_activity_at" current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[120px]">Last Activity</SortHeader>
+    case 'interest':      return plain('Interest')
+    case 'phone':         return plain('Phone')
+    case 'company_phone': return plain('Company Phone')
+    case 'title':         return plain('Job Title')
+    case 'batch':         return plain('Batch')
+    case 'tags':          return plain('Tags')
+    case 'assigned':      return isAdmin ? plain('Assigned To') : null
+    default:              return null
+  }
+}
+
+// ── Dynamic cell renderer ─────────────────────────────────────────────────
+function LeadCell({ colId, lead, isAdmin, onStatusChange, onInterestChange }: {
+  colId: ColumnId; lead: LeadRow; isAdmin: boolean
+  onStatusChange:   (s: LeadRow['status']) => void
+  onInterestChange: (s: InterestStatus) => void
+}) {
+  switch (colId) {
+    case 'name':
+      return (
+        <td className="px-4 py-3">
+          <span className="font-medium text-foreground">{[lead.first_name, lead.last_name].filter(Boolean).join(' ') || '—'}</span>
+        </td>
+      )
+    case 'company':
+      return (
+        <td className="px-4 py-3">
+          {lead.company
+            ? <div className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" /><span className="truncate max-w-[120px]">{lead.company}</span></div>
+            : <span className="text-muted-foreground/40">—</span>}
+        </td>
+      )
+    case 'email':
+      return (
+        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+          <MultiContactCell primary={lead.email ?? null} extras={[lead.custom_fields?.email_2, lead.custom_fields?.email_3].filter(Boolean) as string[]} type="email" />
+        </td>
+      )
+    case 'phone':
+      return (
+        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+          <MultiContactCell primary={lead.phone ?? null} extras={[lead.custom_fields?.phone_2, lead.custom_fields?.phone_3].filter(Boolean) as string[]} type="phone" />
+        </td>
+      )
+    case 'company_phone':
+      return (
+        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+          <MultiContactCell primary={lead.custom_fields?.company_phone ?? null} extras={[lead.custom_fields?.company_phone_2].filter(Boolean) as string[]} type="phone" />
+        </td>
+      )
+    case 'status':
+      return (
+        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+          <StatusDropdown value={lead.status} onChange={onStatusChange} />
+        </td>
+      )
+    case 'interest':
+      return (
+        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+          <InterestDropdown value={lead.interest_status} onChange={onInterestChange} />
+        </td>
+      )
+    case 'assigned':
+      if (!isAdmin) return null
+      return (
+        <td className="px-4 py-3">
+          {lead.assigned_name
+            ? <div className="flex items-center gap-1.5">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-bold text-primary">
+                  {lead.assigned_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+                <span className="text-xs">{lead.assigned_name}</span>
+              </div>
+            : <span className="text-xs text-muted-foreground/40">Unassigned</span>}
+        </td>
+      )
+    case 'batch':
+      return (
+        <td className="px-4 py-3 text-muted-foreground">
+          {lead.batch_name ? <span className="truncate max-w-[120px] block text-xs">{lead.batch_name}</span> : <span className="text-muted-foreground/40 text-xs">—</span>}
+        </td>
+      )
+    case 'title':
+      return <td className="px-4 py-3 text-muted-foreground">{lead.title ?? <span className="text-muted-foreground/40">—</span>}</td>
+    case 'last_activity':
+      return (
+        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+          {lead.last_activity_at ? relativeTime(lead.last_activity_at) : <span className="text-muted-foreground/40">No activity</span>}
+        </td>
+      )
+    case 'tags':
+      return <td className="px-4 py-3"><span className="text-muted-foreground/40 text-xs">—</span></td>
+    default:
+      return null
+  }
 }
 
 // ── Inline status dropdown ────────────────────────────────────────────────
