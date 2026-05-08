@@ -39,17 +39,19 @@ export default async function DashboardLayout({
 
   const workspaceName = member?.workspaces?.name ?? null
   const role = member?.role ?? null
+  const userName = user.user_metadata?.full_name as string | undefined ?? null
+  const userEmail = user.email ?? null
 
   return (
     <NotificationProviderWrapper userId={user.id}>
       <div className="flex h-screen overflow-hidden bg-background">
         {/* Desktop sidebar */}
         <div className="hidden lg:flex lg:shrink-0">
-          <Sidebar workspaceName={workspaceName} role={role} />
+          <Sidebar workspaceName={workspaceName} role={role} userEmail={userEmail} userName={userName} />
         </div>
 
         {/* Mobile sidebar drawer */}
-        <MobileSidebar workspaceName={workspaceName} role={role} />
+        <MobileSidebar workspaceName={workspaceName} role={role} userEmail={userEmail} userName={userName} />
 
         {/* Main content area */}
         <div className="flex flex-1 flex-col overflow-hidden">

@@ -10,9 +10,11 @@ import type { WorkspaceRole } from '@/types/database'
 interface MobileSidebarProps {
   workspaceName?: string | null
   role?: WorkspaceRole | null
+  userEmail?: string | null
+  userName?: string | null
 }
 
-export function MobileSidebar({ workspaceName, role }: MobileSidebarProps) {
+export function MobileSidebar({ workspaceName, role, userEmail, userName }: MobileSidebarProps) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
 
@@ -52,7 +54,7 @@ export function MobileSidebar({ workspaceName, role }: MobileSidebarProps) {
           <X className="h-4 w-4" />
         </button>
 
-        <Sidebar workspaceName={workspaceName} role={role} />
+        <Sidebar workspaceName={workspaceName} role={role} userEmail={userEmail} userName={userName} />
       </div>
     </>
   )

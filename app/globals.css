@@ -35,73 +35,77 @@
 
   --radius: var(--border-radius);
 
-  --font-sans: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  --font-sans: var(--font-sans, -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", ui-sans-serif, system-ui, sans-serif);
 }
 
 /* ── Light mode CSS variables ──────────────────────────────────────────────── */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222 47% 11%;
+  /* Surfaces — Apple-inspired warm gray system */
+  --background: 240 4% 95%;         /* #F2F2F4 */
+  --foreground: 240 14% 6%;         /* #0B0B0F */
 
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card: 0 0% 100%;                /* #FFFFFF */
+  --card-foreground: 240 14% 6%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+  --popover-foreground: 240 14% 6%;
 
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
+  /* Brand blue — #0A6CFF */
+  --primary: 218 100% 52%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222 47% 11%;
+  /* Subtle surface for hover states / secondary elements */
+  --secondary: 240 5% 97%;          /* #F7F7F9 */
+  --secondary-foreground: 240 14% 6%;
 
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
+  --muted: 240 5% 97%;
+  --muted-foreground: 240 2% 58%;   /* #8E8E97 */
 
-  --accent: 210 40% 96%;
-  --accent-foreground: 222 47% 11%;
+  --accent: 240 5% 97%;
+  --accent-foreground: 240 14% 6%;
 
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 358 75% 58%;       /* #E5484D */
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 221 83% 53%;
+  /* Hairline borders */
+  --border: 220 8% 91%;
+  --input: 220 8% 91%;
+  --ring: 218 100% 52%;
 
-  --border-radius: 0.5rem;
-  --sidebar-width: 240px;
+  --border-radius: 0.875rem;         /* 14px */
+  --sidebar-width: 260px;
   --header-height: 60px;
 }
 
 /* ── Dark mode CSS variables ───────────────────────────────────────────────── */
 .dark {
-  --background: 222 47% 7%;
-  --foreground: 210 40% 98%;
+  --background: 240 7% 6%;          /* #0E0E11 */
+  --foreground: 240 5% 96%;         /* #F4F4F6 */
 
-  --card: 222 47% 10%;
-  --card-foreground: 210 40% 98%;
+  --card: 240 7% 12%;               /* #1C1C22 */
+  --card-foreground: 240 5% 96%;
 
-  --popover: 222 47% 10%;
-  --popover-foreground: 210 40% 98%;
+  --popover: 240 7% 12%;
+  --popover-foreground: 240 5% 96%;
 
-  --primary: 217 91% 60%;
-  --primary-foreground: 222 47% 11%;
+  --primary: 218 100% 52%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 217 33% 17%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary: 240 6% 15%;          /* #23232B */
+  --secondary-foreground: 240 5% 96%;
 
-  --muted: 217 33% 17%;
-  --muted-foreground: 215 20% 65%;
+  --muted: 240 6% 15%;
+  --muted-foreground: 240 4% 68%;   /* #ADADB8 */
 
-  --accent: 217 33% 17%;
-  --accent-foreground: 210 40% 98%;
+  --accent: 240 6% 15%;
+  --accent-foreground: 240 5% 96%;
 
-  --destructive: 0 62% 50%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 358 75% 58%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 217 33% 20%;
-  --input: 217 33% 20%;
-  --ring: 217 91% 60%;
+  --border: 240 5% 18%;
+  --input: 240 5% 18%;
+  --ring: 218 100% 52%;
 }
 
 /* ── Base styles ───────────────────────────────────────────────────────────── */
@@ -116,7 +120,8 @@
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings: "ss01", "cv11", "tnum";
+    letter-spacing: -0.01em;
   }
 
   html {
@@ -124,8 +129,8 @@
   }
 
   h1 { font-size: 1.875rem; font-weight: 700; letter-spacing: -0.025em; line-height: 1.2; }
-  h2 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.015em; line-height: 1.3; }
-  h3 { font-size: 1.25rem; font-weight: 600; line-height: 1.4; }
+  h2 { font-size: 1.5rem;   font-weight: 600; letter-spacing: -0.02em;  line-height: 1.3; }
+  h3 { font-size: 1.25rem;  font-weight: 600; letter-spacing: -0.015em; line-height: 1.4; }
   h4 { font-size: 1.125rem; font-weight: 500; line-height: 1.5; }
 }
 
@@ -144,22 +149,23 @@
   .animate-bell-shake {
     animation: bell-shake 0.8s ease-in-out;
   }
+
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
   }
 
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+  .scrollbar-thin::-webkit-scrollbar        { width: 5px; height: 5px; }
+  .scrollbar-thin::-webkit-scrollbar-track  { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb  { background-color: hsl(var(--border)); border-radius: 3px; }
+
+  /* Card-style shadow used in sidebar active items */
+  .shadow-card {
+    box-shadow: 0 1px 2px rgba(15,15,30,0.04), 0 0 0 0.5px rgba(0,0,0,0.04);
   }
 
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--border));
-    border-radius: 3px;
+  /* Primary button glow */
+  .shadow-primary-glow {
+    box-shadow: 0 6px 18px color-mix(in oklab, hsl(var(--primary)) 35%, transparent);
   }
 }
