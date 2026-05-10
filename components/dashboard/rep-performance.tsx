@@ -5,7 +5,6 @@ import { Phone, Calendar, Users, RefreshCw, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer, Legend,
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
 } from 'recharts'
 
 type Period = 'today' | 'week' | 'month'
@@ -103,31 +102,55 @@ function CallDonut({ reps }: { reps: RepStat[] }) {
 }
 
 // ── Horizontal bar per rep ────────────────────────────────────────────────
-function RepCallsLineGraph({ reps }: { reps: RepStat[] }) {
-  const sorted = [...reps].sort((a, b) => b.calls - a.calls).slice(0, 10)
-  const chartData = sorted.map((rep) => ({
-    name: rep.name.split(' ')[0],
-    calls: rep.calls,
-  }))
-  const colors = ['#2563eb', '#16a34a', '#db2777', '#d97706', '#7c3aed', '#0891b2', '#dc2626', '#4f46e5', '#65a30d', '#0d9488']
+function RepCallBars({ reps }: { reps: RepStat[] }) {
+  const maxCalls = Math.max(1, ...reps.map(r => r.calls))
 
   return (
-    <div className="h-[240px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData} margin={{ top: 8, right: 8, left: -12, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-          <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-          <RTooltip />
-          <Line type="monotone" dataKey="calls" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-        </LineChart>
-      </ResponsiveContainer>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {chartData.map((d, idx) => (
-          <span key={d.name} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-            <span className="h-2 w-2 rounded-full" style={{ background: colors[idx % colors.length] }} />
-            {d.name}: {d.calls}
-          </span>
+    <div className="space-y-2.5">
+      {reps.slice(0, 8).map(rep => {
+        const outcomes = Object.entries(rep.callsByOutcome).filter(([, v]) => v > 0)
+        return (
+          <div key={rep.id} className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium truncate max-w-[120px]">{rep.name.split(' ')[0]}</span>
+              <span className="text-muted-foreground">{rep.calls} calls</span>
+            </div>
+            {rep.calls > 0 ? (
+              <div className="flex h-5 w-full overflow-hidden rounded-full bg-muted">
+                {outcomes.map(([outcome, count]) => (
+                  <div
+                    key={outcome}
+                    title={`${OUTCOME_META[outcome]?.label ?? outcome}: ${count}`}
+                    style={{
+                      width: `${(count / maxCalls) * 100}%`,
+                      background: OUTCOME_META[outcome]?.color ?? '#94a3b8',
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="h-5 w-full rounded-full bg-muted/50" />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function CallsByRepPanel({ reps }: { reps: RepStat[] }) {
+  if (reps.length === 0) {
+    return <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">No data</div>
+  }
+  return (
+    <div className="mt-2">
+      <RepCallBars reps={reps} />
+      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
+        {Object.entries(OUTCOME_META).map(([, { label, color }]) => (
+          <div key={label} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+            {label}
+          </div>
         ))}
       </div>
     </div>
@@ -208,11 +231,7 @@ export function RepPerformancePanel() {
             </div>
             <div className="p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Calls per Rep</p>
-              {reps.length === 0 ? (
-                <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">No data</div>
-              ) : (
-                <RepCallsLineGraph reps={reps} />
-              )}
+              <CallsByRepPanel reps={reps} />
             </div>
           </div>
 
