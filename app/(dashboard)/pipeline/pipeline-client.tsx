@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Plus, GripVertical, Building2, Phone,
   X, Mail, Globe, ExternalLink, ChevronDown, Search,
-  Clock, MoreHorizontal,
+  Clock,
   Columns3, List,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -219,9 +219,6 @@ export default function PipelineClient({ stages, initialLeads }: Props) {
                         {stageLeads.length} {stageLeads.length === 1 ? 'lead' : 'leads'}
                       </p>
                     </div>
-                    <button className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-white/60 transition-colors mt-0.5">
-                      <MoreHorizontal className="h-3.5 w-3.5" />
-                    </button>
                   </div>
                 </div>
 

@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { OverdueFollowUpsWidget } from '@/components/notifications/overdue-followups-widget'
 import { RepPerformancePanel } from '@/components/dashboard/rep-performance'
 import { MyActivityPanel }     from '@/components/dashboard/my-activity'
-import { Users, Send, BarChart2, Bell } from 'lucide-react'
+import { Users, PhoneCall, TrendingUp, Bell } from 'lucide-react'
 import type { WorkspaceRole } from '@/types/database'
 
 export const metadata: Metadata = { title: 'Dashboard' }
@@ -73,23 +73,23 @@ export default async function DashboardPage() {
             color="blue"
           />
           <StatCard
-            title="Emails Sent"
-            value={formatNumber(metrics.emailsSentThisWeek)}
-            description="this week"
-            icon={Send}
+            title="Interested"
+            value={formatNumber(metrics.interestedLeads)}
+            description="expressed interest"
+            icon={TrendingUp}
             color="green"
           />
           <StatCard
-            title="Open Rate"
-            value={formatPercent(metrics.openRateLast30Days)}
-            description="last 30 days"
-            icon={BarChart2}
+            title="Calls Logged"
+            value={formatNumber(metrics.callsLogged)}
+            description="this week"
+            icon={PhoneCall}
             color="purple"
           />
           <StatCard
-            title="Unread"
-            value={formatNumber(metrics.unreadNotifications)}
-            description="notifications"
+            title="Follow-ups Due"
+            value={formatNumber(metrics.followUpsDue)}
+            description="pending today"
             icon={Bell}
             color="amber"
           />
@@ -111,22 +111,22 @@ export default async function DashboardPage() {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 type DashboardMetrics = {
-  totalLeads: number
-  newLeads: number
-  emailsSentThisWeek: number
-  openRateLast30Days: number
+  totalLeads:       number
+  newLeads:         number
+  interestedLeads:  number
+  callsLogged:      number
   unreadNotifications: number
-  followUpsDue: number
+  followUpsDue:     number
 }
 
 function emptyDashboardMetrics(): DashboardMetrics {
   return {
-    totalLeads: 0,
-    newLeads: 0,
-    emailsSentThisWeek: 0,
-    openRateLast30Days: 0,
+    totalLeads:          0,
+    newLeads:            0,
+    interestedLeads:     0,
+    callsLogged:         0,
     unreadNotifications: 0,
-    followUpsDue: 0,
+    followUpsDue:        0,
   }
 }
 
@@ -137,9 +137,13 @@ async function getDashboardMetrics(
 ): Promise<DashboardMetrics> {
   const now = new Date()
 
+  const weekAgo = new Date(now)
+  weekAgo.setDate(weekAgo.getDate() - 7)
+
   const [
     leadsResult,
     newLeadsResult,
+    interestedResult,
     followUpsDueResult,
   ] = await Promise.all([
     supabase
@@ -155,6 +159,12 @@ async function getDashboardMetrics(
       .eq('status', 'new')
       .is('deleted_at', null),
     supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('interest_status', 'interested')
+      .is('deleted_at', null),
+    supabase
       .from('follow_ups')
       .select('id', { count: 'exact', head: true })
       .eq('assigned_to', userId)
@@ -162,13 +172,25 @@ async function getDashboardMetrics(
       .lte('due_at', now.toISOString()),
   ])
 
+  // Calls logged this week (best-effort — join through leads)
+  let callsLogged = 0
+  try {
+    const { count } = await supabase
+      .from('activities')
+      .select('id, leads!inner(workspace_id)', { count: 'exact', head: true })
+      .eq('leads.workspace_id', workspaceId)
+      .eq('type', 'call_logged')
+      .gte('created_at', weekAgo.toISOString())
+    callsLogged = count ?? 0
+  } catch {}
+
   return {
-    totalLeads: leadsResult.count ?? 0,
-    newLeads: newLeadsResult.count ?? 0,
-    emailsSentThisWeek: 0,
-    openRateLast30Days: 0,
+    totalLeads:          leadsResult.count     ?? 0,
+    newLeads:            newLeadsResult.count   ?? 0,
+    interestedLeads:     interestedResult.count ?? 0,
+    callsLogged,
     unreadNotifications: 0,
-    followUpsDue: followUpsDueResult.count ?? 0,
+    followUpsDue:        followUpsDueResult.count ?? 0,
   }
 }
 

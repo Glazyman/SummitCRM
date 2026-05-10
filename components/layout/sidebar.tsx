@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
@@ -15,8 +15,15 @@ import {
   BarChart2,
   ChevronLeft,
   ChevronRight,
+  LogOut,
+  UserCog,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 import type { WorkspaceRole } from '@/types/database'
 
 interface NavItem {
@@ -69,8 +76,15 @@ function getInitials(name: string | null | undefined, email: string | null | und
 }
 
 export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarProps) {
-  const pathname = usePathname()
+  const pathname  = usePathname()
+  const router    = useRouter()
   const [activitiesDue, setActivitiesDue] = React.useState<number | undefined>(undefined)
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
   const [collapsed, setCollapsed]         = React.useState(() => {
     try { return localStorage.getItem('sidebar_collapsed') === 'true' } catch { return false }
   })
@@ -224,13 +238,33 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
                 <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">{userEmail}</p>
               )}
             </div>
-            <button
-              type="button"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-              aria-label="More options"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-all hover:shadow-sm hover:text-foreground"
+                  aria-label="More options"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="top" minWidth="160px">
+                <DropdownMenuItem
+                  onClick={() => router.push('/settings/profile')}
+                  icon={<UserCog className="h-3.5 w-3.5" />}
+                >
+                  Profile settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="text-destructive focus:text-destructive"
+                  icon={<LogOut className="h-3.5 w-3.5" />}
+                >
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         )}
       </div>
