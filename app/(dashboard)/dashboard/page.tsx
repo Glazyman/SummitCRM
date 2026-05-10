@@ -55,6 +55,7 @@ export default async function DashboardPage() {
             description="assigned to you"
             icon={Users}
             color="blue"
+            href="/leads"
           />
           <StatCard
             title="New Leads"
@@ -62,6 +63,7 @@ export default async function DashboardPage() {
             description="not yet contacted"
             icon={Users}
             color="green"
+            href="/leads?status=new"
           />
           <StatCard
             title="Follow-ups Due"
@@ -139,17 +141,6 @@ export default async function DashboardPage() {
             </ol>
           </CardContent>
         </Card>
-      )}
-
-      {/* Rep: quick action — leads only */}
-      {role === 'rep' && (
-        <QuickActionCard
-          title="My Leads"
-          description="View and manage your assigned leads."
-          href="/leads"
-          icon={Users}
-          color="blue"
-        />
       )}
 
       {/* Rep: my activity breakdown */}
@@ -271,29 +262,41 @@ function StatCard({
   value,
   description,
   icon: Icon,
+  href,
 }: {
   title: string
   value: string
   description: string
   icon: React.ComponentType<{ className?: string }>
   color: 'blue' | 'green' | 'purple' | 'amber'
+  href?: string
 }) {
-  return (
-    <Card>
-      <CardContent className="pt-5">
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[13px] font-medium text-muted-foreground">{title}</p>
-            <p className="mt-1 text-3xl font-semibold tracking-[-0.03em]">{value}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-          </div>
-          <div className="shrink-0 rounded-xl border border-border bg-secondary p-3 text-foreground">
-            <Icon className="h-5 w-5" />
-          </div>
+  const content = (
+    <CardContent className="pt-5">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[13px] font-medium text-muted-foreground">{title}</p>
+          <p className="mt-1 text-3xl font-semibold tracking-[-0.03em]">{value}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
         </div>
-      </CardContent>
-    </Card>
+        <div className="shrink-0 rounded-xl border border-border bg-secondary p-3 text-foreground">
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+    </CardContent>
   )
+
+  if (href) {
+    return (
+      <Link href={href}>
+        <Card className="transition-colors hover:border-foreground/30 hover:bg-secondary/40 cursor-pointer">
+          {content}
+        </Card>
+      </Link>
+    )
+  }
+
+  return <Card>{content}</Card>
 }
 
 function SetupStep({
