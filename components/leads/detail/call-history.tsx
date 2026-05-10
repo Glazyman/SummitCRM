@@ -29,31 +29,36 @@ export interface NewCall {
   notes:        string | null
 }
 
-const OUTCOME_CONFIG: Record<CallOutcome, { label: string; icon: React.ReactNode; badge: string }> = {
+const OUTCOME_CONFIG: Record<CallOutcome, { label: string; icon: React.ReactNode; badge: string; solid: string }> = {
   answered: {
     label: 'Answered',
     icon:  <Phone className="h-3.5 w-3.5" />,
-    badge: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400',
+    badge: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    solid: 'bg-emerald-500 text-white border-emerald-600',
   },
   voicemail: {
     label: 'Voicemail',
     icon:  <VoicemailIcon className="h-3.5 w-3.5" />,
-    badge: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400',
+    badge: 'bg-purple-100 text-purple-700 border-purple-200',
+    solid: 'bg-purple-500 text-white border-purple-600',
   },
   no_answer: {
     label: 'No Answer',
     icon:  <PhoneMissed className="h-3.5 w-3.5" />,
-    badge: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400',
+    badge: 'bg-slate-200 text-slate-700 border-slate-300',
+    solid: 'bg-slate-500 text-white border-slate-600',
   },
   wrong_number: {
     label: 'Wrong Number',
     icon:  <PhoneOff className="h-3.5 w-3.5" />,
-    badge: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400',
+    badge: 'bg-red-100 text-red-700 border-red-200',
+    solid: 'bg-red-500 text-white border-red-600',
   },
   callback_requested: {
     label: 'Callback Requested',
     icon:  <Phone className="h-3.5 w-3.5" />,
-    badge: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400',
+    badge: 'bg-amber-100 text-amber-700 border-amber-200',
+    solid: 'bg-amber-500 text-white border-amber-600',
   },
 }
 
@@ -111,10 +116,10 @@ function LogCallForm({ onSubmit, onCancel }: {
                 type="button"
                 onClick={() => setOutcome(o)}
                 className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-all',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all',
                   outcome === o
-                    ? `${cfg.badge} ring-2 ring-offset-1 ring-ring`
-                    : 'border-border text-muted-foreground hover:border-primary/50'
+                    ? cfg.solid
+                    : 'border-border bg-card text-foreground hover:shadow-sm'
                 )}
               >
                 {cfg.icon}
@@ -217,8 +222,8 @@ export function CallHistory({ calls, onLogCall }: CallHistoryProps) {
               >
                 {/* Icon */}
                 <div className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-full border flex-shrink-0',
-                  cfg.badge
+                  'flex h-8 w-8 items-center justify-center rounded-lg border flex-shrink-0',
+                  cfg.solid
                 )}>
                   {cfg.icon}
                 </div>
@@ -227,8 +232,8 @@ export function CallHistory({ calls, onLogCall }: CallHistoryProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={cn(
-                      'inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-medium',
-                      cfg.badge
+                      'inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-medium',
+                      cfg.solid
                     )}>
                       {cfg.label}
                     </span>
