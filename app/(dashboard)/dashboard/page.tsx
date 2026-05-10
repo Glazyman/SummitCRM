@@ -24,7 +24,7 @@ export default async function DashboardPage() {
 
   const role = member?.role
   const metrics = member && user
-    ? await getDashboardMetrics(supabase, member.workspace_id, user.id)
+    ? await getDashboardMetrics(supabase, member.workspace_id, user.id, member.role)
     : emptyDashboardMetrics()
   const totalLeadsDescription =
     role === 'rep' || false ? 'assigned to you' : 'in workspace'
@@ -133,12 +133,31 @@ function emptyDashboardMetrics(): DashboardMetrics {
 async function getDashboardMetrics(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
-  userId: string
+  userId: string,
+  role: string
 ): Promise<DashboardMetrics> {
   const now = new Date()
 
+  // End of today — so follow-ups scheduled for any time today are included
+  const endOfToday = new Date(now)
+  endOfToday.setHours(23, 59, 59, 999)
+
   const weekAgo = new Date(now)
   weekAgo.setDate(weekAgo.getDate() - 7)
+
+  const isAdmin = ['admin', 'super_admin'].includes(role)
+
+  // Follow-ups query: admins see all workspace follow-ups, reps see their own
+  const followUpsBase = supabase
+    .from('follow_ups')
+    .select('id', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId)
+    .is('completed_at', null)
+    .lte('due_at', endOfToday.toISOString())
+
+  const followUpsDueQuery = isAdmin
+    ? followUpsBase
+    : followUpsBase.eq('assigned_to', userId)
 
   const [
     leadsResult,
@@ -164,12 +183,7 @@ async function getDashboardMetrics(
       .eq('workspace_id', workspaceId)
       .eq('interest_status', 'interested')
       .is('deleted_at', null),
-    supabase
-      .from('follow_ups')
-      .select('id', { count: 'exact', head: true })
-      .eq('assigned_to', userId)
-      .is('completed_at', null)
-      .lte('due_at', now.toISOString()),
+    followUpsDueQuery,
   ])
 
   // Calls logged this week (best-effort — join through leads)

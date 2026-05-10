@@ -4,29 +4,40 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CalendarClock, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatDistanceToNowStrict, isPast, isToday } from 'date-fns'
 
 interface FollowUp {
-  id:         string
-  lead_id:    string
-  due_at:     string
-  notes:      string | null
-  lead_name:  string
-  company:    string | null
+  id:        string
+  lead_id:   string
+  due_at:    string
+  title:     string
+  notes:     string | null
+  lead_name: string
+  company:   string | null
 }
 
 function getDueLabel(due_at: string): { label: string; urgent: boolean; overdue: boolean } {
-  const date = new Date(due_at)
-  const overdue = isPast(date) && !isToday(date)
-  const urgent  = isPast(date)
+  const d       = new Date(due_at)
+  const now     = new Date()
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const dueMidnight   = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const diffDays = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / 86400000)
 
-  if (overdue) {
-    return { label: `${formatDistanceToNowStrict(date)} overdue`, urgent: true, overdue: true }
+  if (diffDays < 0) {
+    const days = Math.abs(diffDays)
+    return { label: `${days}d overdue`, urgent: true, overdue: true }
   }
-  if (isPast(date)) {
+  if (d < now) {
+    // Today but time has already passed
     return { label: 'Due now', urgent: true, overdue: false }
   }
-  return { label: `Due in ${formatDistanceToNowStrict(date)}`, urgent: false, overdue: false }
+  if (diffDays === 0) {
+    return {
+      label: `Due today · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`,
+      urgent: false,
+      overdue: false,
+    }
+  }
+  return { label: 'Due tomorrow', urgent: false, overdue: false }
 }
 
 interface Props {
@@ -41,14 +52,44 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
   useEffect(() => {
     let cancelled = false
 
-    async function loadFollowUps() {
+    async function load() {
       setLoading(true)
       try {
-        const res = await fetch(`/api/notifications?type=follow_up_due&limit=${limit}`)
-        if (!cancelled && res.ok) {
-          const data = await res.json()
-          setFollowUps(data.follow_ups ?? data.followUps ?? [])
+        // Query follow-ups directly — filter to due today or overdue
+        const res  = await fetch('/api/activities?done=false')
+        if (!res.ok || cancelled) return
+
+        const json = await res.json() as {
+          data?: { activities?: Array<{
+            id: string
+            title: string
+            notes: string | null
+            due_at: string
+            lead: { id: string; first_name: string | null; last_name: string | null; email: string; company: string | null } | null
+          }> }
         }
+
+        const activities = json.data?.activities ?? []
+
+        // End of today
+        const endOfToday = new Date()
+        endOfToday.setHours(23, 59, 59, 999)
+
+        const due = activities
+          .filter(a => a.lead && new Date(a.due_at) <= endOfToday)
+          .sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime())
+          .slice(0, limit)
+          .map(a => ({
+            id:        a.id,
+            lead_id:   a.lead!.id,
+            due_at:    a.due_at,
+            title:     a.title,
+            notes:     a.notes,
+            lead_name: [a.lead!.first_name, a.lead!.last_name].filter(Boolean).join(' ') || a.lead!.email,
+            company:   a.lead!.company,
+          }))
+
+        if (!cancelled) setFollowUps(due)
       } catch {
         if (!cancelled) setFollowUps([])
       } finally {
@@ -56,10 +97,8 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
       }
     }
 
-    void loadFollowUps()
-    return () => {
-      cancelled = true
-    }
+    void load()
+    return () => { cancelled = true }
   }, [limit])
 
   const overdueCount = followUps.filter(f => getDueLabel(f.due_at).overdue).length
@@ -72,14 +111,14 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
           <CalendarClock className="w-4 h-4 text-muted-foreground" />
           <span className="font-semibold text-sm">Follow-ups</span>
           {overdueCount > 0 && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary text-foreground text-[10px] font-semibold">
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-destructive/10 text-destructive text-[10px] font-semibold">
               <AlertCircle className="w-3 h-3" />
               {overdueCount} overdue
             </span>
           )}
         </div>
         <Link
-          href="/leads"
+          href="/activities"
           className="text-xs text-primary hover:underline flex items-center gap-0.5"
         >
           View all <ChevronRight className="w-3.5 h-3.5" />
@@ -97,7 +136,7 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
             <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
               <CalendarClock className="w-5 h-5 text-foreground" />
             </div>
-            <p className="text-sm text-muted-foreground">No follow-ups due</p>
+            <p className="text-sm text-muted-foreground">No follow-ups due today</p>
           </div>
         ) : (
           <ul>
@@ -112,32 +151,28 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
                       i < followUps.length - 1 && 'border-b'
                     )}
                   >
-                    {/* Urgency indicator */}
                     <div className={cn(
                       'w-2 h-2 rounded-full flex-shrink-0 mt-0.5',
-                      due.overdue  ? 'bg-secondary'    :
-                      due.urgent   ? 'bg-secondary' : 'bg-secondary'
+                      due.overdue ? 'bg-destructive' : due.urgent ? 'bg-amber-500' : 'bg-emerald-500'
                     )} />
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="text-sm font-medium truncate">{f.lead_name}</span>
                         <span className={cn(
-                          'text-[11px] flex-shrink-0',
-                          due.overdue  ? 'text-foreground font-semibold' :
-                          due.urgent   ? 'text-foreground font-medium' : 'text-muted-foreground'
+                          'text-[11px] flex-shrink-0 whitespace-nowrap',
+                          due.overdue ? 'text-destructive font-semibold' :
+                          due.urgent  ? 'text-amber-600 font-medium' : 'text-muted-foreground'
                         )}>
                           {due.label}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs text-muted-foreground truncate">{f.title}</span>
                         {f.company && (
-                          <span className="text-xs text-muted-foreground truncate">{f.company}</span>
-                        )}
-                        {f.notes && (
                           <>
-                            {f.company && <span className="text-muted-foreground/40 text-xs">·</span>}
-                            <span className="text-xs text-muted-foreground truncate italic">{f.notes}</span>
+                            <span className="text-muted-foreground/40 text-xs">·</span>
+                            <span className="text-xs text-muted-foreground truncate">{f.company}</span>
                           </>
                         )}
                       </div>
