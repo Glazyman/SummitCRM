@@ -7,6 +7,7 @@ import {
   Plus, GripVertical, Building2, Phone,
   X, Mail, Globe, ExternalLink, ChevronDown, Search,
   Clock, MoreHorizontal,
+  Columns3, List,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -61,6 +62,14 @@ export default function PipelineClient({ stages, initialLeads }: Props) {
   const [dragOverStage,  setDragOverStage]  = React.useState<string | null>(null)
   const [search,         setSearch]         = React.useState('')
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
+  const [pipelineView, setPipelineView] = React.useState<'kanban' | 'list'>(() => {
+    try {
+      const saved = localStorage.getItem('pipeline_view_mode')
+      return saved === 'list' ? 'list' : 'kanban'
+    } catch {
+      return 'kanban'
+    }
+  })
   const didDragRef = React.useRef(false)
 
   React.useEffect(() => {
@@ -141,6 +150,28 @@ export default function PipelineClient({ stages, initialLeads }: Props) {
               onChange={e => setSearch(e.target.value)}
             className="h-8 w-48 rounded-xl border border-border/80 bg-white/75 pl-8 pr-3 text-[13px] text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring transition-colors" />
           </div>
+          <div className="flex rounded-xl border border-border/80 overflow-hidden bg-white/70">
+            <button
+              type="button"
+              onClick={() => { setPipelineView('kanban'); try { localStorage.setItem('pipeline_view_mode', 'kanban') } catch {} }}
+              className={cn(
+                'h-8 px-3 text-[12px] font-semibold flex items-center gap-1.5 transition-colors',
+                pipelineView === 'kanban' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              <Columns3 className="h-3.5 w-3.5" /> Kanban
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPipelineView('list'); try { localStorage.setItem('pipeline_view_mode', 'list') } catch {} }}
+              className={cn(
+                'h-8 px-3 text-[12px] font-semibold flex items-center gap-1.5 transition-colors',
+                pipelineView === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              <List className="h-3.5 w-3.5" /> List
+            </button>
+          </div>
           <Link href="/leads"
             className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl bg-primary text-primary-foreground text-[13px] font-semibold hover:bg-primary/90 transition-colors shadow-primary-glow">
             <Plus className="h-3.5 w-3.5" /> Add Lead
@@ -148,7 +179,8 @@ export default function PipelineClient({ stages, initialLeads }: Props) {
         </div>
       </div>
 
-      {/* ── Board ── */}
+      {/* ── Views ── */}
+      {pipelineView === 'kanban' ? (
       <div className="flex-1 overflow-x-auto">
         <div className="flex gap-4 px-6 py-6 min-h-full items-start"
           style={{ minWidth: `${stages.length * 300 + 96}px` }}>
@@ -235,6 +267,57 @@ export default function PipelineClient({ stages, initialLeads }: Props) {
           })}
         </div>
       </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          {stages.map((stage) => {
+            const stageLeads = leadsByStage.get(stage.id) ?? []
+            const isOver = dragOverStage === stage.id
+            return (
+              <div
+                key={stage.id}
+                className={cn('rounded-2xl border border-border bg-card transition-colors', isOver && 'ring-2 ring-primary/25 bg-primary/5')}
+                onDragOver={(e) => handleDragOver(e, stage.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, stage.id)}
+              >
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
+                    <p className="text-sm font-semibold">{stage.name}</p>
+                    <span className="text-xs text-muted-foreground">{stageLeads.length}</span>
+                  </div>
+                </div>
+                {stageLeads.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-muted-foreground">No leads in this stage.</p>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {stageLeads.map((lead) => {
+                      const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
+                      return (
+                        <button
+                          key={lead.id}
+                          type="button"
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, lead.id)}
+                          onDragEnd={handleDragEnd}
+                          onClick={() => setSelectedLeadId(lead.id)}
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{name}</p>
+                            <p className="truncate text-xs text-muted-foreground">{lead.company ?? 'No company'} · {lead.email}</p>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{timeAgo(lead.created_at)}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── Drawer ── */}
       {selectedLeadId && (
@@ -383,20 +466,20 @@ function LeadDrawer({
   const initials     = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-[390px] flex-col glass-panel shadow-2xl border-l border-white/70">
+    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-[390px] flex-col bg-background shadow-2xl border-l border-border">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary text-[13px] font-black">
             {initials}
           </div>
           <div className="min-w-0">
-            <p className="font-bold text-[15px] leading-tight truncate text-gray-900">{name}</p>
-            {lead?.company && <p className="text-[12px] text-gray-500 truncate">{lead.company}</p>}
+            <p className="font-bold text-[15px] leading-tight truncate text-foreground">{name}</p>
+            {lead?.company && <p className="text-[12px] text-muted-foreground truncate">{lead.company}</p>}
           </div>
         </div>
         <button type="button" onClick={onClose}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -409,11 +492,11 @@ function LeadDrawer({
         <div className="flex-1 overflow-y-auto">
 
           {/* Status & Interest */}
-          <div className="px-5 py-4 border-b border-gray-100">
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Lead status</p>
+          <div className="px-5 py-4 border-b border-border">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Lead status</p>
             <div className="grid grid-cols-2 gap-2.5">
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Status</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button type="button" className={cn(
@@ -440,7 +523,7 @@ function LeadDrawer({
                 </DropdownMenu>
               </div>
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Interest</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Interest</p>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button type="button" className={cn(
@@ -471,32 +554,32 @@ function LeadDrawer({
 
           {/* Contact info */}
           <div className="px-5 py-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Contact</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Contact</p>
             <div className="space-y-2">
               <a href={`tel:${lead.phone}`}
                 className={cn(
-                  'flex items-center gap-3.5 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5',
-                  'text-[13px] font-medium text-gray-700',
-                  'hover:bg-gray-100 hover:border-gray-200 transition-all',
+                  'flex items-center gap-3.5 w-full rounded-2xl border border-border bg-card px-4 py-3.5',
+                  'text-[13px] font-medium text-foreground',
+                  'hover:bg-muted hover:border-border transition-all',
                   !lead.phone && 'opacity-40 pointer-events-none'
                 )}>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white border border-gray-200 shadow-sm">
-                  <Phone className="h-3.5 w-3.5 text-gray-500" />
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background border border-border shadow-sm">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
                 {lead.phone || 'No phone number'}
               </a>
               <a href={`mailto:${lead.email}`}
-                className="flex items-center gap-3.5 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 text-[13px] font-medium text-gray-700 hover:bg-gray-100 hover:border-gray-200 transition-all">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white border border-gray-200 shadow-sm">
-                  <Mail className="h-3.5 w-3.5 text-gray-500" />
+                className="flex items-center gap-3.5 w-full rounded-2xl border border-border bg-card px-4 py-3.5 text-[13px] font-medium text-foreground hover:bg-muted hover:border-border transition-all">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background border border-border shadow-sm">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
                 <span className="truncate">{lead.email}</span>
               </a>
               {lead.website && (
                 <a href={lead.website} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-3.5 w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 text-[13px] font-medium text-gray-700 hover:bg-gray-100 hover:border-gray-200 transition-all">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white border border-gray-200 shadow-sm">
-                    <Globe className="h-3.5 w-3.5 text-gray-500" />
+                  className="flex items-center gap-3.5 w-full rounded-2xl border border-border bg-card px-4 py-3.5 text-[13px] font-medium text-foreground hover:bg-muted hover:border-border transition-all">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background border border-border shadow-sm">
+                    <Globe className="h-3.5 w-3.5 text-muted-foreground" />
                   </div>
                   <span className="truncate">{lead.website.replace(/^https?:\/\//, '')}</span>
                 </a>
@@ -507,7 +590,7 @@ function LeadDrawer({
       ) : null}
 
       {/* Footer */}
-      <div className="border-t border-gray-100 px-5 py-4">
+      <div className="border-t border-border px-5 py-4">
         <Link href={`/leads/${leadId}`}
           className="flex items-center justify-center gap-2 w-full h-11 rounded-2xl bg-primary text-primary-foreground text-[13px] font-bold hover:bg-primary/90 transition-colors shadow-sm">
           Open Full Profile <ExternalLink className="h-4 w-4" />

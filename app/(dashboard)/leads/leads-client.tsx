@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Upload, UserPlus, Download } from 'lucide-react'
+import { Upload, UserPlus, Download, Table2, LayoutGrid } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -14,6 +14,7 @@ import { LeadTable }            from '@/components/leads/lead-table'
 import { BulkActionBar }        from '@/components/leads/bulk-action-bar'
 import { ColumnVisibilityMenu } from '@/components/leads/column-visibility-menu'
 import { CreateLeadModal }      from '@/components/leads/create-lead-modal'
+import { STATUS_CONFIG, INTEREST_CONFIG } from '@/components/leads/status-config'
 
 import { COLUMNS, DEFAULT_FILTERS, DEFAULT_COLUMN_ORDER } from '@/components/leads/types'
 import type { LeadRow, LeadFilters, LeadStatus, InterestStatus, ColumnId, SortField, StatusCount } from '@/components/leads/types'
@@ -163,6 +164,14 @@ export function LeadsClient({
     return DEFAULT_COLUMN_ORDER
   })
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
+  const [leadView, setLeadView] = React.useState<'table' | 'cards'>(() => {
+    try {
+      const saved = localStorage.getItem('leads_view_mode')
+      return saved === 'cards' ? 'cards' : 'table'
+    } catch {
+      return 'table'
+    }
+  })
 
   // ── Keep in sync with server ───────────────────────────────────────────
   // When router.refresh() re-runs the server component, initialLeads gets a
@@ -474,6 +483,11 @@ export function LeadsClient({
     URL.revokeObjectURL(url)
   }
 
+  function setViewMode(mode: 'table' | 'cards') {
+    setLeadView(mode)
+    try { localStorage.setItem('leads_view_mode', mode) } catch {}
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5 pb-24">
@@ -543,6 +557,28 @@ export function LeadsClient({
             )}
           </div>
           <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={cn(
+                  'px-2.5 py-1 text-xs font-medium transition-colors flex items-center gap-1',
+                  leadView === 'table' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+              >
+                <Table2 className="h-3.5 w-3.5" /> Table
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={cn(
+                  'px-2.5 py-1 text-xs font-medium transition-colors flex items-center gap-1',
+                  leadView === 'cards' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Cards
+              </button>
+            </div>
             {/* Per-page selector */}
             <div className="flex items-center gap-1.5 text-sm">
               <span className="text-muted-foreground hidden sm:inline">Per page:</span>
@@ -612,26 +648,33 @@ export function LeadsClient({
         )}
       </div>
 
-      {/* ── Lead table ── */}
-      <LeadTable
-        leads={pageLeads}
-        selectedIds={selectedIds}
-        sortBy={filters.sortBy}
-        sortDir={filters.sortDir}
-        visibleColumns={visibleColumns}
-        columnOrder={columnOrder}
-        isAdmin={isAdmin}
-        onSelectAll={handleSelectAll}
-        onSelectRow={handleSelectRow}
-        onSort={handleSort}
-        onStatusChange={handleStatusChange}
-        onInterestChange={handleInterestChange}
-        onRowClick={(lead) => setSelectedLeadId(lead.id)}
-        onSendEmail={(lead) => {
-          window.location.href = `mailto:${lead.email}`
-        }}
-        onDeleteLead={handleDeleteLead}
-      />
+      {/* ── Lead view ── */}
+      {leadView === 'table' ? (
+        <LeadTable
+          leads={pageLeads}
+          selectedIds={selectedIds}
+          sortBy={filters.sortBy}
+          sortDir={filters.sortDir}
+          visibleColumns={visibleColumns}
+          columnOrder={columnOrder}
+          isAdmin={isAdmin}
+          onSelectAll={handleSelectAll}
+          onSelectRow={handleSelectRow}
+          onSort={handleSort}
+          onStatusChange={handleStatusChange}
+          onInterestChange={handleInterestChange}
+          onRowClick={(lead) => setSelectedLeadId(lead.id)}
+          onSendEmail={(lead) => {
+            window.location.href = `mailto:${lead.email}`
+          }}
+          onDeleteLead={handleDeleteLead}
+        />
+      ) : (
+        <LeadsCardsView
+          leads={pageLeads}
+          onOpenLead={(id) => setSelectedLeadId(id)}
+        />
+      )}
 
       {/* ── Pagination ── */}
       {totalPages > 1 && filters.perPage !== 0 && (
@@ -738,6 +781,55 @@ function Pagination({
 
         <PagBtn disabled={page >= totalPages} onClick={() => onChange(page + 1)}>Next →</PagBtn>
       </div>
+    </div>
+  )
+}
+
+function LeadsCardsView({
+  leads,
+  onOpenLead,
+}: {
+  leads: LeadRow[]
+  onOpenLead: (id: string) => void
+}) {
+  if (leads.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
+        No leads found.
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {leads.map((lead) => {
+        const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
+        const statusMeta = STATUS_CONFIG[lead.status]
+        const interestMeta = INTEREST_CONFIG[lead.interest_status]
+        return (
+          <button
+            key={lead.id}
+            type="button"
+            onClick={() => onOpenLead(lead.id)}
+            className="rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-foreground/25"
+          >
+            <p className="truncate font-semibold">{name}</p>
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">{lead.company ?? 'No company'}</p>
+            <p className="mt-2 truncate text-sm">{lead.email}</p>
+            <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <span className={cn('inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold', statusMeta.badge)}>
+                  {statusMeta.label}
+                </span>
+                <span className={cn('inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold', interestMeta.badge)}>
+                  {interestMeta.label}
+                </span>
+              </div>
+              <span>{new Date(lead.created_at).toLocaleDateString()}</span>
+            </div>
+          </button>
+        )
+      })}
     </div>
   )
 }

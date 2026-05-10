@@ -274,7 +274,7 @@ function AnalyticsContent({ userRole, userId }: Props) {
         )}
 
         {activeTab === 'reps' && isAdmin && (
-          <RepPerformanceTable reps={reps} loading={loadingReps} />
+          <RepPerformanceTable reps={reps} loading={loadingReps} start={start} end={end} />
         )}
 
         {activeTab === 'batches' && (

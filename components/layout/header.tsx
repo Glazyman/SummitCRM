@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { LogOut, User, Menu, Settings, ChevronDown, Search, X } from 'lucide-react'
+import Link from 'next/link'
+import { LogOut, User, Menu, Settings, ChevronDown, Search, X, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -61,6 +62,16 @@ interface HeaderProps {
   onMenuClick?:   () => void
 }
 
+interface SearchLead {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  company: string | null
+  title: string | null
+  status: string
+}
+
 export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) {
   const router   = useRouter()
   const pathname = usePathname()
@@ -69,8 +80,13 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [searchOpen,   setSearchOpen]   = useState(false)
   const [searchQuery,  setSearchQuery]  = useState('')
+  const [searchResults, setSearchResults] = useState<SearchLead[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<SearchLead | null>(null)
+  const [resultsOpen, setResultsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const searchRef   = useRef<HTMLInputElement>(null)
+  const searchBoxRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -81,6 +97,16 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
     if (dropdownOpen) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [dropdownOpen])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setResultsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // Open search with ⌘K
   useEffect(() => {
@@ -95,6 +121,33 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [])
+
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (q.length < 2) {
+      const clearId = window.setTimeout(() => {
+        setSearchResults([])
+        setSearchLoading(false)
+      }, 0)
+      return () => window.clearTimeout(clearId)
+    }
+
+    const id = window.setTimeout(async () => {
+      setSearchLoading(true)
+      try {
+        const res = await fetch(`/api/leads/search?q=${encodeURIComponent(q)}`)
+        const json = await res.json()
+        setSearchResults((json.leads ?? []) as SearchLead[])
+        setResultsOpen(true)
+      } catch {
+        setSearchResults([])
+      } finally {
+        setSearchLoading(false)
+      }
+    }, 180)
+
+    return () => window.clearTimeout(id)
+  }, [searchQuery])
 
   async function handleSignOut() {
     setDropdownOpen(false)
@@ -117,6 +170,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
     if (!searchQuery.trim()) return
     router.push(`/leads?q=${encodeURIComponent(searchQuery.trim())}`)
     setSearchOpen(false)
+    setResultsOpen(false)
     setSearchQuery('')
   }
 
@@ -149,28 +203,60 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
         </h1>
 
         {/* Search bar — pushes right with ml-auto but doesn't crowd buttons */}
-        <form
-          onSubmit={handleSearch}
-          className="ml-auto hidden md:flex w-56 lg:w-72 items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-muted-foreground shadow-card"
-        >
-          <Search className="h-3.5 w-3.5 shrink-0" />
-          <input
-            ref={searchRef}
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground min-w-0"
-            placeholder="Search leads…"
-          />
-          {searchQuery ? (
-            <button type="button" onClick={() => setSearchQuery('')} className="shrink-0 text-muted-foreground hover:text-foreground">
-              <X className="h-3 w-3" />
-            </button>
-          ) : (
-            <kbd className="hidden rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground sm:block shrink-0">
-              ⌘K
-            </kbd>
+        <div ref={searchBoxRef} className="relative ml-auto hidden md:block w-56 lg:w-72">
+          <form
+            onSubmit={handleSearch}
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-muted-foreground shadow-card"
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            <input
+              ref={searchRef}
+              value={searchQuery}
+              onFocus={() => { if (searchResults.length > 0) setResultsOpen(true) }}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground min-w-0"
+              placeholder="Search leads…"
+            />
+            {searchQuery ? (
+              <button type="button" onClick={() => { setSearchQuery(''); setResultsOpen(false) }} className="shrink-0 text-muted-foreground hover:text-foreground">
+                <X className="h-3 w-3" />
+              </button>
+            ) : (
+              <kbd className="hidden rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground sm:block shrink-0">
+                ⌘K
+              </kbd>
+            )}
+          </form>
+
+          {resultsOpen && (searchLoading || searchResults.length > 0) && (
+            <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-border bg-popover shadow-card">
+              {searchLoading ? (
+                <div className="px-3 py-2 text-xs text-muted-foreground">Searching…</div>
+              ) : (
+                <div className="max-h-80 overflow-auto py-1">
+                  {searchResults.map((lead) => (
+                    <button
+                      key={lead.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedLead(lead)
+                        setResultsOpen(false)
+                        setSearchQuery('')
+                      }}
+                      className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left hover:bg-muted"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{lead.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{lead.company ?? 'No company'} · {lead.email}</p>
+                      </div>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase text-muted-foreground">{lead.status}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
-        </form>
+        </div>
 
         {/* Right actions — always visible, shrink-0 prevents squishing */}
         <div className="flex shrink-0 items-center gap-1 ml-2">
@@ -277,6 +363,54 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
               Search for &quot;{searchQuery}&quot;
             </button>
           )}
+        </div>
+      )}
+
+      {selectedLead && (
+        <div className="fixed inset-0 z-50">
+          <button type="button" onClick={() => setSelectedLead(null)} className="absolute inset-0 bg-black/30" aria-label="Close contact card" />
+          <div className="absolute right-0 top-0 h-full w-full max-w-md border-l border-border bg-background shadow-2xl">
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lead Contact</p>
+                  <h3 className="text-base font-semibold">{selectedLead.name}</h3>
+                </div>
+                <button type="button" onClick={() => setSelectedLead(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label="Close">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="space-y-3 p-4 text-sm">
+                <div className="rounded-lg border border-border px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="font-medium">{selectedLead.email}</p>
+                </div>
+                <div className="rounded-lg border border-border px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Phone</p>
+                  <p className="font-medium">{selectedLead.phone ?? '—'}</p>
+                </div>
+                <div className="rounded-lg border border-border px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Company</p>
+                  <p className="font-medium">{selectedLead.company ?? '—'}</p>
+                </div>
+                <div className="rounded-lg border border-border px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Title</p>
+                  <p className="font-medium">{selectedLead.title ?? '—'}</p>
+                </div>
+                <div className="rounded-lg border border-border px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <p className="font-medium capitalize">{selectedLead.status.replace('_', ' ')}</p>
+                </div>
+                <Link
+                  href={`/leads/${selectedLead.id}`}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open Full Lead
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </>

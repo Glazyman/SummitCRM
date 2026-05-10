@@ -1,16 +1,15 @@
 'use client'
 
 import React from 'react'
-import { Phone, Calendar, AlertTriangle, CheckCircle2, Users } from 'lucide-react'
+import { Phone, Calendar, AlertTriangle, CheckCircle2, Users, X } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
-import { cn } from '@/lib/utils'
 import type { RepRow } from './types'
 
 const OUTCOME_COLORS: Record<string, string> = {
-  answered:     '#10b981',
-  voicemail:    '#a855f7',
-  no_answer:    '#94a3b8',
-  wrong_number: '#ef4444',
+  answered:     '#4b8f7a',
+  voicemail:    '#7c6aa7',
+  no_answer:    '#7f8b9a',
+  wrong_number: '#b56a6a',
 }
 
 function initials(name: string | null, email: string) {
@@ -57,14 +56,18 @@ function RepDonut({ rep }: { rep: RepRow }) {
 }
 
 // ── Single rep card ────────────────────────────────────────────────────────
-function RepCard({ rep, rank }: { rep: RepRow; rank: number }) {
+function RepCard({ rep, rank, onOpen }: { rep: RepRow; rank: number; onOpen: (rep: RepRow) => void }) {
   const answerRate  = rep.calls > 0 ? Math.round(rep.calls_answered / rep.calls * 100) : 0
   const fuTotal     = rep.follow_ups_pending + rep.follow_ups_completed
   const fuPct       = fuTotal > 0 ? Math.round(rep.follow_ups_completed / fuTotal * 100) : 0
   const maxOutcome  = Math.max(rep.calls_answered, rep.calls_voicemail, rep.calls_no_answer, rep.calls_wrong_number, 1)
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <button
+      type="button"
+      onClick={() => onOpen(rep)}
+      className="w-full text-left rounded-2xl border border-border bg-card overflow-hidden transition-colors hover:border-foreground/25"
+    >
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -143,7 +146,7 @@ function RepCard({ rep, rank }: { rep: RepRow; rank: number }) {
               </div>
               <div className="space-y-0.5 text-xs">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                  <CheckCircle2 className="h-3 w-3 text-emerald-700" />
                   <span>{rep.follow_ups_completed} done</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -176,10 +179,174 @@ function RepCard({ rep, rank }: { rep: RepRow; rank: number }) {
                   style={{ width: rep.leads_assigned > 0 ? `${Math.round(rep.leads_active / rep.leads_assigned * 100)}%` : '0%' }} />
               </div>
               {rep.leads_new > 0 && (
-                <div className="flex items-center justify-between rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-2 py-1">
-                  <span className="text-blue-600 dark:text-blue-400 font-medium">New (untouched)</span>
-                  <span className="font-bold text-blue-600 dark:text-blue-400">{rep.leads_new}</span>
+                <div className="flex items-center justify-between rounded-md bg-slate-100 border border-slate-300 px-2 py-1">
+                  <span className="text-slate-700 font-medium">New (untouched)</span>
+                  <span className="font-bold text-slate-800">{rep.leads_new}</span>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function RepDetailDrawer({
+  rep,
+  onClose,
+  detail,
+  loading,
+  error,
+  showMoreFollowUps,
+  setShowMoreFollowUps,
+  showMoreCalls,
+  setShowMoreCalls,
+}: {
+  rep: RepRow
+  onClose: () => void
+  detail: RepDetailData | null
+  loading: boolean
+  error: string | null
+  showMoreFollowUps: boolean
+  setShowMoreFollowUps: (v: boolean) => void
+  showMoreCalls: boolean
+  setShowMoreCalls: (v: boolean) => void
+}) {
+  const answerRate = rep.calls > 0 ? Math.round((rep.calls_answered / rep.calls) * 100) : 0
+  const voicemailRate = rep.calls > 0 ? Math.round((rep.calls_voicemail / rep.calls) * 100) : 0
+  const noAnswerRate = rep.calls > 0 ? Math.round((rep.calls_no_answer / rep.calls) * 100) : 0
+  const wrongRate = rep.calls > 0 ? Math.round((rep.calls_wrong_number / rep.calls) * 100) : 0
+  const followUpsTotal = rep.follow_ups_completed + rep.follow_ups_pending
+  const followUpCompletionRate = followUpsTotal > 0 ? Math.round((rep.follow_ups_completed / followUpsTotal) * 100) : 0
+  const leadActivityRate = rep.leads_assigned > 0 ? Math.round((rep.leads_active / rep.leads_assigned) * 100) : 0
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <button type="button" onClick={onClose} className="absolute inset-0 bg-black/30" aria-label="Close detail view" />
+      <div className="absolute right-0 top-0 h-full w-full max-w-2xl border-l border-border bg-background shadow-2xl">
+        <div className="flex h-full flex-col">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Rep Performance Detail</p>
+              <h3 className="text-lg font-semibold">{rep.full_name ?? rep.user_email}</h3>
+            </div>
+            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label="Close">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-auto p-5 space-y-5">
+            <div className="rounded-xl border border-border p-4">
+              <p className="mb-3 text-sm font-semibold">Calls</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <Stat label="Total Calls" value={rep.calls} />
+                <Stat label="Answered" value={`${rep.calls_answered} (${answerRate}%)`} />
+                <Stat label="Voicemail" value={`${rep.calls_voicemail} (${voicemailRate}%)`} />
+                <Stat label="No Answer" value={`${rep.calls_no_answer} (${noAnswerRate}%)`} />
+                <Stat label="Wrong Number" value={`${rep.calls_wrong_number} (${wrongRate}%)`} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border p-4">
+              <p className="mb-3 text-sm font-semibold">Follow-ups</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <Stat label="Pending" value={rep.follow_ups_pending} />
+                <Stat label="Completed" value={rep.follow_ups_completed} />
+                <Stat label="Overdue" value={rep.follow_ups_overdue} />
+                <Stat label="Completion Rate" value={`${followUpCompletionRate}%`} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border p-4">
+              <p className="mb-3 text-sm font-semibold">Leads</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <Stat label="Assigned" value={rep.leads_assigned} />
+                <Stat label="Active" value={rep.leads_active} />
+                <Stat label="New (Untouched)" value={rep.leads_new} />
+                <Stat label="Active Rate" value={`${leadActivityRate}%`} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border p-4">
+              <p className="mb-3 text-sm font-semibold">Follow-ups (Who They Are)</p>
+              {loading ? (
+                <p className="text-sm text-muted-foreground">Loading follow-ups…</p>
+              ) : error ? (
+                <p className="text-sm text-destructive">{error}</p>
+              ) : !detail || detail.followUps.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No follow-ups found for this range.</p>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {(showMoreFollowUps ? detail.followUps : detail.followUps.slice(0, 10)).map((fu) => {
+                      const leadName = fu.lead
+                        ? [fu.lead.first_name, fu.lead.last_name].filter(Boolean).join(' ') || fu.lead.email
+                        : 'Unknown lead'
+                      return (
+                        <div key={fu.id} className="rounded-md border border-border px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-medium truncate">{leadName}</p>
+                            <p className="text-xs text-muted-foreground">{new Date(fu.due_at).toLocaleString()}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {fu.lead?.company ? `${fu.lead.company} · ` : ''}{fu.title}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {detail.followUps.length > 10 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMoreFollowUps(!showMoreFollowUps)}
+                      className="mt-3 text-sm font-medium text-primary hover:underline"
+                    >
+                      {showMoreFollowUps ? 'Show less follow-ups' : `Show more follow-ups (${detail.followUps.length - 10} more)`}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border p-4">
+              <p className="mb-3 text-sm font-semibold">Recent Calls</p>
+              {loading ? (
+                <p className="text-sm text-muted-foreground">Loading calls…</p>
+              ) : error ? (
+                <p className="text-sm text-destructive">{error}</p>
+              ) : !detail || detail.calls.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No calls found for this range.</p>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {(showMoreCalls ? detail.calls : detail.calls.slice(0, 10)).map((call) => {
+                      const leadName = call.lead
+                        ? [call.lead.first_name, call.lead.last_name].filter(Boolean).join(' ') || call.lead.email
+                        : 'Unknown lead'
+                      return (
+                        <div key={call.id} className="rounded-md border border-border px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-medium truncate">{leadName}</p>
+                            <p className="text-xs text-muted-foreground">{new Date(call.called_at).toLocaleString()}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Outcome: {call.outcome.replace('_', ' ')}{call.notes ? ` · ${call.notes}` : ''}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {detail.calls.length > 10 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMoreCalls(!showMoreCalls)}
+                      className="mt-3 text-sm font-medium text-primary hover:underline"
+                    >
+                      {showMoreCalls ? 'Show less calls' : `Show more calls (${detail.calls.length - 10} more)`}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -189,10 +356,69 @@ function RepCard({ rep, rank }: { rep: RepRow; rank: number }) {
   )
 }
 
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-md bg-muted/40 px-3 py-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-0.5 font-semibold">{value}</p>
+    </div>
+  )
+}
+
 // ── Main export ───────────────────────────────────────────────────────────
 interface Props { reps: RepRow[]; loading?: boolean }
 
-export function RepPerformanceTable({ reps, loading }: Props) {
+interface RepDetailData {
+  followUps: Array<{
+    id: string
+    title: string
+    due_at: string
+    completed_at: string | null
+    notes: string | null
+    lead: { first_name: string | null; last_name: string | null; company: string | null; email: string } | null
+  }>
+  calls: Array<{
+    id: string
+    outcome: string
+    called_at: string
+    notes: string | null
+    lead: { first_name: string | null; last_name: string | null; company: string | null; email: string } | null
+  }>
+}
+
+export function RepPerformanceTable({ reps, loading, start, end }: Props & { start?: string; end?: string }) {
+  const [selectedRep, setSelectedRep] = React.useState<RepRow | null>(null)
+  const [detail, setDetail] = React.useState<RepDetailData | null>(null)
+  const [detailLoading, setDetailLoading] = React.useState(false)
+  const [detailError, setDetailError] = React.useState<string | null>(null)
+  const [showMoreFollowUps, setShowMoreFollowUps] = React.useState(false)
+  const [showMoreCalls, setShowMoreCalls] = React.useState(false)
+
+  React.useEffect(() => {
+    async function loadDetail() {
+      if (!selectedRep) return
+      setDetailLoading(true)
+      setDetailError(null)
+      setDetail(null)
+      setShowMoreFollowUps(false)
+      setShowMoreCalls(false)
+      try {
+        const params = new URLSearchParams()
+        if (start) params.set('start', start)
+        if (end) params.set('end', end)
+        const res = await fetch(`/api/analytics/reps/${selectedRep.user_id}?${params.toString()}`)
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error ?? 'Failed to load rep detail')
+        setDetail(json as RepDetailData)
+      } catch (err) {
+        setDetailError(err instanceof Error ? err.message : 'Failed to load rep detail')
+      } finally {
+        setDetailLoading(false)
+      }
+    }
+    void loadDetail()
+  }, [selectedRep, start, end])
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -219,9 +445,23 @@ export function RepPerformanceTable({ reps, loading }: Props) {
       <p className="text-sm text-muted-foreground">{reps.length} rep{reps.length !== 1 ? 's' : ''} · ranked by call volume</p>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {sorted.map((rep, i) => (
-          <RepCard key={rep.user_id} rep={rep} rank={i + 1} />
+          <RepCard key={rep.user_id} rep={rep} rank={i + 1} onOpen={setSelectedRep} />
         ))}
       </div>
+
+      {selectedRep && (
+        <RepDetailDrawer
+          rep={selectedRep}
+          onClose={() => setSelectedRep(null)}
+          detail={detail}
+          loading={detailLoading}
+          error={detailError}
+          showMoreFollowUps={showMoreFollowUps}
+          setShowMoreFollowUps={setShowMoreFollowUps}
+          showMoreCalls={showMoreCalls}
+          setShowMoreCalls={setShowMoreCalls}
+        />
+      )}
     </div>
   )
 }
