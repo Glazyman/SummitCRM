@@ -35,42 +35,52 @@ export async function GET() {
 
     const { admin, member } = ctx
 
-    const [{ data: ws }, { data: overrides }, { data: members }] = await Promise.all([
+    const [wsRes, overridesRes, membersRes] = await Promise.all([
       admin
         .from('workspaces')
         .select('settings')
         .eq('id', member.workspace_id)
-        .single() as Promise<{ data: { settings: Record<string, unknown> } | null }>,
+        .single(),
 
       admin
         .from('rep_call_targets')
         .select('user_id, daily_target')
-        .eq('workspace_id', member.workspace_id) as Promise<{ data: Array<{ user_id: string; daily_target: number }> | null }>,
+        .eq('workspace_id', member.workspace_id),
 
       admin
         .from('workspace_members')
         .select('user_id, role, is_active, users:user_id(email, raw_user_meta_data)')
         .eq('workspace_id', member.workspace_id)
-        .eq('is_active', true) as Promise<{ data: Array<{ user_id: string; role: string; is_active: boolean; users: { email: string | null; raw_user_meta_data: Record<string, unknown> | null } | null }> | null }>,
+        .eq('is_active', true),
     ])
+
+    const ws = wsRes.data as { settings?: Record<string, unknown> } | null
+    const overrides = (overridesRes.data ?? []) as Array<{ user_id: string; daily_target: number }>
+    const members = (membersRes.data ?? []) as Array<{
+      user_id: string
+      role: string
+      is_active: boolean
+      users: Array<{ email: string | null; raw_user_meta_data: Record<string, unknown> | null }> | null
+    }>
 
     const workspaceDefault = Number(ws?.settings?.daily_call_target)
     const defaultDailyTarget = Number.isFinite(workspaceDefault) && workspaceDefault > 0
       ? Math.floor(workspaceDefault)
       : DEFAULT_DAILY_TARGET
 
-    const overrideByUser = new Map((overrides ?? []).map((r) => [r.user_id, r.daily_target]))
+    const overrideByUser = new Map(overrides.map((r) => [r.user_id, r.daily_target]))
 
-    const reps = (members ?? [])
+    const reps = members
       .filter((m) => m.role === 'rep')
       .map((m) => {
-        const meta = m.users?.raw_user_meta_data ?? {}
+        const userRow = m.users?.[0] ?? null
+        const meta = userRow?.raw_user_meta_data ?? {}
         const fullName = (meta.full_name as string | undefined) ?? (meta.name as string | undefined) ?? null
         const override = overrideByUser.get(m.user_id) ?? null
         return {
           user_id: m.user_id,
           full_name: fullName,
-          email: m.users?.email ?? null,
+          email: userRow?.email ?? null,
           override_daily_target: override,
           effective_daily_target: override ?? defaultDailyTarget,
         }
@@ -97,7 +107,7 @@ export async function PATCH(req: NextRequest) {
       overrides?: Array<{ user_id: string; daily_target: number | null }>
     }
 
-    const updates: Promise<unknown>[] = []
+    const updates: PromiseLike<unknown>[] = []
 
     if (body.workspace_default_daily_target !== undefined) {
       const nextDefault = parsePositiveInt(body.workspace_default_daily_target)
@@ -105,12 +115,13 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'workspace_default_daily_target must be an integer between 1 and 10000' }, { status: 422 })
       }
 
-      const { data: ws } = await admin
+      const wsRes = await admin
         .from('workspaces')
         .select('settings')
         .eq('id', member.workspace_id)
-        .single() as { data: { settings: Record<string, unknown> } | null }
+        .single()
 
+      const ws = wsRes.data as { settings?: Record<string, unknown> } | null
       const nextSettings = { ...(ws?.settings ?? {}), daily_call_target: nextDefault }
       updates.push(
         admin
@@ -125,13 +136,15 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'overrides must be an array' }, { status: 422 })
       }
 
-      const { data: repMembers } = await admin
+      const repMembersRes = await admin
         .from('workspace_members')
         .select('user_id, role')
         .eq('workspace_id', member.workspace_id)
-        .eq('is_active', true) as { data: Array<{ user_id: string; role: string }> | null }
+        .eq('is_active', true)
 
-      const repIds = new Set((repMembers ?? []).filter((m) => m.role === 'rep').map((m) => m.user_id))
+      const repMembers = (repMembersRes.data ?? []) as Array<{ user_id: string; role: string }>
+
+      const repIds = new Set(repMembers.filter((m) => m.role === 'rep').map((m) => m.user_id))
 
       for (const item of body.overrides) {
         if (!item || typeof item.user_id !== 'string' || !repIds.has(item.user_id)) {
