@@ -17,7 +17,6 @@ import {
   ChevronRight,
   LogOut,
   UserCog,
-  PhoneCall,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -39,7 +38,6 @@ const mainNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Leads',     href: '/leads',     icon: Users },
   { label: 'Pipeline',  href: '/pipeline',  icon: Kanban },
-  { label: 'Callbacks', href: '/callbacks', icon: PhoneCall },
   { label: 'Activities',href: '/activities',icon: ListChecks },
 ]
 

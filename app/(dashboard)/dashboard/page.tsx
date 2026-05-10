@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     ? await getDashboardMetrics(supabase, member.workspace_id, user.id, member.role)
     : emptyDashboardMetrics()
   const gamePlan = member && user && role === 'rep'
-    ? await getRepGamePlan(supabase, member.workspace_id, user.id)
+    ? await getRepFollowUpsToday(supabase, member.workspace_id, user.id)
     : null
   const totalLeadsDescription =
     role === 'rep' || false ? 'assigned to you' : 'in workspace'
@@ -139,14 +139,10 @@ type GamePlanLead = {
   name:      string
   company:   string | null
   dueAt?:    string
-  createdAt?: string
-  callbackAt?: string
 }
 
-type RepGamePlan = {
+type RepFollowUpsToday = {
   followUpsDueToday: GamePlanLead[]
-  newLeadsFirstContact: GamePlanLead[]
-  callbacksRequested: GamePlanLead[]
 }
 
 function emptyDashboardMetrics(): DashboardMetrics {
@@ -281,55 +277,27 @@ function leadName(first: string | null, last: string | null, email: string) {
   return [first, last].filter(Boolean).join(' ') || email
 }
 
-function formatRelativeDay(iso?: string) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  const days = Math.floor((Date.now() - d.getTime()) / 86400000)
-  if (days <= 0) return 'today'
-  if (days === 1) return '1 day ago'
-  return `${days} days ago`
-}
-
-async function getRepGamePlan(
+async function getRepFollowUpsToday(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
   userId: string
-): Promise<RepGamePlan> {
+): Promise<RepFollowUpsToday> {
   const now = new Date()
   const start = new Date(now)
   start.setHours(0, 0, 0, 0)
   const end = new Date(now)
   end.setHours(23, 59, 59, 999)
 
-  const [followUpsResult, newLeadsResult, callbacksResult] = await Promise.all([
-    supabase
-      .from('follow_ups')
-      .select('lead_id, due_at, leads!inner(first_name,last_name,email,company)')
-      .eq('workspace_id', workspaceId)
-      .eq('assigned_to', userId)
-      .is('completed_at', null)
-      .gte('due_at', start.toISOString())
-      .lte('due_at', end.toISOString())
-      .order('due_at', { ascending: true })
-      .limit(8),
-    supabase
-      .from('leads')
-      .select('id, first_name, last_name, email, company, created_at')
-      .eq('workspace_id', workspaceId)
-      .eq('assigned_to', userId)
-      .eq('status', 'new')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true })
-      .limit(8),
-    supabase
-      .from('call_logs')
-      .select('lead_id, called_at, leads!inner(first_name,last_name,email,company,assigned_to)')
-      .eq('workspace_id', workspaceId)
-      .eq('outcome', 'callback_requested')
-      .eq('leads.assigned_to', userId)
-      .order('called_at', { ascending: false })
-      .limit(40),
-  ])
+  const followUpsResult = await supabase
+    .from('follow_ups')
+    .select('lead_id, due_at, leads!inner(first_name,last_name,email,company)')
+    .eq('workspace_id', workspaceId)
+    .eq('assigned_to', userId)
+    .is('completed_at', null)
+    .gte('due_at', start.toISOString())
+    .lte('due_at', end.toISOString())
+    .order('due_at', { ascending: true })
+    .limit(12)
 
   const followUpsDueToday = ((followUpsResult.data ?? []) as Array<{
     lead_id: string
@@ -342,74 +310,33 @@ async function getRepGamePlan(
     dueAt: r.due_at,
   }))
 
-  const newLeadsFirstContact = ((newLeadsResult.data ?? []) as Array<{
-    id: string
-    first_name: string | null
-    last_name: string | null
-    email: string
-    company: string | null
-    created_at: string
-  }>).map((r) => ({
-    leadId: r.id,
-    name: leadName(r.first_name, r.last_name, r.email),
-    company: r.company,
-    createdAt: r.created_at,
-  }))
-
-  const callbackRows = (callbacksResult.data ?? []) as Array<{
-    lead_id: string
-    called_at: string
-    leads: { first_name: string | null; last_name: string | null; email: string; company: string | null } | null
-  }>
-  const seen = new Set<string>()
-  const callbacksRequested: GamePlanLead[] = []
-  for (const row of callbackRows) {
-    if (seen.has(row.lead_id)) continue
-    seen.add(row.lead_id)
-    callbacksRequested.push({
-      leadId: row.lead_id,
-      name: leadName(row.leads?.first_name ?? null, row.leads?.last_name ?? null, row.leads?.email ?? 'Lead'),
-      company: row.leads?.company ?? null,
-      callbackAt: row.called_at,
-    })
-    if (callbacksRequested.length >= 8) break
-  }
-
-  return { followUpsDueToday, newLeadsFirstContact, callbacksRequested }
+  return { followUpsDueToday }
 }
 
-function TodayGamePlan({ plan }: { plan: RepGamePlan }) {
-  const sections = [
-    { title: 'Follow-ups Due Today', rows: plan.followUpsDueToday, meta: (r: GamePlanLead) => r.dueAt ? new Date(r.dueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '' },
-    { title: 'New Leads To First-Contact', rows: plan.newLeadsFirstContact, meta: (r: GamePlanLead) => `added ${formatRelativeDay(r.createdAt)}` },
-    { title: 'Callbacks Requested', rows: plan.callbacksRequested, meta: (r: GamePlanLead) => `requested ${formatRelativeDay(r.callbackAt)}` },
-  ]
-
+function TodayGamePlan({ plan }: { plan: RepFollowUpsToday }) {
   return (
     <Card>
       <CardContent className="pt-5">
         <div className="mb-4">
           <h2 className="text-base font-semibold">Today&apos;s Game Plan</h2>
         </div>
-        <div className="grid gap-4 lg:grid-cols-3">
-          {sections.map((section) => (
-            <div key={section.title} className="rounded-xl border border-border">
-              <div className="border-b border-border px-3 py-2">
-                <p className="text-sm font-medium">{section.title}</p>
-                <p className="text-xs text-muted-foreground">{section.rows.length} leads</p>
-              </div>
-              <div className="divide-y divide-border">
-                {section.rows.length === 0 ? (
-                  <div className="px-3 py-6 text-sm text-muted-foreground">No items</div>
-                ) : section.rows.map((row) => (
-                  <Link key={`${section.title}-${row.leadId}`} href={`/leads/${row.leadId}`} className="block px-3 py-2 hover:bg-muted/40">
-                    <p className="truncate text-sm font-medium">{row.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{row.company ?? 'No company'} · {section.meta(row)}</p>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="rounded-xl border border-border">
+          <div className="border-b border-border px-3 py-2">
+            <p className="text-sm font-medium">Follow-ups Due Today</p>
+            <p className="text-xs text-muted-foreground">{plan.followUpsDueToday.length} leads</p>
+          </div>
+          <div className="divide-y divide-border">
+            {plan.followUpsDueToday.length === 0 ? (
+              <div className="px-3 py-6 text-sm text-muted-foreground">No follow-ups due today.</div>
+            ) : plan.followUpsDueToday.map((row) => (
+              <Link key={row.leadId} href={`/leads/${row.leadId}`} className="block px-3 py-2 hover:bg-muted/40">
+                <p className="truncate text-sm font-medium">{row.name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {row.company ?? 'No company'} · {row.dueAt ? new Date(row.dueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                </p>
+              </Link>
+            ))}
+          </div>
         </div>
       </CardContent>
     </Card>
