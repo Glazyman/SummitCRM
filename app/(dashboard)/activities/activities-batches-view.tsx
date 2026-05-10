@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Database, RefreshCw, Pencil, Trash2, X, ExternalLink } from 'lucide-react'
+import { Database, RefreshCw, Pencil, Trash2, X, ExternalLink, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
@@ -149,16 +149,15 @@ export function BatchesView({ isAdmin, currentUserId, teamMembers }: Props) {
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Batch</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Leads</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Created</th>
-                {isAdmin && <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Actions</th>}
+                <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {batches.map(batch => (
                 <tr
                   key={batch.id}
-                  onClick={() => openBatchLeads(batch)}
                   className={cn(
-                    'cursor-pointer transition-colors hover:bg-muted/30',
+                    'group transition-colors',
                     openBatch?.id === batch.id && 'bg-primary/5'
                   )}
                 >
@@ -167,28 +166,44 @@ export function BatchesView({ isAdmin, currentUserId, teamMembers }: Props) {
                   <td className="px-5 py-3 text-muted-foreground">
                     {new Date(batch.createdAt).toLocaleDateString()}
                   </td>
-                  {isAdmin && (
-                    <td className="px-5 py-3 text-right" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => renameBatch(batch)}
-                          disabled={!!renamingId}
-                          className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                          title="Rename"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => deleteBatch(batch)}
-                          disabled={deletingId === batch.id}
-                          className="rounded p-1 text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  )}
+                  <td className="px-5 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {/* View leads */}
+                      <button
+                        onClick={() => openBatchLeads(batch)}
+                        className={cn(
+                          'flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                          openBatch?.id === batch.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground'
+                        )}
+                        title="View leads"
+                      >
+                        View leads
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                      {isAdmin && (
+                        <>
+                          <button
+                            onClick={() => renameBatch(batch)}
+                            disabled={!!renamingId}
+                            className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            title="Rename"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => deleteBatch(batch)}
+                            disabled={deletingId === batch.id}
+                            className="rounded p-1 text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
