@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient() as any
   const admin    = createAdminClient() as any
 
-  // Fetch invitation
-  const { data: invitation, error: invErr } = await supabase
+  // Fetch invitation via admin client — user is unauthenticated so RLS would block
+  const { data: invitation, error: invErr } = await admin
     .from('invitations')
     .select('id, workspace_id, email, role, expires_at, accepted_at')
     .eq('token', token)

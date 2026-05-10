@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { Metadata } from 'next'
 import AcceptInviteClient from './accept-invite-client'
 
@@ -13,10 +13,11 @@ export default async function AcceptInvitePage({
   const { token } = await searchParams
   if (!token) redirect('/login')
 
-  const supabase = await createClient() as any
+  // Use admin client — the visitor is unauthenticated so RLS would block a regular client
+  const admin = createAdminClient() as any
 
   // Look up the invitation
-  const { data: invitation } = await supabase
+  const { data: invitation } = await admin
     .from('invitations')
     .select('id, workspace_id, email, role, expires_at, accepted_at, workspaces(name)')
     .eq('token', token)
