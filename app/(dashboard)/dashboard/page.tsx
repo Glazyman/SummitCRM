@@ -117,31 +117,24 @@ export default async function DashboardPage() {
             <ol className="space-y-3">
               <SetupStep
                 number={1}
-                title="Add a sending account"
-                description="Connect a Resend API key or SMTP account to start sending emails."
-                href="/settings/sending-accounts"
-                done={metrics.setup.hasSendingAccount}
-              />
-              <SetupStep
-                number={2}
                 title="Import your first leads"
                 description="Upload a CSV file to bring your prospects into the CRM."
                 href="/leads"
                 done={metrics.setup.hasLeads}
               />
               <SetupStep
-                number={3}
+                number={2}
                 title="Invite your team"
                 description="Add reps and admins to your workspace."
                 href="/settings/team"
                 done={metrics.setup.hasTeamMembers}
               />
               <SetupStep
-                number={4}
-                title="Create your first campaign"
-                description="Set up a multi-step email sequence for your leads."
-                href="/campaigns"
-                done={metrics.setup.hasCampaign}
+                number={3}
+                title="Assign leads to reps"
+                description="Go to a lead and assign it to a rep so they can start calling."
+                href="/leads"
+                done={false}
               />
             </ol>
           </CardContent>
@@ -208,10 +201,8 @@ type DashboardMetrics = {
   unreadNotifications: number
   followUpsDue: number
   setup: {
-    hasSendingAccount: boolean
     hasLeads: boolean
     hasTeamMembers: boolean
-    hasCampaign: boolean
   }
 }
 
@@ -224,10 +215,8 @@ function emptyDashboardMetrics(): DashboardMetrics {
     unreadNotifications: 0,
     followUpsDue: 0,
     setup: {
-      hasSendingAccount: false,
       hasLeads: false,
       hasTeamMembers: false,
-      hasCampaign: false,
     },
   }
 }
@@ -239,29 +228,18 @@ async function getDashboardMetrics(
   role: WorkspaceRole | undefined
 ): Promise<DashboardMetrics> {
   const now = new Date()
-  const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - 7)
-  const startOf30Days = new Date(now)
-  startOf30Days.setDate(now.getDate() - 30)
 
   const [
     leadsResult,
     newLeadsResult,
-    emailsThisWeekResult,
-    sentLast30Result,
-    openedLast30Result,
-    unreadResult,
     followUpsDueResult,
-    sendingAccountsResult,
     membersResult,
-    campaignsResult,
   ] = await Promise.all([
     supabase
       .from('leads')
       .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null),
-    // New leads assigned to this user (status = 'new', never contacted)
     supabase
       .from('leads')
       .select('id', { count: 'exact', head: true })
@@ -270,65 +248,30 @@ async function getDashboardMetrics(
       .eq('status', 'new')
       .is('deleted_at', null),
     supabase
-      .from('emails')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .gte('sent_at', startOfWeek.toISOString()),
-    supabase
-      .from('emails')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .gte('sent_at', startOf30Days.toISOString()),
-    supabase
-      .from('emails')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .gte('sent_at', startOf30Days.toISOString())
-      .not('opened_at', 'is', null),
-    supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', userId)
-      .eq('is_read', false),
-    supabase
       .from('follow_ups')
       .select('id', { count: 'exact', head: true })
       .eq('assigned_to', userId)
       .is('completed_at', null)
       .lte('due_at', now.toISOString()),
     supabase
-      .from('sending_accounts')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .eq('is_active', true),
-    supabase
       .from('workspace_members')
       .select('user_id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
       .eq('is_active', true),
-    supabase
-      .from('campaigns')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId),
   ])
 
-  const sentLast30 = sentLast30Result.count ?? 0
-  const openedLast30 = openedLast30Result.count ?? 0
   const canManageSetup = role === 'admin' || role === 'super_admin'
 
   return {
     totalLeads: leadsResult.count ?? 0,
     newLeads: newLeadsResult.count ?? 0,
-    emailsSentThisWeek: emailsThisWeekResult.count ?? 0,
-    openRateLast30Days: sentLast30 > 0 ? Math.round((openedLast30 / sentLast30) * 100) : 0,
-    unreadNotifications: unreadResult.count ?? 0,
+    emailsSentThisWeek: 0,
+    openRateLast30Days: 0,
+    unreadNotifications: 0,
     followUpsDue: followUpsDueResult.count ?? 0,
     setup: {
-      hasSendingAccount: canManageSetup && (sendingAccountsResult.count ?? 0) > 0,
       hasLeads: (leadsResult.count ?? 0) > 0,
       hasTeamMembers: canManageSetup && (membersResult.count ?? 0) > 1,
-      hasCampaign: canManageSetup && (campaignsResult.count ?? 0) > 0,
     },
   }
 }

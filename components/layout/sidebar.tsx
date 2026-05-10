@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
-  Send,
   BarChart2,
   Settings,
   Bell,
@@ -34,7 +33,6 @@ const mainNav: NavItem[] = [
   { label: 'Leads',     href: '/leads',     icon: Users },
   { label: 'Pipeline',   href: '/pipeline',   icon: Kanban },
   { label: 'Activities', href: '/activities', icon: ListChecks },
-  { label: 'Campaigns',  href: '/campaigns',  icon: Send,     minRole: 'admin' },
   { label: 'Analytics', href: '/analytics', icon: BarChart2, minRole: 'admin' },
   { label: 'Admin',     href: '/admin',     icon: Shield,    minRole: 'admin' },
 ]

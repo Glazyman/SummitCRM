@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Send, Bell, User, Cpu } from 'lucide-react'
+import { Users, Bell, User, Cpu } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Settings' }
 
@@ -20,13 +20,6 @@ const ALL_SECTIONS = [
     icon:        Users,
     title:       'Team Members',
     description: 'Manage team members and their roles.',
-    adminOnly:   true,
-  },
-  {
-    href:        '/settings/sending-accounts',
-    icon:        Send,
-    title:       'Sending Accounts',
-    description: 'Connect Resend API keys and SMTP accounts.',
     adminOnly:   true,
   },
   {
