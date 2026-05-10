@@ -352,7 +352,7 @@ interface EditFollowUpModalProps {
 function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onClose, onSave }: EditFollowUpModalProps) {
   const [title,      setTitle]      = React.useState(followUp.title)
   const [notes,      setNotes]      = React.useState(followUp.notes ?? '')
-  const [dueAt,      setDueAt]      = React.useState(followUp.due_at.slice(0, 16))
+  const [dueAt,      setDueAt]      = React.useState(() => toLocalDatetimeInput(new Date(followUp.due_at)))
   const [assignedTo, setAssignedTo] = React.useState(followUp.assigned_to ?? currentUserId)
   const [saving,     setSaving]     = React.useState(false)
   const [error,      setError]      = React.useState<string | null>(null)
@@ -445,21 +445,31 @@ function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onCl
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+
+/** Format a Date as the local "YYYY-MM-DDTHH:MM" string that datetime-local inputs expect. */
+function toLocalDatetimeInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** Default follow-up time: tomorrow at the next round hour, in local time. */
 function defaultDueAt(): string {
   const d = new Date(Date.now() + 24 * 3600000)
   d.setMinutes(0, 0, 0)
-  return d.toISOString().slice(0, 16)
+  return toLocalDatetimeInput(d)
 }
 
+/** Compare calendar dates (ignoring time-of-day) so a 11 pm follow-up still reads "today". */
 function formatDue(iso: string): string {
-  const d    = new Date(iso)
-  const now  = new Date()
-  const diff = d.getTime() - now.getTime()
-  const days = Math.round(diff / 86400000)
+  const d   = new Date(iso)
+  const now = new Date()
+  const todayMidnight = new Date(now.getFullYear(),  now.getMonth(),  now.getDate())
+  const dueMidnight   = new Date(d.getFullYear(),    d.getMonth(),    d.getDate())
+  const days = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / 86400000)
   if (days < 0)   return `${Math.abs(days)}d overdue`
-  if (days === 0)  return 'Due today'
-  if (days === 1)  return 'Due tomorrow'
-  if (days < 7)   return `Due in ${days}d`
+  if (days === 0) return `Due today · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+  if (days === 1) return 'Due tomorrow'
+  if (days < 7)  return `Due in ${days}d`
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 

@@ -48,12 +48,15 @@ function leadName(lead: Lead | null) {
 }
 
 function fmtDate(iso: string) {
-  const d = new Date(iso)
+  const d   = new Date(iso)
   const now = new Date()
-  const diffDays = Math.ceil((d.getTime() - now.getTime()) / 86400000)
-  if (diffDays < 0)   return { label: `${Math.abs(diffDays)}d overdue`, overdue: true }
-  if (diffDays === 0)  return { label: 'Today',    overdue: false }
-  if (diffDays === 1)  return { label: 'Tomorrow', overdue: false }
+  // Compare calendar days so a 11pm follow-up still reads "Today" at 8am
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const dueMidnight   = new Date(d.getFullYear(),   d.getMonth(),   d.getDate())
+  const days = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / 86400000)
+  if (days < 0)   return { label: `${Math.abs(days)}d overdue`, overdue: true }
+  if (days === 0) return { label: 'Today', overdue: false }
+  if (days === 1) return { label: 'Tomorrow', overdue: false }
   return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), overdue: false }
 }
 
