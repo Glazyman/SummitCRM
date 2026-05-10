@@ -27,6 +27,7 @@ export interface LeadRow {
   batch_name:       string | null
   assigned_to:      string | null
   assigned_name:    string | null  // joined from workspace_members
+  last_contacted_at:string | null
   last_activity_at: string | null
   tags:             { id: string; name: string; color: string }[]
   custom_fields:    Record<string, string>

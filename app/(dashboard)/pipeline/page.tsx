@@ -52,6 +52,25 @@ export default async function PipelinePage() {
     assigned_to: string | null; batch_id: string | null; created_at: string; updated_at: string
   }>
 
+  const leadIds = rawLeads.map((l) => l.id)
+  const { data: callLogsRaw } = leadIds.length > 0
+    ? await supabase
+        .from('call_logs')
+        .select('lead_id, called_at')
+        .in('lead_id', leadIds)
+        .order('called_at', { ascending: false })
+    : { data: [] as Array<{ lead_id: string; called_at: string }> }
+
+  const lastContactedMap = new Map<string, string>()
+  for (const row of (callLogsRaw ?? []) as Array<{ lead_id: string; called_at: string }>) {
+    if (!lastContactedMap.has(row.lead_id)) lastContactedMap.set(row.lead_id, row.called_at)
+  }
+
+  const leadsWithContact = rawLeads.map((lead) => ({
+    ...lead,
+    last_contacted_at: lastContactedMap.get(lead.id) ?? null,
+  }))
+
   const isAdmin = ['admin', 'super_admin'].includes(member.role)
 
   // If no stages exist yet, use defaults (will be seeded on first load)
@@ -68,7 +87,7 @@ export default async function PipelinePage() {
   return (
     <PipelineClient
       stages={defaultStages as any}
-      initialLeads={rawLeads as any}
+      initialLeads={leadsWithContact as any}
       workspaceId={member.workspace_id}
       isAdmin={isAdmin}
       currentUserId={user.id}

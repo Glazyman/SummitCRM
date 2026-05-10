@@ -79,7 +79,7 @@ export default async function LeadsPage() {
 
       teamMembers = memberIds.map((id) => ({ id, name: usersById.get(id) ?? id }))
 
-      leads = ((leadsResult.data ?? []) as Array<{
+      const rawLeads = (leadsResult.data ?? []) as Array<{
         id: string
         workspace_id: string
         first_name: string | null
@@ -98,12 +98,29 @@ export default async function LeadsPage() {
         custom_fields: Record<string, string> | null
         created_at: string
         updated_at: string
-      }>).map((lead) => ({
+      }>
+
+      const leadIds = rawLeads.map((l) => l.id)
+      const { data: callLogsRaw } = leadIds.length > 0
+        ? await supabase
+            .from('call_logs')
+            .select('lead_id, called_at')
+            .in('lead_id', leadIds)
+            .order('called_at', { ascending: false })
+        : { data: [] as Array<{ lead_id: string; called_at: string }> }
+
+      const lastContactedMap = new Map<string, string>()
+      for (const row of (callLogsRaw ?? []) as Array<{ lead_id: string; called_at: string }>) {
+        if (!lastContactedMap.has(row.lead_id)) lastContactedMap.set(row.lead_id, row.called_at)
+      }
+
+      leads = rawLeads.map((lead) => ({
         ...lead,
         interest_status:  lead.interest_status  ?? 'pending',
         pipeline_stage_id: lead.pipeline_stage_id ?? null,
         batch_name:        lead.batch_id ? batchNames.get(lead.batch_id) ?? null : null,
         assigned_name:     lead.assigned_to ? usersById.get(lead.assigned_to) ?? null : null,
+        last_contacted_at: lastContactedMap.get(lead.id) ?? null,
         last_activity_at:  null,
         tags:              [],
         custom_fields:     lead.custom_fields ?? {},

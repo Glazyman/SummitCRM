@@ -27,6 +27,7 @@ interface PipelineLead {
   phone: string | null; status: string; interest_status: InterestStatus
   pipeline_stage_id: string | null; assigned_to: string | null
   batch_id: string | null; created_at: string; updated_at: string
+  last_contacted_at: string | null
 }
 interface Props {
   stages: PipelineStage[]; initialLeads: PipelineLead[]
@@ -299,7 +300,9 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
                             <p className="truncate text-sm font-medium">{name}</p>
                             <p className="truncate text-xs text-muted-foreground">{lead.company ?? 'No company'} · {lead.email}</p>
                           </div>
-                          <span className="text-xs text-muted-foreground">{timeAgo(lead.created_at)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {lead.last_contacted_at ? `Last contacted ${timeAgo(lead.last_contacted_at)}` : `Added ${timeAgo(lead.created_at)}`}
+                          </span>
                         </button>
                       )
                     })}
@@ -413,11 +416,10 @@ function LeadCard({
           </div>
           <span className="text-[10px] text-muted-foreground/80 shrink-0 flex items-center gap-0.5 whitespace-nowrap">
             <Clock className="h-2.5 w-2.5" />
-            {timeAgo(lead.created_at)}
+            {lead.last_contacted_at ? `Contacted ${timeAgo(lead.last_contacted_at)}` : `Added ${timeAgo(lead.created_at)}`}
           </span>
         </div>
       </div>
     </div>
   )
 }
-

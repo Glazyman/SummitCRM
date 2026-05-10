@@ -429,6 +429,7 @@ export function LeadsClient({
         batch_name:       batches.find((b) => b.id === lead.batch_id)?.name ?? null,
         assigned_to:      lead.assigned_to ?? null,
         assigned_name:    teamMembers.find((m) => m.id === lead.assigned_to)?.name ?? null,
+        last_contacted_at:null,
         last_activity_at: null,
         tags:             [],
         custom_fields:    lead.custom_fields ?? {},

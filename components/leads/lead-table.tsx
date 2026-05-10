@@ -294,8 +294,14 @@ function LeadCell({ colId, lead, isAdmin, onStatusChange, onInterestChange }: {
       return <td className="px-5 py-4 text-muted-foreground">{lead.title ?? <span className="text-muted-foreground/40">—</span>}</td>
     case 'last_activity':
       return (
-        <td className="px-5 py-4 text-xs text-muted-foreground whitespace-nowrap">
-          {lead.last_activity_at ? relativeTime(lead.last_activity_at) : <span className="text-muted-foreground/40">No activity</span>}
+        <td className="px-5 py-4 text-xs text-muted-foreground">
+          {lead.last_contacted_at ? (
+            <span className="whitespace-nowrap">Last contacted {relativeTime(lead.last_contacted_at)}</span>
+          ) : lead.last_activity_at ? (
+            <span className="whitespace-nowrap">Last activity {relativeTime(lead.last_activity_at)}</span>
+          ) : (
+            <span className="text-muted-foreground/40">Not contacted</span>
+          )}
         </td>
       )
     case 'tags':
