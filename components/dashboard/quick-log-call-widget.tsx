@@ -23,6 +23,13 @@ type FollowUpSuggestion = {
   due_at: string
 }
 
+function tomorrowAt11LocalIso() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(11, 0, 0, 0)
+  return d.toISOString()
+}
+
 const OUTCOMES: Array<{ id: CallOutcome; label: string }> = [
   { id: 'answered', label: 'Answered' },
   { id: 'voicemail', label: 'Voicemail' },
@@ -126,7 +133,14 @@ export function QuickLogCallWidget() {
       if (!res.ok) throw new Error(json.error ?? 'Failed to log call')
 
       setSuccess('Call logged.')
-      setFollowUpSuggestion((json.follow_up_suggestion ?? null) as FollowUpSuggestion | null)
+      if (json.follow_up_suggestion) {
+        setFollowUpSuggestion({
+          ...(json.follow_up_suggestion as FollowUpSuggestion),
+          due_at: tomorrowAt11LocalIso(),
+        })
+      } else {
+        setFollowUpSuggestion(null)
+      }
       if (!json.follow_up_suggestion) {
         setTimeout(() => {
           window.location.reload()

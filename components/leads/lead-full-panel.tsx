@@ -53,6 +53,13 @@ interface PanelData {
   calls:     CallLogItem[]
 }
 
+function tomorrowAt11LocalIso() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(11, 0, 0, 0)
+  return d.toISOString()
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export function LeadFullPanel({
   leadId,
@@ -110,7 +117,10 @@ export function LeadFullPanel({
       const res = await fetch(`/api/leads/${leadId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.follow_up_suggestion) {
-        setFollowUpPrompt(json.follow_up_suggestion as { title: string; notes: string | null; due_at: string })
+        setFollowUpPrompt({
+          ...(json.follow_up_suggestion as { title: string; notes: string | null; due_at: string }),
+          due_at: tomorrowAt11LocalIso(),
+        })
       }
     } catch {
       setData((d) => d ? { ...d, lead: { ...d.lead, status: prev } } : d)
@@ -216,7 +226,14 @@ export function LeadFullPanel({
     const res  = await fetch(`/api/leads/${leadId}/calls`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(call) })
     const json = await res.json()
     setData((d) => d ? { ...d, calls: [{ ...json.call, logger_name: 'You' }, ...d.calls] } : d)
-    setFollowUpPrompt((json.follow_up_suggestion ?? null) as { title: string; notes: string | null; due_at: string } | null)
+    if (json.follow_up_suggestion) {
+      setFollowUpPrompt({
+        ...(json.follow_up_suggestion as { title: string; notes: string | null; due_at: string }),
+        due_at: tomorrowAt11LocalIso(),
+      })
+    } else {
+      setFollowUpPrompt(null)
+    }
 
     const outcomeToStatus: Partial<Record<typeof call.outcome, LeadStatus>> = {
       answered:           'called',

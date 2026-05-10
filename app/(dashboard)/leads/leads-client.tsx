@@ -32,6 +32,13 @@ interface LeadsClientProps {
 
 const PER_PAGE = 50
 
+function tomorrowAt11LocalIso() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(11, 0, 0, 0)
+  return d.toISOString()
+}
+
 // ── Sorting helper ─────────────────────────────────────────────────────────
 function sortLeads(leads: LeadRow[], by: SortField, dir: 'asc' | 'desc'): LeadRow[] {
   return [...leads].sort((a, b) => {
@@ -329,6 +336,7 @@ export function LeadsClient({
           leadId,
           leadName,
           ...(json.follow_up_suggestion as { title: string; notes: string | null; due_at: string }),
+          due_at: tomorrowAt11LocalIso(),
         })
       }
     } catch (err) {

@@ -19,21 +19,21 @@ function followUpSuggestionForStatus(status: LeadStatus) {
     const d = new Date()
     d.setDate(d.getDate() + 1)
     d.setHours(10, 0, 0, 0)
-    return {
-      title: 'Follow up after voicemail',
-      notes: 'Left voicemail. Try again tomorrow morning.',
-      due_at: d.toISOString(),
-    }
+      return {
+        title: 'Follow up after voicemail',
+        notes: 'Left voicemail. Try again tomorrow morning.',
+        due_at: (() => { d.setHours(11, 0, 0, 0); return d.toISOString() })(),
+      }
   }
   if (status === 'no_answer') {
     const d = new Date()
     d.setDate(d.getDate() + 1)
     d.setHours(10, 0, 0, 0)
-    return {
-      title: 'Follow up after no answer',
-      notes: 'No answer. Retry tomorrow morning.',
-      due_at: d.toISOString(),
-    }
+      return {
+        title: 'Follow up after no answer',
+        notes: 'No answer. Retry tomorrow morning.',
+        due_at: (() => { d.setHours(11, 0, 0, 0); return d.toISOString() })(),
+      }
   }
   return null
 }

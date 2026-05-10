@@ -26,6 +26,13 @@ const TABS = [
 type TabId = typeof TABS[number]['id']
 type FollowUpSuggestion = { title: string; notes: string | null; due_at: string }
 
+function tomorrowAt11LocalIso() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(11, 0, 0, 0)
+  return d.toISOString()
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────
 interface LeadDetailClientProps {
   lead:          LeadDetail
@@ -97,7 +104,11 @@ export default function LeadDetailClient({
         body: JSON.stringify({ status }),
       })
       setLead((l) => ({ ...l, ...data.lead, batch_name: l.batch_name, assigned_name: l.assigned_name }))
-      setFollowUpPrompt(data.follow_up_suggestion ?? null)
+      setFollowUpPrompt(
+        data.follow_up_suggestion
+          ? { ...data.follow_up_suggestion, due_at: tomorrowAt11LocalIso() }
+          : null
+      )
       addActivity({ type: 'lead_status_changed', metadata: { from: prev, to: status } })
       router.refresh() // bust leads + pipeline page caches
     } catch (err) {
