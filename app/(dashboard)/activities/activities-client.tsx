@@ -56,6 +56,8 @@ function fmtDate(iso: string) {
   return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), overdue: false }
 }
 
+const selectCls = 'h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   initialActivities: Activity[]
