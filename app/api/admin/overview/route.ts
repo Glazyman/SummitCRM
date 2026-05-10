@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     const wsId = member.workspace_id
 
     // Parallel queries
-    const [emailsRes, leadsRes, leadsNewRes, campaignsRes, aiRes, accountsRes, interestedRes, contactedRes, statusesRes] =
+    const [emailsRes, leadsRes, leadsNewRes, campaignsRes, aiRes, accountsRes, interestedRes, contactedRes, statusesRes, unassignedRes] =
       await Promise.all([
         adminClient
           .from('emails')
@@ -115,6 +115,14 @@ export async function GET(req: Request) {
           .select('status')
           .eq('workspace_id', wsId)
           .is('deleted_at', null),
+
+        // unassigned leads
+        adminClient
+          .from('leads')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', wsId)
+          .is('assigned_to', null)
+          .is('deleted_at', null),
       ]) as [
         { data: Array<{ status: string }> | null },
         { count: number | null },
@@ -124,7 +132,8 @@ export async function GET(req: Request) {
         { data: Array<{ id: string; name: string; from_email: string; type: string; emails_sent_today: number; daily_limit: number; is_active: boolean }> | null },
         { count: number | null },
         { count: number | null },
-        { data: Array<{ status: string }> | null }
+        { data: Array<{ status: string }> | null },
+        { count: number | null },
       ]
 
     // Calls count (separate query — join syntax may vary)
@@ -180,9 +189,10 @@ export async function GET(req: Request) {
         bounce_rate:      bounceRate,
         active_leads:     leadsRes.count     ?? 0,
         new_leads_period: leadsNewRes.count  ?? 0,
-        interested_leads: interestedRes.count ?? 0,
+        interested_leads: interestedRes.count  ?? 0,
         calls_period:     callsCount,
-        leads_contacted:  contactedRes.count  ?? 0,
+        leads_contacted:  contactedRes.count   ?? 0,
+        unassigned_leads: unassignedRes.count  ?? 0,
       },
       quota_warnings:     quotaWarnings,
       active_campaigns:   campaignsRes.count ?? 0,

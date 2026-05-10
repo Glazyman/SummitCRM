@@ -1,29 +1,22 @@
 'use client'
 
-/**
- * components/admin/overview-stats-row.tsx
- *
- * Six KPI cards spanning the full width of the dashboard.
- * Each card has: icon, label, value, trend indicator.
- */
-
 import React from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
-  Mail, TrendingUp, Users, Zap, Phone, PhoneCall,
+  TrendingUp, Users, Phone, PhoneCall, UserX, Target,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { OverviewTotals } from './types'
 
 interface StatCardProps {
-  icon:      React.ReactNode
-  label:     string
-  value:     string | number
-  sub?:      string
-  alert?:    boolean
+  icon:       React.ReactNode
+  label:      string
+  value:      string | number
+  sub?:       string
+  alert?:     boolean
   highlight?: 'green' | 'orange' | 'red' | 'blue' | 'purple'
-  loading?:  boolean
+  loading?:   boolean
 }
 
 function StatCard({ icon, label, value, sub, alert, highlight, loading }: StatCardProps) {
@@ -43,9 +36,7 @@ function StatCard({ icon, label, value, sub, alert, highlight, loading }: StatCa
             </div>
           </div>
           {alert && (
-            <Badge variant="secondary" className="text-xs">
-              Alert
-            </Badge>
+            <Badge variant="secondary" className="text-xs">Alert</Badge>
           )}
         </div>
 
@@ -57,10 +48,7 @@ function StatCard({ icon, label, value, sub, alert, highlight, loading }: StatCa
             </div>
           ) : (
             <>
-              <p className={cn(
-                'text-2xl font-bold tracking-tight',
-                highlight ? 'text-foreground' : '',
-              )}>
+              <p className={cn('text-2xl font-bold tracking-tight', highlight ? 'text-foreground' : '')}>
                 {value}
               </p>
               <p className="mt-0.5 text-sm text-muted-foreground">{label}</p>
@@ -74,12 +62,16 @@ function StatCard({ icon, label, value, sub, alert, highlight, loading }: StatCa
 }
 
 interface OverviewStatsRowProps {
-  totals:           OverviewTotals
-  activeCampaigns:  number
-  loading?:         boolean
+  totals:          OverviewTotals
+  activeCampaigns: number
+  loading?:        boolean
 }
 
-export function OverviewStatsRow({ totals, activeCampaigns, loading }: OverviewStatsRowProps) {
+export function OverviewStatsRow({ totals, loading }: OverviewStatsRowProps) {
+  const conversionRate = totals.leads_contacted > 0
+    ? Math.round((totals.interested_leads / totals.leads_contacted) * 100)
+    : 0
+
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
       <StatCard
@@ -114,17 +106,19 @@ export function OverviewStatsRow({ totals, activeCampaigns, loading }: OverviewS
         loading={loading}
       />
       <StatCard
-        icon={<Mail />}
-        label="Emails sent"
-        value={totals.emails_sent.toLocaleString()}
-        sub={`${totals.reply_rate}% reply rate`}
+        icon={<Target />}
+        label="Conversion rate"
+        value={`${conversionRate}%`}
+        sub="interested / contacted"
+        highlight={conversionRate >= 10 ? 'green' : conversionRate >= 5 ? 'orange' : undefined}
         loading={loading}
       />
       <StatCard
-        icon={<Zap />}
-        label="Active campaigns"
-        value={activeCampaigns}
-        highlight={activeCampaigns > 0 ? 'green' : undefined}
+        icon={<UserX />}
+        label="Unassigned"
+        value={totals.unassigned_leads.toLocaleString()}
+        sub="need a rep"
+        alert={totals.unassigned_leads > 0}
         loading={loading}
       />
     </div>

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -15,10 +16,13 @@ export default async function ImportPage() {
 
   const { data: memberData } = await supabase
     .from('workspace_members')
-    .select('workspace_id')
+    .select('workspace_id, role')
     .eq('user_id', user?.id ?? '')
     .eq('is_active', true)
-    .single() as { data: { workspace_id: string } | null; error: unknown }
+    .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
+
+  // Reps cannot import leads
+  if (memberData?.role === 'rep') redirect('/leads')
 
   const workspaceId = memberData?.workspace_id
 

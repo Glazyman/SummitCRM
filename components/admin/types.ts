@@ -21,6 +21,7 @@ export interface OverviewTotals {
   interested_leads: number   // leads with interest_status = 'interested'
   calls_period:     number   // call_logged activities in date range
   leads_contacted:  number   // leads with status in called/voicemail/no_answer/emailed/contacted/replied
+  unassigned_leads: number   // leads with no assigned rep
 }
 
 export interface OverviewData {

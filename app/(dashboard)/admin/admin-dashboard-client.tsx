@@ -21,6 +21,7 @@ import {
   ActiveCampaignsSummary,
   WorkspaceActivityFeed,
   LeadPipelineBreakdown,
+  RepPerformanceChart,
 } from '@/components/admin'
 import type {
   DateRangePreset,
@@ -50,6 +51,7 @@ const EMPTY_OVERVIEW: OverviewData = {
     interested_leads: 0,
     calls_period:     0,
     leads_contacted:  0,
+    unassigned_leads: 0,
   },
   quota_warnings:     [],
   active_campaigns:   0,
@@ -209,6 +211,7 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
           loading={loadingOverview}
         />
 
+
         {/* Pipeline breakdown */}
         <LeadPipelineBreakdown
           counts={overview.lead_status_counts ?? {}}
@@ -228,6 +231,9 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
             />
           </div>
         </div>
+
+        {/* Rep performance chart */}
+        <RepPerformanceChart stats={teamStats} loading={loadingTeam} />
 
         {/* Sending accounts health */}
         {isAdmin && (

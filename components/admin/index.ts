@@ -7,6 +7,7 @@ export { ActiveCampaignsSummary }                    from './active-campaigns-su
 export { AiUsageWidget }                             from './ai-usage-widget'
 export { WorkspaceActivityFeed }                     from './workspace-activity-feed'
 export { LeadPipelineBreakdown }                     from './lead-pipeline-breakdown'
+export { RepPerformanceChart }                       from './rep-performance-chart'
 export type {
   DateRange, DateRangePreset, OverviewData, OverviewTotals,
   RepStat, SendingAccountHealth, CampaignSummary,
