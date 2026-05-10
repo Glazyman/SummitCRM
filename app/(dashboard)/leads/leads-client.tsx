@@ -490,7 +490,7 @@ export function LeadsClient({
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-5 pb-24">
+    <div className="space-y-7 pb-24">
 
       {/* ── Page header ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

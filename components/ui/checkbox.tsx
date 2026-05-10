@@ -42,13 +42,13 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         >
           {/* Indeterminate dash */}
           {indeterminate && !checked && (
-            <span className="h-px w-2 rounded-full bg-muted-foreground/50" />
+            <span className="h-px w-2 rounded-full bg-foreground/60" />
           )}
 
           {/* Checkmark */}
           {checked && (
             <svg
-              className="h-2.5 w-2.5 text-foreground/50"
+              className="h-2.5 w-2.5 text-foreground/75"
               viewBox="0 0 10 10"
               fill="none"
               stroke="currentColor"

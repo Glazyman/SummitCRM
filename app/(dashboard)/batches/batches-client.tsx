@@ -270,7 +270,7 @@ export function BatchesClient() {
             <table className="w-full text-sm">
               <thead className="bg-muted/40 border-b border-border">
                 <tr>
-                  <th className="w-10 px-4 py-2.5 text-left">
+                  <th className="w-10 px-5 py-4 text-left">
                     <Checkbox
                       checked={allSelected}
                       indeterminate={someSelected}
@@ -278,16 +278,16 @@ export function BatchesClient() {
                       aria-label="Select all batches"
                     />
                   </th>
-                  <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Batch</th>
-                  <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Leads</th>
-                  <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Created</th>
-                  <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Actions</th>
+                  <th className="px-5 py-4 text-left font-medium text-muted-foreground">Batch</th>
+                  <th className="px-5 py-4 text-left font-medium text-muted-foreground">Leads</th>
+                  <th className="px-5 py-4 text-left font-medium text-muted-foreground">Created</th>
+                  <th className="px-5 py-4 text-right font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {batches.map((b) => (
                   <tr key={b.id} className="border-b border-border/60 last:border-0">
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       <Checkbox
                         checked={selectedIds.has(b.id)}
                         onChange={() => {
@@ -301,7 +301,7 @@ export function BatchesClient() {
                         aria-label={`Select batch ${b.name}`}
                       />
                     </td>
-                    <td className="px-4 py-3 font-medium">
+                    <td className="px-5 py-4 font-medium">
                       <button
                         type="button"
                         onClick={() => void openBatch(b)}
@@ -311,9 +311,9 @@ export function BatchesClient() {
                         <ExternalLink className="h-3 w-3 text-muted-foreground" />
                       </button>
                     </td>
-                    <td className="px-4 py-3">{b.leadCount.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{new Date(b.createdAt).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-5 py-4">{b.leadCount.toLocaleString()}</td>
+                    <td className="px-5 py-4 text-muted-foreground">{new Date(b.createdAt).toLocaleString()}</td>
+                    <td className="px-5 py-4 text-right">
                       <Button
                         variant="outline"
                         size="sm"

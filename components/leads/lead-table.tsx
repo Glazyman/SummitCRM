@@ -87,17 +87,17 @@ export function LeadTable({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
-      <table className="w-full min-w-[700px] text-sm">
+      <table className="w-full min-w-[760px] text-sm">
         {/* ── Header ── */}
         <thead>
           <tr className="border-b border-border bg-muted/40">
-            <th className="w-10 px-4 py-3">
+            <th className="w-10 px-4 py-4">
               <Checkbox checked={allSelected} indeterminate={someSelected} onChange={onSelectAll} aria-label="Select all" />
             </th>
             {orderedVisible.map(colId => (
               <ColumnHeader key={colId} colId={colId} sortBy={sortBy} sortDir={sortDir} onSort={onSort} isAdmin={isAdmin} />
             ))}
-            <th className="w-20 px-4 py-3" />
+            <th className="w-20 px-5 py-4" />
           </tr>
         </thead>
 
@@ -153,7 +153,7 @@ function LeadTableRow({
         selected ? 'bg-primary/5' : 'hover:bg-muted/40'
       )}
     >
-      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
         <Checkbox checked={selected} onChange={onSelect} aria-label={`Select ${name}`} />
       </td>
 
@@ -169,7 +169,7 @@ function LeadTableRow({
       ))}
 
       {/* Actions */}
-      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Tooltip content="View lead">
             <Link href={`/leads/${lead.id}`} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
@@ -200,7 +200,7 @@ function ColumnHeader({ colId, sortBy, sortDir, onSort, isAdmin }: {
   onSort: (f: SortField) => void; isAdmin: boolean
 }) {
   const plain = (label: string) => (
-    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-muted-foreground">{label}</th>
+    <th className="whitespace-nowrap px-5 py-4 text-left text-xs font-medium text-muted-foreground">{label}</th>
   )
   switch (colId) {
     case 'name':          return <SortHeader field="name"            current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[180px]">Name</SortHeader>
@@ -228,13 +228,13 @@ function LeadCell({ colId, lead, isAdmin, onStatusChange, onInterestChange }: {
   switch (colId) {
     case 'name':
       return (
-        <td className="px-4 py-3">
+        <td className="px-5 py-4">
           <span className="font-medium text-foreground">{[lead.first_name, lead.last_name].filter(Boolean).join(' ') || '—'}</span>
         </td>
       )
     case 'company':
       return (
-        <td className="px-4 py-3">
+        <td className="px-5 py-4">
           {lead.company
             ? <div className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" /><span className="truncate max-w-[120px]">{lead.company}</span></div>
             : <span className="text-muted-foreground/40">—</span>}
@@ -242,38 +242,38 @@ function LeadCell({ colId, lead, isAdmin, onStatusChange, onInterestChange }: {
       )
     case 'email':
       return (
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+        <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
           <MultiContactCell primary={lead.email ?? null} extras={[lead.custom_fields?.email_2, lead.custom_fields?.email_3].filter(Boolean) as string[]} type="email" />
         </td>
       )
     case 'phone':
       return (
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+        <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
           <MultiContactCell primary={lead.phone ?? null} extras={[lead.custom_fields?.phone_2, lead.custom_fields?.phone_3].filter(Boolean) as string[]} type="phone" />
         </td>
       )
     case 'company_phone':
       return (
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+        <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
           <MultiContactCell primary={lead.custom_fields?.company_phone ?? null} extras={[lead.custom_fields?.company_phone_2].filter(Boolean) as string[]} type="phone" />
         </td>
       )
     case 'status':
       return (
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+        <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
           <StatusDropdown value={lead.status} onChange={onStatusChange} />
         </td>
       )
     case 'interest':
       return (
-        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+        <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
           <InterestDropdown value={lead.interest_status} onChange={onInterestChange} />
         </td>
       )
     case 'assigned':
       if (!isAdmin) return null
       return (
-        <td className="px-4 py-3">
+        <td className="px-5 py-4">
           {lead.assigned_name
             ? <div className="flex items-center gap-1.5">
                 <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-bold text-primary">
@@ -286,20 +286,20 @@ function LeadCell({ colId, lead, isAdmin, onStatusChange, onInterestChange }: {
       )
     case 'batch':
       return (
-        <td className="px-4 py-3 text-muted-foreground">
+        <td className="px-5 py-4 text-muted-foreground">
           {lead.batch_name ? <span className="truncate max-w-[120px] block text-xs">{lead.batch_name}</span> : <span className="text-muted-foreground/40 text-xs">—</span>}
         </td>
       )
     case 'title':
-      return <td className="px-4 py-3 text-muted-foreground">{lead.title ?? <span className="text-muted-foreground/40">—</span>}</td>
+      return <td className="px-5 py-4 text-muted-foreground">{lead.title ?? <span className="text-muted-foreground/40">—</span>}</td>
     case 'last_activity':
       return (
-        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+        <td className="px-5 py-4 text-xs text-muted-foreground whitespace-nowrap">
           {lead.last_activity_at ? relativeTime(lead.last_activity_at) : <span className="text-muted-foreground/40">No activity</span>}
         </td>
       )
     case 'tags':
-      return <td className="px-4 py-3"><span className="text-muted-foreground/40 text-xs">—</span></td>
+      return <td className="px-5 py-4"><span className="text-muted-foreground/40 text-xs">—</span></td>
     default:
       return null
   }
@@ -459,7 +459,7 @@ interface SortHeaderProps {
 function SortHeader({ field, current, dir, onSort, children, className }: SortHeaderProps) {
   const active = current === field
   return (
-    <th className={cn('px-4 py-3', className)}>
+    <th className={cn('px-5 py-4', className)}>
       <button
         type="button"
         onClick={() => onSort(field)}
@@ -488,11 +488,11 @@ function SortHeader({ field, current, dir, onSort, children, className }: SortHe
 function TableSkeleton() {
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
-      <table className="w-full min-w-[700px] text-sm">
+      <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="border-b border-border bg-muted/40">
             {['w-10', 'w-40', 'w-48', 'w-32', 'w-28', 'w-24', 'w-28', 'w-20'].map((w, i) => (
-              <th key={i} className={cn('px-4 py-3', w)}>
+              <th key={i} className={cn('px-5 py-4', w)}>
                 <div className="h-3 w-full rounded bg-muted animate-pulse" />
               </th>
             ))}
@@ -502,7 +502,7 @@ function TableSkeleton() {
           {Array.from({ length: 8 }).map((_, i) => (
             <tr key={i}>
               {[10, 40, 48, 32, 28, 24, 28, 20].map((w, j) => (
-                <td key={j} className="px-4 py-3.5">
+                <td key={j} className="px-5 py-4.5">
                   <div
                     className="h-3 rounded bg-muted animate-pulse"
                     style={{ width: `${w * 4}px`, animationDelay: `${i * 60 + j * 20}ms` }}
