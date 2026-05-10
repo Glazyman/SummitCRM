@@ -27,9 +27,6 @@ export default async function DashboardPage() {
   const metrics = member && user
     ? await getDashboardMetrics(supabase, member.workspace_id, user.id, member.role)
     : emptyDashboardMetrics()
-  const gamePlan = member && user && role === 'rep'
-    ? await getRepFollowUpsToday(supabase, member.workspace_id, user.id)
-    : null
   const totalLeadsDescription =
     role === 'rep' || false ? 'assigned to you' : 'in workspace'
 
@@ -109,7 +106,6 @@ export default async function DashboardPage() {
 
       {/* Rep: my activity breakdown */}
       {role === 'rep' && <MyActivityPanel />}
-      {role === 'rep' && gamePlan && <TodayGamePlan plan={gamePlan} />}
 
       {/* Admin: rep performance table */}
       {(role === 'admin' || role === 'super_admin') && <RepPerformancePanel />}
@@ -132,17 +128,6 @@ type DashboardMetrics = {
   dailyCallTarget:  number
   unreadNotifications: number
   followUpsDue:     number
-}
-
-type GamePlanLead = {
-  leadId:    string
-  name:      string
-  company:   string | null
-  dueAt?:    string
-}
-
-type RepFollowUpsToday = {
-  followUpsDueToday: GamePlanLead[]
 }
 
 function emptyDashboardMetrics(): DashboardMetrics {
@@ -271,76 +256,6 @@ async function getDashboardMetrics(
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value)
-}
-
-function leadName(first: string | null, last: string | null, email: string) {
-  return [first, last].filter(Boolean).join(' ') || email
-}
-
-async function getRepFollowUpsToday(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  workspaceId: string,
-  userId: string
-): Promise<RepFollowUpsToday> {
-  const now = new Date()
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
-  const end = new Date(now)
-  end.setHours(23, 59, 59, 999)
-
-  const followUpsResult = await supabase
-    .from('follow_ups')
-    .select('lead_id, due_at, leads!inner(first_name,last_name,email,company)')
-    .eq('workspace_id', workspaceId)
-    .eq('assigned_to', userId)
-    .is('completed_at', null)
-    .gte('due_at', start.toISOString())
-    .lte('due_at', end.toISOString())
-    .order('due_at', { ascending: true })
-    .limit(12)
-
-  const followUpsDueToday = ((followUpsResult.data ?? []) as Array<{
-    lead_id: string
-    due_at: string
-    leads: { first_name: string | null; last_name: string | null; email: string; company: string | null } | null
-  }>).map((r) => ({
-    leadId: r.lead_id,
-    name: leadName(r.leads?.first_name ?? null, r.leads?.last_name ?? null, r.leads?.email ?? 'Lead'),
-    company: r.leads?.company ?? null,
-    dueAt: r.due_at,
-  }))
-
-  return { followUpsDueToday }
-}
-
-function TodayGamePlan({ plan }: { plan: RepFollowUpsToday }) {
-  return (
-    <Card>
-      <CardContent className="pt-5">
-        <div className="mb-4">
-          <h2 className="text-base font-semibold">Today&apos;s Game Plan</h2>
-        </div>
-        <div className="rounded-xl border border-border">
-          <div className="border-b border-border px-3 py-2">
-            <p className="text-sm font-medium">Follow-ups Due Today</p>
-            <p className="text-xs text-muted-foreground">{plan.followUpsDueToday.length} leads</p>
-          </div>
-          <div className="divide-y divide-border">
-            {plan.followUpsDueToday.length === 0 ? (
-              <div className="px-3 py-6 text-sm text-muted-foreground">No follow-ups due today.</div>
-            ) : plan.followUpsDueToday.map((row) => (
-              <Link key={row.leadId} href={`/leads/${row.leadId}`} className="block px-3 py-2 hover:bg-muted/40">
-                <p className="truncate text-sm font-medium">{row.name}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {row.company ?? 'No company'} · {row.dueAt ? new Date(row.dueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                </p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────
