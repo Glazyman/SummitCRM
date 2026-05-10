@@ -203,17 +203,6 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
           </div>
         )}
 
-        {/* Documents section — admins only, hidden when collapsed */}
-        {!isRep && !collapsed && (
-          <div className="mt-6">
-            <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">
-              Documents
-            </p>
-            <div className="flex flex-col gap-1">
-              <NavLink item={{ label: 'Batches', href: '/batches', icon: Building2 }} active={isActive('/batches')} />
-            </div>
-          </div>
-        )}
       </nav>
 
       {/* Bottom nav */}
