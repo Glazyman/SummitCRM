@@ -14,7 +14,6 @@ import type {
   LeadDetail, ActivityEntry, EmailHistoryItem,
   FollowUp, NewFollowUp, TeamMember, LeadStatus,
 } from '@/components/leads/detail/types'
-import type { SendingAccountPublic, QuotaStatus } from '@/lib/email/types'
 import type { CallLogItem, NewCall } from '@/components/leads/detail/call-history'
 
 // ── Tab config ────────────────────────────────────────────────────────────
@@ -34,8 +33,6 @@ interface LeadDetailClientProps {
   followUps:     FollowUp[]
   calls:         CallLogItem[]
   teamMembers:   TeamMember[]
-  accounts:      SendingAccountPublic[]
-  quotas:        Record<string, QuotaStatus>
   currentUserId: string
   isAdmin:       boolean
   canEditBatch:  boolean
@@ -47,8 +44,6 @@ export default function LeadDetailClient({
   followUps:    initialFollowUps,
   calls:        initialCalls,
   teamMembers,
-  accounts,
-  quotas,
   currentUserId,
   isAdmin,
   canEditBatch,
@@ -143,6 +138,23 @@ export default function LeadDetailClient({
     } catch (err) {
       setLead(previous)
       console.error(err)
+    }
+  }
+
+  async function handleDeleteLead() {
+    if (!isAdmin) return
+    if (!window.confirm('Delete this lead? This cannot be undone.')) return
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? 'Delete failed')
+      }
+      router.push('/leads')
+      router.refresh()
+    } catch (err) {
+      console.error(err)
+      window.alert('Could not delete lead. Please try again.')
     }
   }
 
@@ -363,9 +375,7 @@ export default function LeadDetailClient({
         onStatusChange={handleStatusChange}
         onInterestChange={handleInterestChange}
         onAssign={handleAssign}
-        onSendEmail={() => {}}
-        onAIDraft={() => {}}
-        onDelete={() => {/* TODO: soft delete + navigate away */}}
+        onDelete={handleDeleteLead}
         onDoNotContact={() => handleStatusChange('do_not_contact')}
       />
 

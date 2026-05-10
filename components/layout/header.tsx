@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { LogOut, User, Menu, Settings, ChevronDown, Shield, Search, X } from 'lucide-react'
+import { LogOut, User, Menu, Settings, ChevronDown, Search, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -16,9 +16,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/dashboard':  'Dashboard',
   '/leads':      'Leads',
   '/activities': 'Activities',
-  '/analytics':  'Analytics',
   '/settings':   'Settings',
-  '/admin':      'Admin',
   '/pipeline':   'Pipeline',
 }
 
@@ -98,8 +96,6 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
     return () => document.removeEventListener('keydown', handler)
   }, [])
 
-  useEffect(() => { setDropdownOpen(false) }, [pathname])
-
   async function handleSignOut() {
     setDropdownOpen(false)
     await supabase.auth.signOut()
@@ -117,12 +113,16 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
     window.dispatchEvent(new Event('open-mobile-sidebar'))
   }
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault()
+  function runSearch() {
     if (!searchQuery.trim()) return
     router.push(`/leads?q=${encodeURIComponent(searchQuery.trim())}`)
     setSearchOpen(false)
     setSearchQuery('')
+  }
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    runSearch()
   }
 
   const fullName    = user?.user_metadata?.full_name as string | undefined
@@ -239,12 +239,6 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
                     className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary">
                     <User className="h-4 w-4 text-muted-foreground" /> Profile
                   </button>
-                  {role && ['admin', 'super_admin'].includes(role) && (
-                    <button role="menuitem" type="button" onClick={() => navigate('/admin')}
-                      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary">
-                      <Shield className="h-4 w-4 text-muted-foreground" /> Admin Panel
-                    </button>
-                  )}
                 </div>
 
                 <div className="border-t border-border" />
@@ -278,9 +272,9 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
             </button>
           </form>
           {searchQuery.trim() && (
-            <button type="button" onClick={() => handleSearch({ preventDefault: () => {} } as any)}
+            <button type="button" onClick={runSearch}
               className="mt-3 rounded-xl bg-primary text-primary-foreground py-3 text-sm font-medium">
-              Search for "{searchQuery}"
+              Search for &quot;{searchQuery}&quot;
             </button>
           )}
         </div>

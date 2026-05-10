@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@/lib/supabase/server'
 
 // POST /api/leads — create a new lead
@@ -9,7 +10,7 @@ export async function POST(req: NextRequest) {
 
   const { data: member } = await supabase
     .from('workspace_members')
-    .select('workspace_id')
+    .select('workspace_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
@@ -24,6 +25,23 @@ export async function POST(req: NextRequest) {
   } = body
 
   if (!email) return NextResponse.json({ error: 'email is required' }, { status: 400 })
+  const requestedAssignee = assigned_to || null
+  const effectiveAssignee = requestedAssignee ?? user.id
+
+  if (member.role === 'rep' && requestedAssignee && requestedAssignee !== user.id) {
+    return NextResponse.json({ error: 'Reps can only assign leads to themselves' }, { status: 403 })
+  }
+
+  if (requestedAssignee) {
+    const { data: assignee } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', member.workspace_id)
+      .eq('user_id', requestedAssignee)
+      .eq('is_active', true)
+      .single()
+    if (!assignee) return NextResponse.json({ error: 'Assignee is not a workspace member' }, { status: 422 })
+  }
 
   const { data: lead, error } = await supabase
     .from('leads')
@@ -38,7 +56,7 @@ export async function POST(req: NextRequest) {
       website:      website    || null,
       linkedin_url: linkedin_url || null,
       batch_id:     batch_id   || null,
-      assigned_to:  assigned_to || user.id,
+      assigned_to:  effectiveAssignee,
       status,
       source:       'manual',
     })

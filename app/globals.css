@@ -40,37 +40,37 @@
 
 /* ── Light-only CSS variables ──────────────────────────────────────────────── */
 :root {
-  /* Surfaces — Acme-style neutral dashboard system */
-  --background: 0 0% 96%;           /* #F5F5F5 */
-  --foreground: 0 0% 7%;            /* #111111 */
+  /* Apple-inspired neutrals */
+  --background: 220 20% 97%;
+  --foreground: 220 16% 12%;
 
-  --card: 0 0% 100%;                /* #FFFFFF */
-  --card-foreground: 0 0% 7%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 16% 12%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 7%;
+  --popover-foreground: 220 16% 12%;
 
   /* Monochrome primary — black actions, no saturated brand color */
-  --primary: 0 0% 7%;
+  --primary: 214 89% 52%;
   --primary-foreground: 0 0% 100%;
 
   /* Subtle surface for hover states / secondary elements */
-  --secondary: 0 0% 94%;            /* #F0F0F0 */
-  --secondary-foreground: 0 0% 7%;
+  --secondary: 220 20% 95%;
+  --secondary-foreground: 220 16% 18%;
 
-  --muted: 0 0% 94%;
-  --muted-foreground: 0 0% 45%;     /* #737373 */
+  --muted: 220 20% 95%;
+  --muted-foreground: 220 10% 45%;
 
-  --accent: 0 0% 92%;
-  --accent-foreground: 0 0% 7%;
+  --accent: 220 20% 93%;
+  --accent-foreground: 220 16% 18%;
 
-  --destructive: 0 0% 13%;
+  --destructive: 0 72% 52%;
   --destructive-foreground: 0 0% 100%;
 
   /* Hairline borders */
-  --border: 0 0% 88%;
-  --input: 0 0% 86%;
-  --ring: 0 0% 15%;
+  --border: 220 16% 87%;
+  --input: 220 16% 86%;
+  --ring: 214 89% 52%;
 
   --border-radius: 1rem;            /* 16px */
   --sidebar-width: 236px;
@@ -79,33 +79,33 @@
 
 /* Light-only app: dark class intentionally maps back to the same neutral theme. */
 .dark {
-  --background: 0 0% 96%;
-  --foreground: 0 0% 7%;
+  --background: 220 20% 97%;
+  --foreground: 220 16% 12%;
 
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 7%;
+  --card-foreground: 220 16% 12%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 7%;
+  --popover-foreground: 220 16% 12%;
 
-  --primary: 0 0% 7%;
+  --primary: 214 89% 52%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 0 0% 94%;
-  --secondary-foreground: 0 0% 7%;
+  --secondary: 220 20% 95%;
+  --secondary-foreground: 220 16% 18%;
 
-  --muted: 0 0% 94%;
-  --muted-foreground: 0 0% 45%;
+  --muted: 220 20% 95%;
+  --muted-foreground: 220 10% 45%;
 
-  --accent: 0 0% 92%;
-  --accent-foreground: 0 0% 7%;
+  --accent: 220 20% 93%;
+  --accent-foreground: 220 16% 18%;
 
-  --destructive: 0 0% 13%;
+  --destructive: 0 72% 52%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 0 0% 88%;
-  --input: 0 0% 86%;
-  --ring: 0 0% 15%;
+  --border: 220 16% 87%;
+  --input: 220 16% 86%;
+  --ring: 214 89% 52%;
 }
 
 /* ── Base styles ───────────────────────────────────────────────────────────── */
@@ -116,7 +116,10 @@
   }
 
   body {
-    background-color: hsl(var(--background));
+    background:
+      radial-gradient(1200px 500px at 10% -10%, rgba(115, 173, 255, 0.15), transparent 60%),
+      radial-gradient(900px 420px at 95% 0%, rgba(153, 199, 255, 0.14), transparent 62%),
+      hsl(var(--background));
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -171,11 +174,18 @@
 
   /* Card-style shadow used in sidebar active items */
   .shadow-card {
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.035);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 14px 38px rgba(15, 23, 42, 0.08);
   }
 
   /* Primary button lift */
   .shadow-primary-glow {
-    box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+    box-shadow: 0 8px 20px rgba(10, 132, 255, 0.26), 0 1px 2px rgba(10, 132, 255, 0.2);
+  }
+
+  .glass-panel {
+    background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.52));
+    backdrop-filter: blur(16px) saturate(120%);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
+    border: 1px solid rgba(255,255,255,0.75);
   }
 }

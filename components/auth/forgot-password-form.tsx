@@ -21,8 +21,12 @@ export function ForgotPasswordForm() {
     setLoading(true)
     setError(null)
 
+    const appOrigin =
+      process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+      (typeof window !== 'undefined' ? window.location.origin : '')
+
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
+      redirectTo: `${appOrigin}/auth/callback?next=/reset-password`,
     })
 
     setLoading(false)

@@ -50,21 +50,23 @@ const ROLE_COLORS: Record<WorkspaceRole, string> = {
 }
 
 // ── Invite form ────────────────────────────────────────────────────────────
-function InviteForm({ onInvite }: { onInvite: (email: string, role: WorkspaceRole) => Promise<void> }) {
+function InviteForm({ onInvite }: { onInvite: (email: string, role: WorkspaceRole) => Promise<string | null> }) {
   const [email, setEmail]     = React.useState('')
   const [role, setRole]       = React.useState<WorkspaceRole>('rep')
   const [submitting, setSub]  = React.useState(false)
   const [error, setError]     = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
+  const [inviteUrl, setInviteUrl] = React.useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null); setSuccess(null)
+    setError(null); setSuccess(null); setInviteUrl(null)
     if (!email.trim()) return
     setSub(true)
     try {
-      await onInvite(email.trim(), role)
+      const url = await onInvite(email.trim(), role)
       setSuccess(`Invitation sent to ${email.trim()}`)
+      setInviteUrl(url)
       setEmail('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send invitation')
@@ -86,9 +88,19 @@ function InviteForm({ onInvite }: { onInvite: (email: string, role: WorkspaceRol
         </div>
       )}
       {success && (
-        <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400 flex items-center gap-2">
-          <Check className="h-4 w-4" />
-          {success}
+        <div className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground">
+          <div className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-primary" />
+            {success}
+          </div>
+          {inviteUrl && (
+            <div className="mt-1.5 text-xs">
+              Invite link:{' '}
+              <a href={inviteUrl} target="_blank" rel="noreferrer" className="underline break-all">
+                {inviteUrl}
+              </a>
+            </div>
+          )}
         </div>
       )}
 
@@ -151,7 +163,7 @@ export default function TeamSettingsClient({
       .finally(() => setLoading(false))
   }, [])
 
-  async function handleInvite(email: string, role: WorkspaceRole) {
+  async function handleInvite(email: string, role: WorkspaceRole): Promise<string | null> {
     const res = await fetch('/api/team/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -170,6 +182,7 @@ export default function TeamSettingsClient({
       },
       ...prev,
     ])
+    return data.invitation?.invite_url ?? null
   }
 
   async function handleRoleChange(memberId: string, role: WorkspaceRole) {

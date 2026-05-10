@@ -6,6 +6,7 @@ import type { Notification } from './types'
 interface NotificationContextValue {
   notifications:     Notification[]
   unreadCount:       number
+  hasMore:           boolean
   isLoading:         boolean
   fetchNotifications: (opts?: { reset?: boolean }) => Promise<void>
   markRead:          (id: string) => Promise<void>
@@ -33,6 +34,7 @@ interface Props {
 export function NotificationProvider({ userId, children }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount,   setUnreadCount]   = useState(0)
+  const [totalCount,    setTotalCount]    = useState(0)
   const [isLoading,     setIsLoading]     = useState(false)
   const [page,          setPage]          = useState(1)
   const shakeTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -53,7 +55,8 @@ export function NotificationProvider({ userId, children }: Props) {
     try {
       const res = await fetch(`/api/notifications?page=${targetPage}&limit=20`)
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json() as { notifications: Notification[]; total?: number }
+        setTotalCount(data.total ?? 0)
         if (opts?.reset) {
           setNotifications(data.notifications)
           setPage(2)
@@ -61,12 +64,13 @@ export function NotificationProvider({ userId, children }: Props) {
           setNotifications(prev => [...prev, ...data.notifications])
           setPage(p => p + 1)
         }
-        setUnreadCount(data.notifications.filter((n: Notification) => !n.is_read).length)
+        await fetchUnreadCount()
       }
     } finally {
       setIsLoading(false)
     }
-  }, [page])
+  }, [fetchUnreadCount, page])
+  const hasMore = notifications.length < totalCount
 
   const markRead = useCallback(async (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
@@ -101,6 +105,7 @@ export function NotificationProvider({ userId, children }: Props) {
 
   // Initial load
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNotifications({ reset: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
@@ -142,6 +147,7 @@ export function NotificationProvider({ userId, children }: Props) {
     <NotificationContext.Provider value={{
       notifications,
       unreadCount,
+      hasMore,
       isLoading,
       fetchNotifications,
       markRead,

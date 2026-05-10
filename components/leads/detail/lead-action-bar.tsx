@@ -1,10 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Mail, Sparkles, MoreHorizontal,
+  ArrowLeft, MoreHorizontal,
   Trash2, BellOff, UserRound, ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -24,8 +23,6 @@ interface LeadActionBarProps {
   onStatusChange:   (s: LeadStatus) => void
   onInterestChange?: (s: InterestStatus) => void
   onAssign:         (userId: string) => void
-  onSendEmail:      () => void
-  onAIDraft:        () => void
   onDelete:         () => void
   onDoNotContact:   () => void
 }
@@ -37,8 +34,6 @@ export function LeadActionBar({
   onStatusChange,
   onInterestChange,
   onAssign,
-  onSendEmail,
-  onAIDraft,
   onDelete,
   onDoNotContact,
 }: LeadActionBarProps) {

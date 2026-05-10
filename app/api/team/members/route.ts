@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { WorkspaceRole } from '@/types/database'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // GET /api/team/members — list all workspace members with their profile info
 export async function GET() {
   const supabase = await createClient() as any
+  const admin = createAdminClient() as any
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: currentMember } = await supabase
+  const { data: currentMember } = await admin
     .from('workspace_members')
     .select('workspace_id, role')
     .eq('user_id', user.id)
@@ -19,7 +21,7 @@ export async function GET() {
   if (!currentMember) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
 
   // Fetch all members
-  const { data: members, error } = await supabase
+  const { data: members, error } = await admin
     .from('workspace_members')
     .select('id, user_id, role, is_active, joined_at, created_at')
     .eq('workspace_id', currentMember.workspace_id)
@@ -28,7 +30,6 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Enrich with auth user info (email/name) using admin client
-  const admin = createAdminClient() as any
   const userIds: string[] = (members ?? []).map((m: any) => m.user_id as string)
   const enriched = await Promise.all(
     userIds.map(async (uid: string) => {
@@ -67,10 +68,11 @@ export async function GET() {
 // PATCH /api/team/members — update a member's role or active status
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient() as any
+  const admin = createAdminClient() as any
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: currentMember } = await supabase
+  const { data: currentMember } = await admin
     .from('workspace_members')
     .select('workspace_id, role')
     .eq('user_id', user.id)
@@ -95,7 +97,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
   }
 
-  const { data: updated, error } = await supabase
+  const { data: updated, error } = await admin
     .from('workspace_members')
     .update(patch)
     .eq('id', member_id)
@@ -107,7 +109,7 @@ export async function PATCH(req: NextRequest) {
 
   // Log activity
   const actType = is_active === false ? 'member_deactivated' : role ? 'role_changed' : 'member_deactivated'
-  await supabase.from('activity_logs').insert({
+  await admin.from('activity_logs').insert({
     workspace_id: currentMember.workspace_id,
     lead_id:      null,
     user_id:      user.id,

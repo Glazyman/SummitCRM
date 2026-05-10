@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type { LeadStatus } from '@/types/database'
 
-async function getContext(req: NextRequest) {
+async function getContext() {
   const supabase = await createClient() as any
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
@@ -20,9 +21,12 @@ async function getContext(req: NextRequest) {
 
 // PATCH /api/leads/bulk — bulk update (status, assigned_to, batch_id)
 export async function PATCH(req: NextRequest) {
-  const ctx = await getContext(req)
+  const ctx = await getContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { user, member, admin } = ctx
+
+  if (!['admin', 'super_admin'].includes(member.role))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await req.json().catch(() => ({}))
   const { ids, status, assigned_to, batch_id } = body
@@ -65,7 +69,7 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE /api/leads/bulk — bulk hard delete
 export async function DELETE(req: NextRequest) {
-  const ctx = await getContext(req)
+  const ctx = await getContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { member, admin } = ctx
 

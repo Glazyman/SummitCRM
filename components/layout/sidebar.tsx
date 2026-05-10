@@ -6,17 +6,15 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
-  BarChart2,
   Settings,
   Bell,
-  Shield,
   PlusCircle,
   Building2,
   MoreHorizontal,
   Kanban,
   ListChecks,
-  PanelLeftClose,
-  PanelLeftOpen,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WorkspaceRole } from '@/types/database'
@@ -34,8 +32,6 @@ const mainNav: NavItem[] = [
   { label: 'Leads',     href: '/leads',     icon: Users },
   { label: 'Pipeline',   href: '/pipeline',   icon: Kanban },
   { label: 'Activities', href: '/activities', icon: ListChecks },
-  { label: 'Analytics', href: '/analytics', icon: BarChart2, minRole: 'admin' },
-  { label: 'Admin',     href: '/admin',     icon: Shield,    minRole: 'admin' },
 ]
 
 const bottomNav: NavItem[] = [
@@ -111,27 +107,33 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
   return (
     <aside className={cn(
       'flex h-full flex-col border-r border-border bg-background transition-all duration-200',
+      'relative',
       collapsed ? 'w-[60px]' : 'w-[var(--sidebar-width)]'
     )}>
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        className={cn(
+          'absolute -right-4 top-4 z-30',
+          'flex h-8 w-8 items-center justify-center rounded-full',
+          'border border-white/80 bg-white/95 backdrop-blur-md',
+          'text-foreground shadow-card ring-1 ring-black/5',
+          'transition-all hover:scale-105 hover:bg-white'
+        )}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+      </button>
       {/* Brand */}
       {collapsed ? (
-        /* Collapsed: show only the expand button, centered and obvious */
         <div className="flex flex-col items-center gap-3 px-2 pb-3 pt-4">
           <div className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold text-foreground shadow-card">
             {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
           </div>
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-primary-glow hover:bg-primary/90 transition-colors"
-            aria-label="Expand sidebar"
-            title="Expand sidebar"
-          >
-            <PanelLeftOpen className="h-4 w-4" />
-          </button>
         </div>
       ) : (
-        /* Expanded: workspace name + collapse button */
+        /* Expanded: workspace name */
         <div className="flex items-center gap-2.5 px-3 pb-3 pt-4">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold text-foreground shadow-card">
             {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
@@ -139,15 +141,6 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
           <p className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-none tracking-[-0.02em]">
             {workspaceName ?? 'Summit Mergers'}
           </p>
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-            aria-label="Collapse sidebar"
-            title="Collapse sidebar"
-          >
-            <PanelLeftClose className="h-3.5 w-3.5" />
-          </button>
         </div>
       )}
 
@@ -199,7 +192,6 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
             </p>
             <div className="flex flex-col gap-1">
               <NavLink item={{ label: 'Data Library', href: '/leads', icon: Building2 }} active={false} />
-              <NavLink item={{ label: 'Reports', href: '/analytics', icon: BarChart2 }} active={false} />
               <NavLink item={{ label: 'Notifications', href: '/notifications', icon: Bell }} active={isActive('/notifications')} />
             </div>
           </div>

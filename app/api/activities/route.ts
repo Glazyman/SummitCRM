@@ -2,6 +2,7 @@
  * GET  /api/activities  — list follow-ups + callbacks for workspace
  * POST /api/activities  — create a new activity
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
@@ -48,7 +49,11 @@ export async function GET(request: NextRequest) {
 
     if (type)       query = query.eq('type', type)
     if (priority)   query = query.eq('priority', priority)
-    if (assignedTo) query = query.eq('assigned_to', assignedTo)
+    if (member.role === 'rep') {
+      query = query.eq('assigned_to', ctx.user.id)
+    } else if (assignedTo) {
+      query = query.eq('assigned_to', assignedTo)
+    }
     if (done === 'true')  query = query.not('completed_at', 'is', null)
     if (done === 'false') query = query.is('completed_at', null)
 
@@ -84,12 +89,40 @@ export async function POST(request: NextRequest) {
 
     const { leadId, type, priority, title, notes, dueAt, assignedTo } = parsed.data
 
+    const effectiveAssignedTo = assignedTo ?? user.id
+    if (member.role === 'rep' && effectiveAssignedTo !== user.id) {
+      return apiError('Reps can only assign activities to themselves', 403)
+    }
+
+    if (assignedTo) {
+      const { data: assignee } = await (admin as any)
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', member.workspace_id)
+        .eq('user_id', assignedTo)
+        .eq('is_active', true)
+        .single()
+      if (!assignee) return apiError('Assignee is not an active workspace member', 422)
+    }
+
+    const { data: lead } = await (admin as any)
+      .from('leads')
+      .select('id, assigned_to')
+      .eq('id', leadId)
+      .eq('workspace_id', member.workspace_id)
+      .is('deleted_at', null)
+      .single()
+    if (!lead) return apiError('Lead not found', 404)
+    if (member.role === 'rep' && lead.assigned_to !== user.id) {
+      return apiError('Insufficient permissions for this lead', 403)
+    }
+
     const { data, error } = await (admin as any)
       .from('follow_ups')
       .insert({
         workspace_id: member.workspace_id,
         lead_id:      leadId,
-        assigned_to:  assignedTo ?? user.id,
+        assigned_to:  effectiveAssignedTo,
         type,
         priority,
         title,

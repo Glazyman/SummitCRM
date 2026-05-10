@@ -4,7 +4,7 @@ import { Spinner }       from '@/components/ui/spinner'
 import LeadDetailClient  from './lead-detail-client'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import type { ActivityEntry, EmailHistoryItem, FollowUp, LeadDetail, TeamMember } from '@/components/leads/detail/types'
-import type { QuotaStatus, SendingAccountPublic } from '@/lib/email/types'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -27,7 +27,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
   const workspaceId = member?.workspace_id
   if (!workspaceId) notFound()
 
-  const [leadResult, batchesResult, activityResult, notesResult, emailsResult, followUpsResult, callsResult, accountsResult, membersResult] = await Promise.all([
+  const [leadResult, batchesResult, activityResult, notesResult, emailsResult, followUpsResult, callsResult, membersResult] = await Promise.all([
     supabase
       .from('leads')
       .select('id, workspace_id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, interest_status, is_unsubscribed, batch_id, assigned_to, ai_summary, custom_fields, created_at, updated_at')
@@ -41,7 +41,6 @@ export default async function LeadDetailPage({ params }: PageProps) {
     supabase.from('emails').select('id, subject, body_html, sent_by, status, sent_at, opened_at, clicked_at, replied_at, bounced_at, created_at').eq('lead_id', id).order('created_at', { ascending: false }),
     supabase.from('follow_ups').select('id, title, notes, due_at, completed_at, assigned_to').eq('lead_id', id).order('due_at', { ascending: true }),
     supabase.from('call_logs').select('id, outcome, duration_sec, notes, called_at, logged_by').eq('lead_id', id).order('called_at', { ascending: false }),
-    supabase.from('sending_accounts_safe').select('*').eq('workspace_id', workspaceId).eq('is_active', true),
     supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('is_active', true),
   ])
 
@@ -161,27 +160,6 @@ export default async function LeadDetailPage({ params }: PageProps) {
     assigned_name: followUp.assigned_to ? usersById.get(followUp.assigned_to) ?? null : null,
   }))
 
-  const accounts: SendingAccountPublic[] = ((accountsResult.data ?? []) as SendingAccountPublic[]).map((account) => ({
-    ...account,
-    quota_remaining: Math.max((account.daily_limit ?? 0) - (account.emails_sent_today ?? 0), 0),
-    quota_percent: account.daily_limit > 0 ? Math.round(((account.emails_sent_today ?? 0) / account.daily_limit) * 100) : 0,
-  }))
-
-  const quotas: Record<string, QuotaStatus> = Object.fromEntries(accounts.map((account) => {
-    const percent = account.daily_limit > 0 ? Math.round((account.emails_sent_today / account.daily_limit) * 100) : 0
-    const remaining = Math.max(account.daily_limit - account.emails_sent_today, 0)
-    return [account.id, {
-      account_id: account.id,
-      account_name: account.name,
-      daily_limit: account.daily_limit,
-      sent_today: account.emails_sent_today,
-      remaining,
-      percent_used: percent,
-      at_limit: remaining <= 0,
-      reset_at: account.quota_reset_at,
-    }]
-  }))
-
   const calls = ((callsResult.data ?? []) as Array<{
     id: string
     outcome: string
@@ -210,8 +188,6 @@ export default async function LeadDetailPage({ params }: PageProps) {
         followUps={followUps}
         calls={calls}
         teamMembers={teamMembers}
-        accounts={accounts}
-        quotas={quotas}
         currentUserId={currentUserId}
         isAdmin={isAdmin}
         canEditBatch={canEditBatch}

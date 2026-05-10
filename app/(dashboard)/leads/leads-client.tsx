@@ -163,22 +163,14 @@ export function LeadsClient({
     return DEFAULT_COLUMN_ORDER
   })
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
-  // Derive the panel lead live from state so status/interest changes reflect instantly
-  const selectedLead = selectedLeadId ? (leads.find((l) => l.id === selectedLeadId) ?? null) : null
 
   // ── Keep in sync with server ───────────────────────────────────────────
   // When router.refresh() re-runs the server component, initialLeads gets a
   // new reference → sync local state so changes from the detail page show up.
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLeads(initialLeads)
   }, [initialLeads])
-
-  // On every mount (including after navigating back from lead detail),
-  // ask Next.js to re-run the server component so we always get fresh data.
-  React.useEffect(() => {
-    router.refresh()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // ── Derive displayed leads ────────────────────────────────────────────
   const filtered = React.useMemo(
@@ -281,33 +273,48 @@ export function LeadsClient({
   function handleSelectRow(id: string) {
     setSelectedIds((s) => {
       const next = new Set(s)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }
 
   // ── Inline status change (optimistic + API) ──────────────────────────
-  function handleStatusChange(leadId: string, status: LeadStatus) {
+  async function handleStatusChange(leadId: string, status: LeadStatus) {
+    const previous = leads
     setLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, status, updated_at: new Date().toISOString() } : l))
     )
-    fetch(`/api/leads/${leadId}`, {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ status }),
-    }).catch(console.error)
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ status }),
+      })
+      if (!res.ok) throw new Error('Status update failed')
+    } catch (err) {
+      console.error(err)
+      setLeads(previous)
+    }
   }
 
   // ── Inline interest change (optimistic + API) ─────────────────────────
-  function handleInterestChange(leadId: string, interest_status: InterestStatus) {
+  async function handleInterestChange(leadId: string, interest_status: InterestStatus) {
+    const previous = leads
     setLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, interest_status, updated_at: new Date().toISOString() } : l))
     )
-    fetch(`/api/leads/${leadId}`, {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ interest_status }),
-    }).catch(console.error)
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ interest_status }),
+      })
+      if (!res.ok) throw new Error('Interest update failed')
+    } catch (err) {
+      console.error(err)
+      setLeads(previous)
+    }
   }
 
   // ── Bulk actions ───────────────────────────────────────────────────────
@@ -428,7 +435,8 @@ export function LeadsClient({
   function handleToggleColumn(id: ColumnId) {
     setVisibleCols((s) => {
       const next = new Set(s)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }
@@ -619,7 +627,9 @@ export function LeadsClient({
         onStatusChange={handleStatusChange}
         onInterestChange={handleInterestChange}
         onRowClick={(lead) => setSelectedLeadId(lead.id)}
-        onSendEmail={(lead) => console.log('send email to', lead.email)}
+        onSendEmail={(lead) => {
+          window.location.href = `mailto:${lead.email}`
+        }}
         onDeleteLead={handleDeleteLead}
       />
 

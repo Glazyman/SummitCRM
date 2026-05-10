@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
-import { SignupForm } from '@/components/auth/signup-form'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
-  title: 'Create Account',
+  title: 'Sign In',
 }
 
 export default function SignupPage() {
-  return <SignupForm />
+  redirect('/login')
 }

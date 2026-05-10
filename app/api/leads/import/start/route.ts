@@ -9,6 +9,7 @@
  *
  * Auth: rep+
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient }         from '@/lib/supabase/server'
@@ -94,6 +95,19 @@ export async function POST(request: NextRequest) {
     }
 
     const { rows: rawRows, mapping, customFieldNames, batchId, newBatchName, duplicateMode, assignedTo, fileName } = parsed.data
+    if (assignedTo) {
+      if (role === 'rep' && assignedTo !== user.id) {
+        return apiError('Reps can only assign imported leads to themselves', 403)
+      }
+      const { data: assignee } = await (admin as any)
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', assignedTo)
+        .eq('is_active', true)
+        .single() as { data: { user_id: string } | null; error: unknown }
+      if (!assignee) return apiError('Assignee is not an active workspace member', 422)
+    }
 
     // Coerce row values to strings (client sends Record<string, string> but JSON typing loses that)
     const rows: Record<string, string>[] = rawRows.map((r) =>

@@ -20,7 +20,7 @@ const TYPE_OPTIONS: { value: NotificationType | 'all'; label: string }[] = [
 ]
 
 export function NotificationsClient() {
-  const { notifications, unreadCount, isLoading, markRead, markAllRead, dismiss, fetchNotifications } =
+  const { notifications, unreadCount, hasMore, isLoading, markRead, markAllRead, dismiss, fetchNotifications } =
     useNotifications()
 
   const [typeFilter,  setTypeFilter]  = useState<NotificationType | 'all'>('all')
@@ -136,7 +136,7 @@ export function NotificationsClient() {
       </div>
 
       {/* Load more */}
-      {notifications.length >= 20 && (
+      {hasMore && (
         <div className="flex justify-center">
           <button
             onClick={() => fetchNotifications()}
@@ -173,7 +173,7 @@ export function NotificationsClient() {
 
       {/* Preferences link */}
       <p className="text-center text-sm text-muted-foreground">
-        Manage what you're notified about in{' '}
+        Manage what you are notified about in{' '}
         <a href="/settings/notifications" className="text-primary hover:underline">
           Notification preferences
         </a>

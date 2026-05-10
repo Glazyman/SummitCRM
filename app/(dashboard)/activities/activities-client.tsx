@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   Phone, ArrowUpRight, CheckCircle2, Circle, Clock,
-  AlertCircle, Minus, ChevronDown, Plus, X,
+  Plus, X,
   User, Mail, Building2, ExternalLink, Calendar, PhoneMissed,
   PhoneOff, PhoneCall, Voicemail, RotateCcw,
 } from 'lucide-react'
@@ -42,12 +41,6 @@ interface Activity {
   assigned_to:  string | null
   created_at:   string
   lead:         Lead | null
-}
-
-const PRIORITY: Record<Priority, { label: string; color: string; icon: React.FC<{className?:string}> }> = {
-  high:   { label: 'High',   color: 'text-red-500',   icon: AlertCircle  },
-  medium: { label: 'Medium', color: 'text-amber-500', icon: Minus        },
-  low:    { label: 'Low',    color: 'text-slate-400', icon: ChevronDown  },
 }
 
 function leadName(lead: Lead | null) {
@@ -531,7 +524,6 @@ interface Props {
 }
 
 export function ActivitiesClient({ initialActivities, teamMembers, currentUserId, isAdmin }: Props) {
-  const router = useRouter()
   const [activities,      setActivities]      = useState<Activity[]>(initialActivities)
   const [justCompleted,   setJustCompleted]   = useState<Set<string>>(new Set())
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
@@ -543,11 +535,13 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
   const [saving,          setSaving]          = useState(false)
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
-  useEffect(() => { setActivities(initialActivities) }, [initialActivities])
-  useEffect(() => { router.refresh() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActivities(initialActivities)
+  }, [initialActivities])
 
   // ── New form ──────────────────────────────────────────────────────────────
-  const [newForm, setNewForm] = useState({
+  const [newForm, setNewForm] = useState(() => ({
     leadId:     '',
     type:       'follow_up' as ActivityType,
     priority:   'medium'   as Priority,
@@ -555,7 +549,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
     notes:      '',
     dueAt:      new Date(Date.now() + 86400000).toISOString().slice(0, 16),
     assignedTo: currentUserId,
-  })
+  }))
 
   // ── Filtered list ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -722,7 +716,6 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
               </tr>
             )}
             {filtered.map((a) => {
-              const PIcon = PRIORITY[a.priority].icon
               const due   = fmtDate(a.due_at)
               const done  = !!a.completed_at
               const linger = justCompleted.has(a.id)

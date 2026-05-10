@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { z } from 'zod'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
 import type { LeadStatus, WorkspaceRole } from '@/types/database'
 
@@ -18,20 +19,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     const { data: member } = await supabase
       .from('workspace_members')
-      .select('workspace_id')
+      .select('workspace_id, role')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single() as { data: { workspace_id: string } | null; error: unknown }
+      .single() as { data: { workspace_id: string; role: WorkspaceRole } | null; error: unknown }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
 
-    const { data: lead, error } = await supabase
+    let leadQuery = supabase
       .from('leads')
       .select('id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, interest_status, pipeline_stage_id, assigned_to, batch_id, ai_summary, custom_fields, created_at, updated_at')
       .eq('id', id)
       .eq('workspace_id', member.workspace_id)
       .is('deleted_at', null)
-      .single()
+    if (member.role === 'rep') leadQuery = leadQuery.eq('assigned_to', user.id)
+    const { data: lead, error } = await leadQuery.single()
 
     if (error || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
@@ -155,6 +157,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
 
     if (!existing) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    if (member.role === 'rep' && existing.assigned_to !== user.id) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+    if (
+      member.role === 'rep' &&
+      patch.assigned_to !== undefined &&
+      patch.assigned_to !== user.id
+    ) {
+      return NextResponse.json({ error: 'Reps cannot reassign leads' }, { status: 403 })
+    }
 
     // ── Pipeline auto-move rules ──────────────────────────────────────────
     // If interest_status is changing AND the caller hasn't explicitly set
@@ -255,12 +267,15 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     const { data: member } = await supabase
       .from('workspace_members')
-      .select('workspace_id')
+      .select('workspace_id, role')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .single() as { data: { workspace_id: string } | null; error: unknown }
+      .single() as { data: { workspace_id: string; role: WorkspaceRole } | null; error: unknown }
 
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+    if (!['admin', 'super_admin'].includes(member.role)) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
 
     // Hard delete via admin client (bypasses RLS)
     const admin = createAdminClient()
