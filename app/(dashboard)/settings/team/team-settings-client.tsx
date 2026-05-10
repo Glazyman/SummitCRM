@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Users, UserPlus, Shield, Mail, MoreHorizontal, Check, X, Clock, RefreshCw } from 'lucide-react'
+import { Users, UserPlus, Shield, Mail, Check, X, Clock, RefreshCw, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -198,17 +198,27 @@ export default function TeamSettingsClient({
     }
   }
 
-  async function handleDeactivate(memberId: string) {
-    if (!confirm('Remove this member from the workspace?')) return
+  async function handleDeleteMember(memberId: string, name: string) {
+    if (!confirm(`Remove ${name} from the workspace? This cannot be undone.`)) return
     const res = await fetch('/api/team/members', {
-      method: 'PATCH',
+      method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id: memberId, is_active: false }),
+      body: JSON.stringify({ member_id: memberId }),
     })
     if (res.ok) {
-      setMembers((prev) =>
-        prev.map((m) => m.id === memberId ? { ...m, is_active: false } : m)
-      )
+      setMembers((prev) => prev.filter((m) => m.id !== memberId))
+    }
+  }
+
+  async function handleDeleteInvite(inviteId: string, email: string) {
+    if (!confirm(`Cancel invitation for ${email}?`)) return
+    const res = await fetch('/api/team/invite', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invitation_id: inviteId }),
+    })
+    if (res.ok) {
+      setInvites((prev) => prev.filter((i) => i.id !== inviteId))
     }
   }
 
@@ -275,12 +285,23 @@ export default function TeamSettingsClient({
                       Expires {new Date(invite.expires_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <span className={cn(
-                    'px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide border',
-                    ROLE_COLORS[invite.role as WorkspaceRole] ?? 'bg-muted text-muted-foreground border-border'
-                  )}>
-                    {ROLE_LABELS[invite.role as WorkspaceRole] ?? invite.role}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className={cn(
+                      'px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide border',
+                      ROLE_COLORS[invite.role as WorkspaceRole] ?? 'bg-muted text-muted-foreground border-border'
+                    )}>
+                      {ROLE_LABELS[invite.role as WorkspaceRole] ?? invite.role}
+                    </span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteInvite(invite.id, invite.email)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        title="Cancel invitation"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -358,11 +379,11 @@ export default function TeamSettingsClient({
                           ))}
                         </select>
                         <button
-                          onClick={() => handleDeactivate(member.id)}
+                          onClick={() => handleDeleteMember(member.id, member.full_name ?? member.email ?? 'this member')}
                           className="text-muted-foreground hover:text-destructive transition-colors"
-                          title="Remove from workspace"
+                          title="Delete member"
                         >
-                          <X className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </>
                     ) : (
@@ -403,20 +424,29 @@ export default function TeamSettingsClient({
                     </div>
                   </div>
                   {isAdmin && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        const res = await fetch('/api/team/members', {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ member_id: member.id, is_active: true }),
-                        })
-                        if (res.ok) setMembers((prev) => prev.map((m) => m.id === member.id ? { ...m, is_active: true } : m))
-                      }}
-                    >
-                      Reactivate
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          const res = await fetch('/api/team/members', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ member_id: member.id, is_active: true }),
+                          })
+                          if (res.ok) setMembers((prev) => prev.map((m) => m.id === member.id ? { ...m, is_active: true } : m))
+                        }}
+                      >
+                        Reactivate
+                      </Button>
+                      <button
+                        onClick={() => handleDeleteMember(member.id, member.full_name ?? member.email ?? 'this member')}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        title="Delete permanently"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}

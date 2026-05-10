@@ -117,3 +117,37 @@ export async function POST(req: NextRequest) {
     invitation: { id: invitation.id, email, role, expires_at: expiresAt, invite_url: inviteUrl },
   }, { status: 201 })
 }
+
+// DELETE /api/team/invite — cancel a pending invitation
+export async function DELETE(req: NextRequest) {
+  const supabase = await createClient() as any
+  const admin = createAdminClient() as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: member } = await admin
+    .from('workspace_members')
+    .select('workspace_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+  if (!['admin', 'super_admin'].includes(member.role)) {
+    return NextResponse.json({ error: 'Only admins can cancel invitations' }, { status: 403 })
+  }
+
+  const body = await req.json().catch(() => ({}))
+  const { invitation_id }: { invitation_id: string } = body
+  if (!invitation_id) return NextResponse.json({ error: 'invitation_id is required' }, { status: 400 })
+
+  const { error } = await admin
+    .from('invitations')
+    .delete()
+    .eq('id', invitation_id)
+    .eq('workspace_id', member.workspace_id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ success: true })
+}
