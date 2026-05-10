@@ -3,10 +3,11 @@
 import React, { useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
+  ResponsiveContainer,
+  Cell,
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart2 } from 'lucide-react'
+import { BarChart2, Trophy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RepStat } from './types'
 
@@ -46,7 +47,9 @@ interface RepPerformanceChartProps {
 }
 
 export function RepPerformanceChart({ stats, loading }: RepPerformanceChartProps) {
+  const [view, setView] = useState<'overview' | 'calls_race'>('calls_race')
   const [active, setActive] = useState<Set<Metric>>(new Set(['calls_count', 'leads_assigned', 'emails_sent']))
+  const REP_COLORS = ['#2563eb', '#16a34a', '#db2777', '#d97706', '#7c3aed', '#0891b2', '#dc2626', '#4f46e5', '#65a30d', '#0d9488']
 
   // Sort by calls desc, take top 15
   const chartData = [...stats]
@@ -59,6 +62,7 @@ export function RepPerformanceChart({ stats, loading }: RepPerformanceChartProps
       leads_assigned: s.leads_assigned,
       emails_sent:    s.emails_sent,
     }))
+  const winner = chartData[0]
 
   function toggleMetric(key: Metric) {
     setActive((prev) => {
@@ -78,24 +82,27 @@ export function RepPerformanceChart({ stats, loading }: RepPerformanceChartProps
             Rep performance
           </CardTitle>
 
-          {/* Metric toggles */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {METRICS.map(({ key, label, color }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => toggleMetric(key)}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all',
-                  active.has(key)
-                    ? 'border-border bg-card text-foreground shadow-sm'
-                    : 'border-transparent text-muted-foreground opacity-50',
-                )}
-              >
-                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setView('calls_race')}
+              className={cn(
+                'rounded-lg border px-3 py-1.5 text-xs font-medium',
+                view === 'calls_race' ? 'border-border bg-card shadow-sm' : 'opacity-60'
+              )}
+            >
+              Calls by Rep
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('overview')}
+              className={cn(
+                'rounded-lg border px-3 py-1.5 text-xs font-medium',
+                view === 'overview' ? 'border-border bg-card shadow-sm' : 'opacity-60'
+              )}
+            >
+              Overview
+            </button>
           </div>
         </div>
       </CardHeader>
@@ -110,44 +117,89 @@ export function RepPerformanceChart({ stats, loading }: RepPerformanceChartProps
             No rep data yet
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={chartData}
-              margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
-              barCategoryGap="28%"
-              barGap={3}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="hsl(220 16% 87%)"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 12, fill: 'hsl(220 10% 45%)' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                allowDecimals={false}
-                tick={{ fontSize: 11, fill: 'hsl(220 10% 45%)' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(220 14% 90% / 0.5)' }} />
+          <>
+            {view === 'calls_race' && winner && (
+              <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-300/70 bg-amber-100/60 px-3 py-2 text-sm">
+                <Trophy className="h-4 w-4 text-amber-700" />
+                <span className="font-medium">Winning rep:</span>
+                <span className="font-semibold">{winner.fullName}</span>
+                <span className="text-muted-foreground">({winner.calls_count} calls)</span>
+              </div>
+            )}
 
-              {METRICS.filter((m) => active.has(m.key)).map(({ key, label, color }) => (
-                <Bar
-                  key={key}
-                  dataKey={key}
-                  name={label}
-                  fill={color}
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={40}
+            {view === 'overview' && (
+              <div className="mb-3 flex items-center gap-2 flex-wrap">
+                {METRICS.map(({ key, label, color }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleMetric(key)}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all',
+                      active.has(key)
+                        ? 'border-border bg-card text-foreground shadow-sm'
+                        : 'border-transparent text-muted-foreground opacity-50',
+                    )}
+                  >
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart
+                data={chartData}
+                margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+                barCategoryGap="28%"
+                barGap={3}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(220 16% 87%)"
+                  vertical={false}
                 />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 12, fill: 'hsl(220 10% 45%)' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fontSize: 11, fill: 'hsl(220 10% 45%)' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(220 14% 90% / 0.5)' }} />
+
+                {view === 'calls_race' ? (
+                  <Bar
+                    dataKey="calls_count"
+                    name="Calls"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={42}
+                  >
+                    {chartData.map((_, idx) => (
+                      <Cell key={`rep-color-${idx}`} fill={REP_COLORS[idx % REP_COLORS.length]} />
+                    ))}
+                  </Bar>
+                ) : (
+                  METRICS.filter((m) => active.has(m.key)).map(({ key, label, color }) => (
+                    <Bar
+                      key={key}
+                      dataKey={key}
+                      name={label}
+                      fill={color}
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={40}
+                    />
+                  ))
+                )}
+              </BarChart>
+            </ResponsiveContainer>
+          </>
         )}
       </CardContent>
     </Card>
