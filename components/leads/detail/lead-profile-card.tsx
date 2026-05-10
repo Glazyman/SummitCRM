@@ -170,16 +170,14 @@ export function LeadProfileCard({
             {onStatusChange ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity',
-                      statusMeta.badge
-                    )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', statusMeta.badge)}
                   >
                     {statusMeta.label}
                     <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                  </button>
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" minWidth="170px">
                   <DropdownMenuLabel>Change status</DropdownMenuLabel>
@@ -203,7 +201,7 @@ export function LeadProfileCard({
               </DropdownMenu>
             ) : (
               <span className={cn(
-                'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium',
                 statusMeta.badge
               )}>
                 {statusMeta.label}
@@ -214,16 +212,14 @@ export function LeadProfileCard({
             {onInterestChange && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity',
-                      interestMeta ? interestMeta.badge : 'bg-slate-100 text-slate-600 border-slate-200'
-                    )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', interestMeta ? interestMeta.badge : 'bg-muted text-muted-foreground')}
                   >
-                    {interestMeta?.label ?? 'Interest'}
+                    {interestMeta?.icon} {interestMeta?.label ?? 'Interest'}
                     <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                  </button>
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" minWidth="160px">
                   <DropdownMenuLabel>Interest level</DropdownMenuLabel>
@@ -236,7 +232,7 @@ export function LeadProfileCard({
                         className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}
                       >
                         <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
-                        {m.label}
+                        {m.icon} {m.label}
                         {s === lead.interest_status && (
                           <span className="ml-auto text-xs text-muted-foreground">current</span>
                         )}

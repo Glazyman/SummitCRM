@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
-import { ArrowLeft, KeyRound } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ArrowLeft } from 'lucide-react'
 import { ProfileForm } from './profile-form'
+import { ChangePasswordForm } from './change-password-form'
 
 export const metadata: Metadata = { title: 'Profile — Settings' }
 
@@ -37,23 +37,7 @@ export default async function ProfilePage() {
       <ProfileForm initialName={fullName} email={email} />
 
       {/* Password */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <KeyRound className="w-4 h-4 text-muted-foreground" />
-            <CardTitle className="text-base">Password</CardTitle>
-          </div>
-          <CardDescription>Use a strong, unique password for your account.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link
-            href="/forgot-password"
-            className="text-sm text-primary hover:underline font-medium"
-          >
-            Reset password via email →
-          </Link>
-        </CardContent>
-      </Card>
+      <ChangePasswordForm />
     </div>
   )
 }

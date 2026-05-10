@@ -6,13 +6,14 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowUpDown, ArrowUp, ArrowDown,
   Mail, ExternalLink, MoreHorizontal,
-  Building2, User, Clock,
+  Building2, User, Clock, ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator,
@@ -317,17 +318,14 @@ function StatusDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap',
-            'cursor-pointer transition-all hover:opacity-80 active:scale-95',
-            meta.badge
-          )}
+        <Button
+          size="sm"
+          variant="outline"
+          className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', meta.badge)}
         >
           {meta.label}
-          <ArrowUpDown className="h-3 w-3 shrink-0 opacity-50" />
-        </button>
+          <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" minWidth="170px" side="top">
         {ALL_STATUSES.map((status) => {
@@ -363,17 +361,14 @@ function InterestDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap',
-            'cursor-pointer transition-all hover:opacity-80 active:scale-95',
-            meta.badge
-          )}
+        <Button
+          size="sm"
+          variant="outline"
+          className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', meta.badge)}
         >
-          {meta.label}
-          <ArrowUpDown className="h-3 w-3 shrink-0 opacity-50" />
-        </button>
+          {meta.icon} {meta.label}
+          <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" minWidth="155px" side="top">
         {ALL_INTEREST_STATUSES.map((status) => {
@@ -386,7 +381,7 @@ function InterestDropdown({
               className={cn(current && 'opacity-50 cursor-default')}
             >
               <span className={cn('h-2 w-2 rounded-full', m.dot)} />
-              {m.label}
+              {m.icon} {m.label}
               {current && <span className="ml-auto text-xs text-muted-foreground">current</span>}
             </DropdownMenuItem>
           )

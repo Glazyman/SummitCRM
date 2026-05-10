@@ -4,6 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { Activity, Clock, Phone, X, ExternalLink, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuLabel,
@@ -291,16 +292,14 @@ export function LeadFullPanel({
               <div className="flex shrink-0 items-center gap-1.5 border-l border-border px-3">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:opacity-80 transition-opacity',
-                        STATUS_CONFIG[lead.status].badge
-                      )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', STATUS_CONFIG[lead.status].badge)}
                     >
                       {STATUS_CONFIG[lead.status].label}
                       <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                    </button>
+                    </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" minWidth="170px">
                     <DropdownMenuLabel>Change status</DropdownMenuLabel>
@@ -323,16 +322,14 @@ export function LeadFullPanel({
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:opacity-80 transition-opacity',
-                        INTEREST_CONFIG[lead.interest_status].badge
-                      )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', INTEREST_CONFIG[lead.interest_status].badge)}
                     >
-                      {INTEREST_CONFIG[lead.interest_status].label}
+                      {INTEREST_CONFIG[lead.interest_status].icon} {INTEREST_CONFIG[lead.interest_status].label}
                       <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                    </button>
+                    </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" minWidth="160px">
                     <DropdownMenuLabel>Interest level</DropdownMenuLabel>
@@ -345,7 +342,7 @@ export function LeadFullPanel({
                           className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}
                         >
                           <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
-                          {m.label}
+                          {m.icon} {m.label}
                           {s === lead.interest_status && <span className="ml-auto text-xs text-muted-foreground">current</span>}
                         </DropdownMenuItem>
                       )
