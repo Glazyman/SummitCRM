@@ -5,19 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Plus, GripVertical, Building2, Phone,
-  X, Mail, Globe, ExternalLink, ChevronDown, Search,
-  Clock,
-  Columns3, List,
+  Clock, Search, Columns3, List,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu'
-import {
-  INTEREST_CONFIG, ALL_INTEREST_STATUSES,
-  STATUS_CONFIG, ALL_STATUSES,
+  INTEREST_CONFIG,
+  STATUS_CONFIG,
 } from '@/components/leads/status-config'
+import { LeadFullPanel } from '@/components/leads/lead-full-panel'
 import type { InterestStatus } from '@/types/database'
 import type { LeadStatus } from '@/components/leads/types'
 
@@ -35,7 +30,7 @@ interface PipelineLead {
 }
 interface Props {
   stages: PipelineStage[]; initialLeads: PipelineLead[]
-  workspaceId: string; isAdmin: boolean
+  workspaceId: string; isAdmin: boolean; currentUserId: string
 }
 
 function timeAgo(iso: string) {
@@ -55,7 +50,7 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-export default function PipelineClient({ stages, initialLeads }: Props) {
+export default function PipelineClient({ stages, initialLeads, isAdmin, currentUserId }: Props) {
   const router = useRouter()
   const [leads,          setLeads]          = React.useState<PipelineLead[]>(initialLeads)
   const [draggingId,     setDraggingId]     = React.useState<string | null>(null)
@@ -316,12 +311,16 @@ export default function PipelineClient({ stages, initialLeads }: Props) {
         </div>
       )}
 
-      {/* ── Drawer ── */}
+      {/* ── Side panel ── */}
       {selectedLeadId && (
         <>
           <div className="fixed inset-0 z-40 bg-black/25" onClick={() => setSelectedLeadId(null)} />
-          <LeadDrawer
+          <LeadFullPanel
             leadId={selectedLeadId}
+            teamMembers={[]}
+            isAdmin={isAdmin}
+            currentUserId={currentUserId}
+            canEditBatch={isAdmin}
             onClose={() => setSelectedLeadId(null)}
             onLeadChange={patch => patchLead(selectedLeadId, patch)}
           />
@@ -422,177 +421,3 @@ function LeadCard({
   )
 }
 
-// ── Lead drawer ────────────────────────────────────────────────────────────
-interface FullLead {
-  id: string; first_name: string | null; last_name: string | null
-  email: string; phone: string | null; company: string | null
-  title: string | null; website: string | null
-  status: LeadStatus; interest_status: InterestStatus
-}
-
-function LeadDrawer({
-  leadId, onClose, onLeadChange,
-}: {
-  leadId: string; onClose: () => void; onLeadChange: (patch: Partial<PipelineLead>) => void
-}) {
-  const [lead,    setLead]    = React.useState<FullLead | null>(null)
-  const [loading, setLoading] = React.useState(true)
-
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true); setLead(null)
-    fetch(`/api/leads/${leadId}`)
-      .then(r => r.json()).then(d => setLead(d.lead ?? null))
-      .catch(console.error).finally(() => setLoading(false))
-  }, [leadId])
-
-  async function changeStatus(status: LeadStatus) {
-    if (!lead) return
-    setLead(l => l ? { ...l, status } : l); onLeadChange({ status })
-    await fetch(`/api/leads/${leadId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }).catch(console.error)
-  }
-  async function changeInterest(interest_status: InterestStatus) {
-    if (!lead) return
-    setLead(l => l ? { ...l, interest_status } : l); onLeadChange({ interest_status })
-    await fetch(`/api/leads/${leadId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interest_status }) }).catch(console.error)
-  }
-
-  const name         = lead ? [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email : '…'
-  const statusMeta   = lead ? STATUS_CONFIG[lead.status] : null
-  const interestMeta = lead ? INTEREST_CONFIG[lead.interest_status] : null
-  const initials     = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-
-  return (
-    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-[390px] flex-col bg-background shadow-2xl border-l border-border">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary text-[13px] font-black">
-            {initials}
-          </div>
-          <div className="min-w-0">
-            <p className="font-bold text-[15px] leading-tight truncate text-foreground">{name}</p>
-            {lead?.company && <p className="text-[12px] text-muted-foreground truncate">{lead.company}</p>}
-          </div>
-        </div>
-        <button type="button" onClick={onClose}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-gray-600" />
-        </div>
-      ) : lead ? (
-        <div className="flex-1 overflow-y-auto">
-
-          {/* Status & Interest */}
-          <div className="px-5 py-4 border-b border-border">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Lead status</p>
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button type="button" className={cn(
-                      'w-full flex items-center justify-between gap-1 rounded-xl border px-3 py-2 text-[11px] font-bold cursor-pointer hover:opacity-80 transition-opacity',
-                      statusMeta?.badge
-                    )}>
-                      <span className="truncate">{statusMeta?.label}</span>
-                      <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" minWidth="170px">
-                    <DropdownMenuLabel>Change status</DropdownMenuLabel>
-                    {ALL_STATUSES.map(s => {
-                      const m = STATUS_CONFIG[s]
-                      return (
-                        <DropdownMenuItem key={s} onClick={() => changeStatus(s)}
-                          className={cn(s === lead.status && 'opacity-50 cursor-default')}>
-                          <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />{m.label}
-                          {s === lead.status && <span className="ml-auto text-xs text-muted-foreground">current</span>}
-                        </DropdownMenuItem>
-                      )
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Interest</p>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button type="button" className={cn(
-                      'w-full flex items-center justify-between gap-1 rounded-xl border px-3 py-2 text-[11px] font-bold cursor-pointer hover:opacity-80 transition-opacity',
-                      interestMeta?.badge
-                    )}>
-                      <span className="truncate">{interestMeta?.label}</span>
-                      <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" minWidth="160px">
-                    <DropdownMenuLabel>Interest level</DropdownMenuLabel>
-                    {ALL_INTEREST_STATUSES.map(s => {
-                      const m = INTEREST_CONFIG[s]
-                      return (
-                        <DropdownMenuItem key={s} onClick={() => changeInterest(s)}
-                          className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}>
-                          <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />{m.label}
-                          {s === lead.interest_status && <span className="ml-auto text-xs text-muted-foreground">current</span>}
-                        </DropdownMenuItem>
-                      )
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          </div>
-
-          {/* Contact info */}
-          <div className="px-5 py-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Contact</p>
-            <div className="space-y-2">
-              <a href={`tel:${lead.phone}`}
-                className={cn(
-                  'flex items-center gap-3.5 w-full rounded-2xl border border-border bg-card px-4 py-3.5',
-                  'text-[13px] font-medium text-foreground',
-                  'hover:bg-muted hover:border-border transition-all',
-                  !lead.phone && 'opacity-40 pointer-events-none'
-                )}>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background border border-border shadow-sm">
-                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-                {lead.phone || 'No phone number'}
-              </a>
-              <a href={`mailto:${lead.email}`}
-                className="flex items-center gap-3.5 w-full rounded-2xl border border-border bg-card px-4 py-3.5 text-[13px] font-medium text-foreground hover:bg-muted hover:border-border transition-all">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background border border-border shadow-sm">
-                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-                <span className="truncate">{lead.email}</span>
-              </a>
-              {lead.website && (
-                <a href={lead.website} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-3.5 w-full rounded-2xl border border-border bg-card px-4 py-3.5 text-[13px] font-medium text-foreground hover:bg-muted hover:border-border transition-all">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background border border-border shadow-sm">
-                    <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                  </div>
-                  <span className="truncate">{lead.website.replace(/^https?:\/\//, '')}</span>
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Footer */}
-      <div className="border-t border-border px-5 py-4">
-        <Link href={`/leads/${leadId}`}
-          className="flex items-center justify-center gap-2 w-full h-11 rounded-2xl bg-primary text-primary-foreground text-[13px] font-bold hover:bg-primary/90 transition-colors shadow-sm">
-          Open Full Profile <ExternalLink className="h-4 w-4" />
-        </Link>
-      </div>
-    </div>
-  )
-}

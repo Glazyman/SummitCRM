@@ -71,6 +71,7 @@ export default async function PipelinePage() {
       initialLeads={rawLeads as any}
       workspaceId={member.workspace_id}
       isAdmin={isAdmin}
+      currentUserId={user.id}
     />
   )
 }
