@@ -107,7 +107,11 @@ export function LeadFullPanel({
     setData((d) => d ? { ...d, lead: { ...d.lead, status } } : d)
     onLeadChange({ status })
     try {
-      await fetch(`/api/leads/${leadId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+      const res = await fetch(`/api/leads/${leadId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && json.follow_up_suggestion) {
+        setFollowUpPrompt(json.follow_up_suggestion as { title: string; notes: string | null; due_at: string })
+      }
     } catch {
       setData((d) => d ? { ...d, lead: { ...d.lead, status: prev } } : d)
       onLeadChange({ status: prev })

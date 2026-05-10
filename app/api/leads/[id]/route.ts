@@ -14,6 +14,30 @@ const STATUS_TO_CALL_OUTCOME: Partial<Record<LeadStatus, CallOutcome>> = {
   sold_already: 'answered',
 }
 
+function followUpSuggestionForStatus(status: LeadStatus) {
+  if (status === 'voicemail') {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(10, 0, 0, 0)
+    return {
+      title: 'Follow up after voicemail',
+      notes: 'Left voicemail. Try again tomorrow morning.',
+      due_at: d.toISOString(),
+    }
+  }
+  if (status === 'no_answer') {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(10, 0, 0, 0)
+    return {
+      title: 'Follow up after no answer',
+      notes: 'No answer. Retry tomorrow morning.',
+      due_at: d.toISOString(),
+    }
+  }
+  return null
+}
+
 type Params = { params: Promise<{ id: string }> }
 
 // ── GET /api/leads/:id ────────────────────────────────────────────────────
@@ -277,7 +301,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       await adminClient.from('activity_logs').insert(logInserts as never)
     }
 
-    return NextResponse.json({ lead })
+    const followUpSuggestion = patch.status ? followUpSuggestionForStatus(patch.status as LeadStatus) : null
+    return NextResponse.json({ lead, follow_up_suggestion: followUpSuggestion })
   } catch (err) {
     console.error('[PATCH /api/leads/[id]]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
