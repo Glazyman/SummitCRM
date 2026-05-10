@@ -18,6 +18,9 @@ export interface OverviewTotals {
   bounce_rate:      number
   active_leads:     number
   new_leads_period: number
+  interested_leads: number   // leads with interest_status = 'interested'
+  calls_period:     number   // call_logged activities in date range
+  leads_contacted:  number   // leads with status in called/voicemail/no_answer/emailed/contacted/replied
 }
 
 export interface OverviewData {
@@ -27,20 +30,23 @@ export interface OverviewData {
   active_campaigns:   number
   ai_tokens_month:    number
   ai_cost_usd:        number
+  lead_status_counts: Record<string, number>
 }
 
 // ── /api/admin/team-stats ─────────────────────────────────────────────────
 export interface RepStat {
-  user_id:       string
-  user_email:    string
-  full_name:     string | null
-  role:          string
-  emails_sent:   number
-  emails_opened: number
-  emails_replied:number
-  open_rate:     number   // %
-  reply_rate:    number   // %
-  last_active:   string | null
+  user_id:        string
+  user_email:     string
+  full_name:      string | null
+  role:           string
+  emails_sent:    number
+  emails_opened:  number
+  emails_replied: number
+  open_rate:      number   // %
+  reply_rate:     number   // %
+  last_active:    string | null
+  leads_assigned: number
+  calls_count:    number
 }
 
 // ── /api/admin/account-health ─────────────────────────────────────────────

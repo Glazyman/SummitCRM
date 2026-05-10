@@ -86,6 +86,8 @@ export async function POST(req: NextRequest) {
   // Send invite email via Supabase auth or Resend
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    process.env.SITE_URL?.trim() ||
     req.nextUrl.origin ||
     'http://localhost:3000'
   const inviteUrl = `${baseUrl}/accept-invite?token=${token}`

@@ -57,7 +57,7 @@ export async function GET(req: Request) {
     const wsId = member.workspace_id
 
     // Load all active members + their emails in the period
-    const [membersRes, emailsRes] = await Promise.all([
+    const [membersRes, emailsRes, leadsAssignedRes] = await Promise.all([
       adminClient
         .from('workspace_members')
         .select('user_id, role, users:user_id(email, raw_user_meta_data)')
@@ -70,13 +70,52 @@ export async function GET(req: Request) {
         .eq('workspace_id', wsId)
         .gte('created_at', range.start)
         .lte('created_at', range.end),
+
+      // leads assigned per user
+      adminClient
+        .from('leads')
+        .select('assigned_to')
+        .eq('workspace_id', wsId)
+        .not('assigned_to', 'is', null)
+        .is('deleted_at', null),
     ]) as [
       { data: Array<{ user_id: string; role: string; users: { email: string; raw_user_meta_data: Record<string, unknown> } | null }> | null },
-      { data: Array<{ sent_by: string | null; status: string; created_at: string }> | null }
+      { data: Array<{ sent_by: string | null; status: string; created_at: string }> | null },
+      { data: Array<{ assigned_to: string }> | null }
     ]
 
-    const members = membersRes.data ?? []
-    const emails  = emailsRes.data  ?? []
+    // Calls per rep (separate query — join syntax may vary)
+    let callRows: Array<{ user_id: string }> = []
+    try {
+      const cr = await adminClient
+        .from('activities')
+        .select('user_id, leads!inner(workspace_id)')
+        .eq('leads.workspace_id', wsId)
+        .eq('type', 'call_logged')
+        .gte('created_at', range.start)
+        .lte('created_at', range.end)
+      callRows = (cr.data ?? []) as Array<{ user_id: string }>
+    } catch {}
+
+    const members      = membersRes.data       ?? []
+    const emails       = emailsRes.data        ?? []
+    const leadsRows    = leadsAssignedRes.data  ?? []
+
+    // Count leads assigned per user
+    const leadsByUser = new Map<string, number>()
+    for (const row of leadsRows) {
+      if (row.assigned_to) {
+        leadsByUser.set(row.assigned_to, (leadsByUser.get(row.assigned_to) ?? 0) + 1)
+      }
+    }
+
+    // Count calls per user
+    const callsByUser = new Map<string, number>()
+    for (const row of callRows) {
+      if (row.user_id) {
+        callsByUser.set(row.user_id, (callsByUser.get(row.user_id) ?? 0) + 1)
+      }
+    }
 
     // Group emails by sent_by
     const emailByUser = new Map<string, { sent: number; opened: number; replied: number; bounced: number }>()
@@ -108,6 +147,8 @@ export async function GET(req: Request) {
         open_rate:      openRate,
         reply_rate:     replyRate,
         last_active:    null,   // TODO: join activities
+        leads_assigned: leadsByUser.get(m.user_id) ?? 0,
+        calls_count:    callsByUser.get(m.user_id)  ?? 0,
       }
     }).sort((a, b) => b.emails_sent - a.emails_sent)
 

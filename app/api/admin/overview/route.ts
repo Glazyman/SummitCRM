@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     const wsId = member.workspace_id
 
     // Parallel queries
-    const [emailsRes, leadsRes, leadsNewRes, campaignsRes, aiRes, accountsRes] =
+    const [emailsRes, leadsRes, leadsNewRes, campaignsRes, aiRes, accountsRes, interestedRes, contactedRes, statusesRes] =
       await Promise.all([
         adminClient
           .from('emails')
@@ -92,14 +92,53 @@ export async function GET(req: Request) {
           .select('id, name, from_email, type, emails_sent_today, daily_limit, is_active')
           .eq('workspace_id', wsId)
           .eq('is_active', true),
+
+        // interested leads
+        adminClient
+          .from('leads')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', wsId)
+          .eq('interest_status', 'interested')
+          .is('deleted_at', null),
+
+        // contacted leads (reached at least once)
+        adminClient
+          .from('leads')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', wsId)
+          .in('status', ['called', 'voicemail', 'no_answer', 'emailed', 'contacted', 'replied'])
+          .is('deleted_at', null),
+
+        // all lead statuses for breakdown
+        adminClient
+          .from('leads')
+          .select('status')
+          .eq('workspace_id', wsId)
+          .is('deleted_at', null),
       ]) as [
         { data: Array<{ status: string }> | null },
         { count: number | null },
         { count: number | null },
         { count: number | null },
         { data: Array<{ total_tokens: number; cost_usd: number }> | null },
-        { data: Array<{ id: string; name: string; from_email: string; type: string; emails_sent_today: number; daily_limit: number; is_active: boolean }> | null }
+        { data: Array<{ id: string; name: string; from_email: string; type: string; emails_sent_today: number; daily_limit: number; is_active: boolean }> | null },
+        { count: number | null },
+        { count: number | null },
+        { data: Array<{ status: string }> | null }
       ]
+
+    // Calls count (separate query — join syntax may vary)
+    let callsCount = 0
+    try {
+      const callsRes = await adminClient
+        .from('activities')
+        .select('id, leads!inner(workspace_id)', { count: 'exact', head: true })
+        .eq('leads.workspace_id', wsId)
+        .eq('type', 'call_logged')
+        .gte('created_at', range.start)
+        .lte('created_at', range.end)
+      callsCount = callsRes.count ?? 0
+    } catch {}
 
     const emails      = emailsRes.data     ?? []
     const sent        = emails.filter((e) => e.status !== 'queued')
@@ -114,6 +153,13 @@ export async function GET(req: Request) {
     const aiRows      = aiRes.data ?? []
     const aiTokens    = aiRows.reduce((s, r) => s + r.total_tokens, 0)
     const aiCost      = aiRows.reduce((s, r) => s + r.cost_usd, 0)
+
+    // Build lead status breakdown
+    const statusRows = statusesRes.data ?? []
+    const lead_status_counts: Record<string, number> = {}
+    for (const row of statusRows) {
+      lead_status_counts[row.status] = (lead_status_counts[row.status] ?? 0) + 1
+    }
 
     const accounts    = accountsRes.data ?? []
     const quotaWarnings = accounts
@@ -132,13 +178,17 @@ export async function GET(req: Request) {
         open_rate:        openRate,
         reply_rate:       replyRate,
         bounce_rate:      bounceRate,
-        active_leads:     leadsRes.count    ?? 0,
-        new_leads_period: leadsNewRes.count ?? 0,
+        active_leads:     leadsRes.count     ?? 0,
+        new_leads_period: leadsNewRes.count  ?? 0,
+        interested_leads: interestedRes.count ?? 0,
+        calls_period:     callsCount,
+        leads_contacted:  contactedRes.count  ?? 0,
       },
-      quota_warnings:   quotaWarnings,
-      active_campaigns: campaignsRes.count ?? 0,
-      ai_tokens_month:  aiTokens,
-      ai_cost_usd:      Math.round(aiCost * 10000) / 10000,
+      quota_warnings:     quotaWarnings,
+      active_campaigns:   campaignsRes.count ?? 0,
+      ai_tokens_month:    aiTokens,
+      ai_cost_usd:        Math.round(aiCost * 10000) / 10000,
+      lead_status_counts,
     })
   } catch (err) {
     console.error('[GET /api/admin/overview]', err)

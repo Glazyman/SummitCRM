@@ -11,7 +11,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import {
-  UserPlus, Settings, Megaphone, AlertCircle, X, Mail, Check,
+  UserPlus, Settings, Megaphone, AlertCircle, X, Mail, Check, Upload, Database,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,17 +20,29 @@ interface InviteModalProps {
 }
 
 function InviteModal({ onClose }: InviteModalProps) {
-  const [email, setEmail]     = useState('')
-  const [role,  setRole]      = useState('rep')
-  const [sent,  setSent]      = useState(false)
+  const [email,   setEmail]   = useState('')
+  const [role,    setRole]    = useState('rep')
+  const [sent,    setSent]    = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState('')
 
   const handleSend = async () => {
     setLoading(true)
-    // Placeholder — wire to /api/workspace/invite when built
-    await new Promise((r) => setTimeout(r, 800))
-    setSent(true)
-    setLoading(false)
+    setError('')
+    try {
+      const res = await fetch('/api/team/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, role }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to send invite')
+      setSent(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send invite')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -70,6 +82,7 @@ function InviteModal({ onClose }: InviteModalProps) {
                 </select>
               </div>
             </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="flex gap-2 pt-2">
               <Button onClick={handleSend} disabled={!email || loading} className="flex-1 gap-2">
                 {loading ? 'Sending…' : <><Mail className="h-4 w-4" /> Send invite</>}
@@ -137,6 +150,20 @@ export function QuickActionsBar({ isAdmin, quotaAlerts = 0 }: QuickActionsBarPro
           <Link href="/campaigns">
             <Megaphone className="h-4 w-4" />
             <span className="hidden sm:inline">All campaigns</span>
+          </Link>
+        </Button>
+
+        <Button variant="outline" size="sm" asChild className="gap-2 h-9">
+          <Link href="/leads/import">
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline">Import leads</span>
+          </Link>
+        </Button>
+
+        <Button variant="outline" size="sm" asChild className="gap-2 h-9">
+          <Link href="/batches">
+            <Database className="h-4 w-4" />
+            <span className="hidden sm:inline">Batches</span>
           </Link>
         </Button>
 

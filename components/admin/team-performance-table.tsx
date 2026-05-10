@@ -12,11 +12,11 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge }    from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Users, ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink } from 'lucide-react'
+import { Users, ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, PhoneCall } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RepStat } from './types'
 
-type SortField = 'full_name' | 'emails_sent' | 'open_rate' | 'reply_rate' | 'emails_replied'
+type SortField = 'full_name' | 'emails_sent' | 'open_rate' | 'reply_rate' | 'emails_replied' | 'leads_assigned' | 'calls_count'
 type SortDir   = 'asc' | 'desc'
 
 function initials(name: string | null, email: string): string {
@@ -99,6 +99,8 @@ export function TeamPerformanceTable({ stats, loading }: TeamPerformanceTablePro
               <tr className="border-b bg-muted/40">
                 {([
                   { key: 'full_name',      label: 'Rep'           },
+                  { key: 'leads_assigned', label: 'Leads'         },
+                  { key: 'calls_count',    label: 'Calls'         },
                   { key: 'emails_sent',    label: 'Sent'          },
                   { key: 'open_rate',      label: 'Open rate'     },
                   { key: 'reply_rate',     label: 'Reply rate'    },
@@ -124,6 +126,8 @@ export function TeamPerformanceTable({ stats, loading }: TeamPerformanceTablePro
               {loading && Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b animate-pulse">
                   <td className="px-4 py-3"><div className="h-4 w-32 rounded bg-muted" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-12 rounded bg-muted" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-12 rounded bg-muted" /></td>
                   <td className="px-4 py-3"><div className="h-4 w-16 rounded bg-muted" /></td>
                   <td className="px-4 py-3"><div className="h-4 w-20 rounded bg-muted" /></td>
                   <td className="px-4 py-3"><div className="h-4 w-20 rounded bg-muted" /></td>
@@ -153,6 +157,19 @@ export function TeamPerformanceTable({ stats, loading }: TeamPerformanceTablePro
                         <Badge className={cn('text-xs ml-1', ROLE_COLORS[rep.role] ?? ROLE_COLORS.rep)}>
                           {rep.role}
                         </Badge>
+                      </div>
+                    </td>
+
+                    {/* Leads assigned */}
+                    <td className="px-4 py-3 font-medium tabular-nums">
+                      {rep.leads_assigned.toLocaleString()}
+                    </td>
+
+                    {/* Calls logged */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <PhoneCall className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="font-medium tabular-nums">{rep.calls_count.toLocaleString()}</span>
                       </div>
                     </td>
 
@@ -202,7 +219,7 @@ export function TeamPerformanceTable({ stats, loading }: TeamPerformanceTablePro
               })}
               {!loading && sorted.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground text-sm">
                     No team members found
                   </td>
                 </tr>

@@ -6,6 +6,7 @@ export { SendingAccountHealthTable }                 from './sending-account-hea
 export { ActiveCampaignsSummary }                    from './active-campaigns-summary'
 export { AiUsageWidget }                             from './ai-usage-widget'
 export { WorkspaceActivityFeed }                     from './workspace-activity-feed'
+export { LeadPipelineBreakdown }                     from './lead-pipeline-breakdown'
 export type {
   DateRange, DateRangePreset, OverviewData, OverviewTotals,
   RepStat, SendingAccountHealth, CampaignSummary,

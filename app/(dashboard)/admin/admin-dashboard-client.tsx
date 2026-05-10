@@ -19,13 +19,13 @@ import {
   TeamPerformanceTable,
   SendingAccountHealthTable,
   ActiveCampaignsSummary,
-  AiUsageWidget,
   WorkspaceActivityFeed,
+  LeadPipelineBreakdown,
 } from '@/components/admin'
 import type {
   DateRangePreset,
   OverviewData, RepStat, SendingAccountHealth,
-  CampaignSummary, AiUsageSummary, ActivityEvent,
+  CampaignSummary, ActivityEvent,
 } from '@/components/admin'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -41,25 +41,21 @@ interface AdminDashboardClientProps {
 const EMPTY_OVERVIEW: OverviewData = {
   date_range: { start: '', end: '' },
   totals: {
-    emails_sent: 0,
-    open_rate: 0,
-    reply_rate: 0,
-    bounce_rate: 0,
-    active_leads: 0,
+    emails_sent:      0,
+    open_rate:        0,
+    reply_rate:       0,
+    bounce_rate:      0,
+    active_leads:     0,
     new_leads_period: 0,
+    interested_leads: 0,
+    calls_period:     0,
+    leads_contacted:  0,
   },
-  quota_warnings: [],
-  active_campaigns: 0,
-  ai_tokens_month: 0,
-  ai_cost_usd: 0,
-}
-
-const EMPTY_AI_USAGE: AiUsageSummary = {
-  total_tokens: 0,
-  total_cost_usd: 0,
-  total_calls: 0,
-  budget: 0,
-  budget_used_pct: 0,
+  quota_warnings:     [],
+  active_campaigns:   0,
+  ai_tokens_month:    0,
+  ai_cost_usd:        0,
+  lead_status_counts: {},
 }
 
 function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardClientProps) {
@@ -73,7 +69,6 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
   const [teamStats, setTeamStats] = useState<RepStat[]>([])
   const [accounts,  setAccounts]  = useState<SendingAccountHealth[]>([])
   const [campaigns, setCampaigns] = useState<CampaignSummary[]>([])
-  const [aiUsage,   setAiUsage]   = useState<AiUsageSummary>(EMPTY_AI_USAGE)
   const [activity,  setActivity]  = useState<ActivityEvent[]>([])
 
   // Per-section loading
@@ -145,12 +140,6 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
     void fetchAccounts()
     void fetchCampaigns()
     void fetchActivity()
-    if (isAdmin) {
-      fetch('/api/admin/ai-usage')
-        .then((r) => r.ok ? r.json() : null)
-        .then((d) => d && setAiUsage(d))
-        .catch(() => {})
-    }
   }
 
   // ── Range picker ──────────────────────────────────────────────────────────
@@ -213,25 +202,25 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
         {/* Quick actions */}
         <QuickActionsBar isAdmin={isAdmin} quotaAlerts={quotaAlerts} />
 
-        {/* KPI overview row */}
+        {/* KPI stats */}
         <OverviewStatsRow
           totals={overview.totals}
           activeCampaigns={overview.active_campaigns}
           loading={loadingOverview}
         />
 
-        {/* Team + accounts — two column on large screens */}
+        {/* Pipeline breakdown */}
+        <LeadPipelineBreakdown
+          counts={overview.lead_status_counts ?? {}}
+          loading={loadingOverview}
+        />
+
+        {/* Team + campaigns — two column */}
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          {/* Team table spans 2/3 */}
           <div className="xl:col-span-2">
             <TeamPerformanceTable stats={teamStats} loading={loadingTeam} />
           </div>
-
-          {/* Right column: AI widget + campaigns */}
-          <div className="space-y-6">
-            {isAdmin && (
-              <AiUsageWidget usage={aiUsage} loading={false} />
-            )}
+          <div>
             <ActiveCampaignsSummary
               campaigns={campaigns}
               isAdmin={isAdmin}
@@ -240,7 +229,7 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
           </div>
         </div>
 
-        {/* Sending account health (full width) */}
+        {/* Sending accounts health */}
         {isAdmin && (
           <SendingAccountHealthTable
             accounts={accounts}
@@ -249,7 +238,7 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
           />
         )}
 
-        {/* Activity feed (full width) */}
+        {/* Activity feed */}
         <WorkspaceActivityFeed events={activity} loading={loadingActivity} />
 
       </div>

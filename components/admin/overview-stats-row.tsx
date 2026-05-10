@@ -11,8 +11,7 @@ import React from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
-  Mail, TrendingUp, MessageSquare, AlertCircle,
-  Users, UserPlus, Zap,
+  Mail, TrendingUp, Users, Zap, Phone, PhoneCall,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { OverviewTotals } from './types'
@@ -84,42 +83,41 @@ export function OverviewStatsRow({ totals, activeCampaigns, loading }: OverviewS
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
       <StatCard
-        icon={<Mail />}
-        label="Emails sent"
-        value={totals.emails_sent.toLocaleString()}
+        icon={<Users />}
+        label="Total leads"
+        value={totals.active_leads.toLocaleString()}
+        sub={`+${totals.new_leads_period} new this period`}
         highlight="blue"
         loading={loading}
       />
       <StatCard
         icon={<TrendingUp />}
-        label="Open rate"
-        value={`${totals.open_rate}%`}
-        highlight={totals.open_rate >= 25 ? 'green' : totals.open_rate >= 15 ? 'orange' : 'red'}
-        sub={totals.open_rate >= 25 ? 'Above benchmark' : 'Below 25% benchmark'}
+        label="Interested"
+        value={totals.interested_leads.toLocaleString()}
+        sub="expressed interest"
+        highlight={totals.interested_leads > 0 ? 'green' : undefined}
         loading={loading}
       />
       <StatCard
-        icon={<MessageSquare />}
-        label="Reply rate"
-        value={`${totals.reply_rate}%`}
-        highlight={totals.reply_rate >= 5 ? 'green' : 'orange'}
+        icon={<Phone />}
+        label="Contacted"
+        value={totals.leads_contacted.toLocaleString()}
+        sub="leads reached"
         loading={loading}
       />
       <StatCard
-        icon={<AlertCircle />}
-        label="Bounce rate"
-        value={`${totals.bounce_rate}%`}
-        highlight={totals.bounce_rate > 5 ? 'red' : totals.bounce_rate > 2 ? 'orange' : 'green'}
-        alert={totals.bounce_rate > 5}
-        sub={totals.bounce_rate > 5 ? 'High — review accounts' : undefined}
-        loading={loading}
-      />
-      <StatCard
-        icon={<Users />}
-        label="Active leads"
-        value={totals.active_leads.toLocaleString()}
-        sub={`+${totals.new_leads_period} this period`}
+        icon={<PhoneCall />}
+        label="Calls logged"
+        value={totals.calls_period.toLocaleString()}
+        sub="this period"
         highlight="purple"
+        loading={loading}
+      />
+      <StatCard
+        icon={<Mail />}
+        label="Emails sent"
+        value={totals.emails_sent.toLocaleString()}
+        sub={`${totals.reply_rate}% reply rate`}
         loading={loading}
       />
       <StatCard
