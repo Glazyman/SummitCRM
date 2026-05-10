@@ -151,6 +151,13 @@ export function MyActivityPanel() {
 
   React.useEffect(() => { load(period) }, [period, load])
 
+  // Refresh when user switches back to this tab or returns from another page
+  React.useEffect(() => {
+    const handler = () => { if (document.visibilityState === 'visible') load(period) }
+    document.addEventListener('visibilitychange', handler)
+    return () => document.removeEventListener('visibilitychange', handler)
+  }, [period, load])
+
   return (
     <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
       {/* Header */}

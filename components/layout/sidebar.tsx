@@ -114,28 +114,42 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
       collapsed ? 'w-[60px]' : 'w-[var(--sidebar-width)]'
     )}>
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-3 pb-3 pt-4">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold text-foreground shadow-card">
-          {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
+      {collapsed ? (
+        /* Collapsed: show only the expand button, centered and obvious */
+        <div className="flex flex-col items-center gap-3 px-2 pb-3 pt-4">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold text-foreground shadow-card">
+            {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
+          </div>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-primary-glow hover:bg-primary/90 transition-colors"
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </button>
         </div>
-        {!collapsed && (
+      ) : (
+        /* Expanded: workspace name + collapse button */
+        <div className="flex items-center gap-2.5 px-3 pb-3 pt-4">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold text-foreground shadow-card">
+            {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
+          </div>
           <p className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-none tracking-[-0.02em]">
             {workspaceName ?? 'Summit Mergers'}
           </p>
-        )}
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed
-            ? <PanelLeftOpen className="h-3.5 w-3.5" />
-            : <PanelLeftClose className="h-3.5 w-3.5" />
-          }
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+          >
+            <PanelLeftClose className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Main nav */}
       <nav className="flex flex-1 flex-col overflow-y-auto px-2 scrollbar-thin">

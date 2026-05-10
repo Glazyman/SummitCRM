@@ -141,24 +141,15 @@ export default async function DashboardPage() {
         </Card>
       )}
 
-      {/* Rep: quick actions */}
+      {/* Rep: quick action — leads only */}
       {role === 'rep' && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <QuickActionCard
-            title="My Leads"
-            description="View and manage your assigned leads."
-            href="/leads"
-            icon={Users}
-            color="blue"
-          />
-          <QuickActionCard
-            title="Notifications"
-            description="Check your follow-up reminders and activity."
-            href="/notifications"
-            icon={Bell}
-            color="amber"
-          />
-        </div>
+        <QuickActionCard
+          title="My Leads"
+          description="View and manage your assigned leads."
+          href="/leads"
+          icon={Users}
+          color="blue"
+        />
       )}
 
       {/* Rep: my activity breakdown */}
@@ -168,18 +159,7 @@ export default async function DashboardPage() {
       {(role === 'admin' || role === 'super_admin') && <RepPerformancePanel />}
 
       {/* Overdue follow-ups widget */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <OverdueFollowUpsWidget />
-        {role !== 'rep' && (
-          <QuickActionCard
-            title="Notifications"
-            description="Replies, bounces, quota alerts, and follow-up reminders."
-            href="/notifications"
-            icon={Bell}
-            color="amber"
-          />
-        )}
-      </div>
+      <OverdueFollowUpsWidget />
     </div>
   )
 }
