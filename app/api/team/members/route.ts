@@ -88,6 +88,16 @@ export async function DELETE(req: NextRequest) {
   const { member_id }: { member_id: string } = body
   if (!member_id) return NextResponse.json({ error: 'member_id is required' }, { status: 400 })
 
+  // Fetch the member's user_id before deleting so we can remove them from Supabase Auth
+  const { data: targetMember } = await admin
+    .from('workspace_members')
+    .select('user_id')
+    .eq('id', member_id)
+    .eq('workspace_id', currentMember.workspace_id)
+    .single()
+
+  if (!targetMember) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+
   const { error } = await admin
     .from('workspace_members')
     .delete()
@@ -95,6 +105,10 @@ export async function DELETE(req: NextRequest) {
     .eq('workspace_id', currentMember.workspace_id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Delete from Supabase Auth so the account is fully removed.
+  // This means re-inviting them will send a fresh invite email (new user flow).
+  await admin.auth.admin.deleteUser(targetMember.user_id).catch(() => null)
 
   return NextResponse.json({ success: true })
 }
