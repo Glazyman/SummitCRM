@@ -64,7 +64,7 @@ function CallDonut({ reps }: { reps: RepStat[] }) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative [&_path]:!cursor-default [&_path]:!outline-none">
       <ResponsiveContainer width="100%" height={200}>
         <PieChart>
           <Pie

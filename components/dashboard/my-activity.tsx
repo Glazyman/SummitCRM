@@ -54,7 +54,7 @@ function CallDonut({ stats }: { stats: MyStats }) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative [&_path]:!cursor-default [&_path]:!outline-none">
       <ResponsiveContainer width="100%" height={180}>
         <PieChart>
           <Pie data={data} cx="50%" cy="50%" innerRadius={52} outerRadius={72} paddingAngle={2} dataKey="value" strokeWidth={0}>
