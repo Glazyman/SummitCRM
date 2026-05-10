@@ -21,7 +21,7 @@ import {
   ActiveCampaignsSummary,
   WorkspaceActivityFeed,
   LeadPipelineBreakdown,
-  RepPerformanceChart,
+  RepPerformanceLineChart,
 } from '@/components/admin'
 import type {
   DateRangePreset,
@@ -30,7 +30,7 @@ import type {
 } from '@/components/admin'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, LayoutDashboard } from 'lucide-react'
+import { RefreshCw, LayoutDashboard, Trophy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface AdminDashboardClientProps {
@@ -80,7 +80,7 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
   const [loadingCampaigns, setLoadingCampaigns] = useState(false)
   const [loadingActivity,  setLoadingActivity]  = useState(false)
   const [lastRefreshed,    setLastRefreshed]    = useState(new Date())
-  const [repView,          setRepView]          = useState<'table' | 'chart'>('table')
+  const [repView,          setRepView]          = useState<'overview' | 'graph'>('overview')
 
   // ── Fetch helpers ─────────────────────────────────────────────────────────
   const fetchOverview = useCallback(async (r: string) => {
@@ -228,30 +228,47 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
                 <div className="inline-flex rounded-lg border border-border overflow-hidden">
                   <button
                     type="button"
-                    onClick={() => setRepView('table')}
+                    onClick={() => setRepView('overview')}
                     className={cn(
                       'px-3 py-1.5 text-xs font-medium transition-colors',
-                      repView === 'table' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                      repView === 'overview' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
                     )}
                   >
-                    Table
+                    Overview
                   </button>
                   <button
                     type="button"
-                    onClick={() => setRepView('chart')}
+                    onClick={() => setRepView('graph')}
                     className={cn(
                       'px-3 py-1.5 text-xs font-medium transition-colors',
-                      repView === 'chart' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                      repView === 'graph' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
                     )}
                   >
-                    Chart
+                    Graph
                   </button>
                 </div>
               </div>
-              {repView === 'table'
-                ? <TeamPerformanceTable stats={teamStats} loading={loadingTeam} />
-                : <RepPerformanceChart stats={teamStats} loading={loadingTeam} />
-              }
+              {repView === 'overview' ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-2 px-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {[...teamStats]
+                      .sort((a, b) => b.calls_count - a.calls_count)
+                      .slice(0, 3)
+                      .map((rep, idx) => (
+                        <div key={rep.user_id} className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-sm font-medium">{rep.full_name ?? rep.user_email}</p>
+                            {idx === 0 && <Trophy className="h-3.5 w-3.5 text-amber-500" />}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{rep.calls_count.toLocaleString()} calls</p>
+                        </div>
+                      ))}
+                  </div>
+                  <TeamPerformanceTable stats={teamStats} loading={loadingTeam} />
+                </div>
+              ) : (
+                <RepPerformanceLineChart stats={teamStats} loading={loadingTeam} />
+              )}
             </div>
           </div>
           <div>
