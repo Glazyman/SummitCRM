@@ -24,6 +24,7 @@ const TABS = [
 ] as const
 
 type TabId = typeof TABS[number]['id']
+type FollowUpSuggestion = { title: string; notes: string | null; due_at: string }
 
 // ── Props ─────────────────────────────────────────────────────────────────
 interface LeadDetailClientProps {
@@ -56,6 +57,7 @@ export default function LeadDetailClient({
   const [followUps, setFollowUps]= React.useState(initialFollowUps)
   const [calls,     setCalls]    = React.useState<CallLogItem[]>(initialCalls)
   const [activeTab, setActiveTab]= React.useState<TabId>('activity')
+  const [followUpPrompt, setFollowUpPrompt] = React.useState<FollowUpSuggestion | null>(null)
 
   // ── Lead mutations ───────────────────────────────────────────────────
   async function handleSaveProfile(patch: Partial<LeadDetail>) {
@@ -90,11 +92,12 @@ export default function LeadDetailClient({
     if (prev === status) return
     setLead((l) => ({ ...l, status }))
     try {
-      const data = await requestJson<{ lead: Partial<LeadDetail> }>(`/api/leads/${lead.id}`, {
+      const data = await requestJson<{ lead: Partial<LeadDetail>; follow_up_suggestion?: FollowUpSuggestion | null }>(`/api/leads/${lead.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       })
       setLead((l) => ({ ...l, ...data.lead, batch_name: l.batch_name, assigned_name: l.assigned_name }))
+      setFollowUpPrompt(data.follow_up_suggestion ?? null)
       addActivity({ type: 'lead_status_changed', metadata: { from: prev, to: status } })
       router.refresh() // bust leads + pipeline page caches
     } catch (err) {
@@ -334,6 +337,27 @@ export default function LeadDetailClient({
     }
   }
 
+  async function scheduleSuggestedFollowUp() {
+    if (!followUpPrompt) return
+    const result = await requestJson<{ follow_up: Omit<FollowUp, 'is_completed' | 'assigned_name'> }>(
+      `/api/leads/${lead.id}/follow-ups`,
+      {
+        method: 'POST',
+        body: JSON.stringify(followUpPrompt),
+      }
+    )
+    const member = teamMembers.find((m) => m.id === result.follow_up.assigned_to)
+    const newFU: FollowUp = {
+      ...result.follow_up,
+      is_completed:  Boolean(result.follow_up.completed_at),
+      assigned_name: member?.name ?? null,
+    }
+    setFollowUps((prev) => [newFU, ...prev])
+    setFollowUpPrompt(null)
+    setActiveTab('followups')
+    addActivity({ type: 'follow_up_scheduled', metadata: { title: newFU.title, due_at: newFU.due_at } })
+  }
+
   // ── Utility ───────────────────────────────────────────────────────────
   function addActivity(partial: Pick<ActivityEntry, 'type' | 'metadata'>) {
     const currentUser = teamMembers.find((m) => m.id === currentUserId)
@@ -391,6 +415,22 @@ export default function LeadDetailClient({
         onDelete={handleDeleteLead}
         onDoNotContact={() => handleStatusChange('do_not_contact')}
       />
+
+      {followUpPrompt && (
+        <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <span>Status updated to no answer/voicemail. Schedule a follow-up for tomorrow morning?</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={scheduleSuggestedFollowUp} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+                Schedule
+              </button>
+              <button type="button" onClick={() => setFollowUpPrompt(null)} className="rounded-md px-2 py-1.5 text-xs text-amber-900 hover:bg-amber-100">
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Two-column desktop layout ─────────────────────────────────── */}
       <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
