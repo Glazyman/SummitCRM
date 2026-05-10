@@ -4,7 +4,6 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
-  /** Show indeterminate state (partially checked — e.g. "select all" with some selected) */
   indeterminate?: boolean
 }
 
@@ -21,7 +20,7 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
 
     return (
       <span className={cn('relative inline-flex h-4 w-4 shrink-0 items-center justify-center', className)}>
-        {/* Hidden native input — handles all a11y / keyboard / form semantics */}
+        {/* Hidden native input */}
         <input
           type="checkbox"
           ref={ref}
@@ -30,33 +29,33 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
           {...props}
         />
 
-        {/* Custom visual */}
+        {/* Square box visual */}
         <span
           aria-hidden="true"
           className={cn(
-            'pointer-events-none flex h-4 w-4 items-center justify-center rounded border transition-colors',
+            'pointer-events-none flex h-4 w-4 items-center justify-center rounded-sm border-2 transition-colors',
             checked || indeterminate
-              ? 'border-border bg-muted'
-              : 'border-border/50 bg-background',
+              ? 'border-foreground bg-foreground'
+              : 'border-border bg-background',
           )}
         >
           {/* Indeterminate dash */}
           {indeterminate && !checked && (
-            <span className="h-px w-2 rounded-full bg-foreground/60" />
+            <span className="h-0.5 w-2.5 rounded-full bg-white" />
           )}
 
-          {/* Checkmark */}
+          {/* Checkmark — white on dark box */}
           {checked && (
             <svg
-              className="h-2.5 w-2.5 text-foreground/75"
-              viewBox="0 0 10 10"
+              className="h-3 w-3 text-white"
+              viewBox="0 0 12 12"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M1.5 5l2.5 2.5 4.5-4.5" />
+              <path d="M2 6l3 3 5-5" />
             </svg>
           )}
         </span>
