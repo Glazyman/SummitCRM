@@ -37,8 +37,13 @@ export default async function DashboardLayout({
       error: unknown
     }
 
-  const workspaceName = member?.workspaces?.name ?? null
-  const role = member?.role ?? null
+  // No active workspace membership — access has been revoked. Boot to login.
+  if (!member) {
+    redirect('/login')
+  }
+
+  const workspaceName = member.workspaces?.name ?? null
+  const role = member.role ?? null
   const userName = user.user_metadata?.full_name as string | undefined ?? null
   const userEmail = user.email ?? null
 

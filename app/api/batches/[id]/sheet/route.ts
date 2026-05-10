@@ -47,6 +47,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
     if (!member) return apiUnauthorized()
 
+    if (!['admin', 'super_admin'].includes(member.role)) {
+      return apiError('Access denied', 403)
+    }
+
     const { data: batch } = await (admin as any)
       .from('lead_batches')
       .select('id, name')

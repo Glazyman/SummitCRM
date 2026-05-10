@@ -23,6 +23,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
     if (!member) return apiUnauthorized()
 
+    if (!['admin', 'super_admin'].includes(member.role)) {
+      return apiError('Access denied', 403)
+    }
+
     const { data: batch } = await supabase
       .from('lead_batches')
       .select('id, name, created_at')
@@ -32,7 +36,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
     if (!batch) return apiError('Batch not found', 404)
 
-    let leadsQuery = supabase
+    const leadsQuery = supabase
       .from('leads')
       .select('id, first_name, last_name, email, phone, company, title, status, custom_fields, created_at')
       .eq('workspace_id', member.workspace_id)
@@ -40,10 +44,6 @@ export async function GET(_request: NextRequest, { params }: Params) {
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(2000)
-
-    if (member.role === 'rep') {
-      leadsQuery = leadsQuery.eq('assigned_to', user.id)
-    }
 
     const { data: leads, error: leadsError } = await leadsQuery
     if (leadsError) return apiServerError(leadsError)

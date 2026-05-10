@@ -33,6 +33,10 @@ export async function GET() {
 
     const { member, admin } = ctx
 
+    if (!['admin', 'super_admin'].includes(member.role)) {
+      return apiError('Access denied', 403)
+    }
+
     const { data, error } = await (admin as any)
       .from('lead_batches')
       .select('id, name, created_at')
@@ -80,8 +84,8 @@ export async function POST(request: NextRequest) {
 
     const { user, member, admin } = ctx
 
-    if (!['super_admin', 'admin', 'rep'].includes(member.role)) {
-      return apiError('Insufficient permissions', 403)
+    if (!['admin', 'super_admin'].includes(member.role)) {
+      return apiError('Access denied', 403)
     }
 
     let body: unknown
