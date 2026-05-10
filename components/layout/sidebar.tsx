@@ -37,9 +37,8 @@ interface NavItem {
 const mainNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Leads',     href: '/leads',     icon: Users },
-  { label: 'Import',    href: '/leads/import', icon: PlusCircle },
-  { label: 'Pipeline',   href: '/pipeline',   icon: Kanban },
-  { label: 'Activities', href: '/activities', icon: ListChecks },
+  { label: 'Pipeline',  href: '/pipeline',  icon: Kanban },
+  { label: 'Activities',href: '/activities',icon: ListChecks },
 ]
 
 const bottomNav: NavItem[] = [
@@ -162,7 +161,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
 
       {/* Main nav */}
       <nav className="flex flex-1 flex-col overflow-y-auto px-2 scrollbar-thin">
-        {!collapsed && (
+        {isAdmin && !collapsed && (
           <Link
             href="/leads/import"
             className="mb-3 flex items-center gap-2 rounded-lg bg-primary px-2.5 py-2 text-[13px] font-medium text-primary-foreground shadow-primary-glow transition-colors hover:bg-primary/90"
@@ -171,7 +170,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
             Import
           </Link>
         )}
-        {collapsed && (
+        {isAdmin && collapsed && (
           <Link
             href="/leads/import"
             className="mb-3 flex items-center justify-center rounded-lg bg-primary p-2 text-primary-foreground shadow-primary-glow transition-colors hover:bg-primary/90"
@@ -191,14 +190,16 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
         {isAdmin && !collapsed && (
           <div className="mt-6">
             <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">Admin</p>
-            <NavLink item={{ label: 'Analytics', href: '/analytics', icon: BarChart2 }} active={isActive('/analytics')} />
-            <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }} active={isActive('/settings/team')} />
+            <NavLink item={{ label: 'Import',       href: '/leads/import',  icon: PlusCircle }} active={isActive('/leads/import')} />
+            <NavLink item={{ label: 'Analytics',    href: '/analytics',     icon: BarChart2 }}  active={isActive('/analytics')} />
+            <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }}      active={isActive('/settings/team')} />
           </div>
         )}
         {isAdmin && collapsed && (
           <div className="mt-4">
-            <NavLink item={{ label: 'Analytics', href: '/analytics', icon: BarChart2 }} active={isActive('/analytics')} collapsed />
-            <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }} active={isActive('/settings/team')} collapsed />
+            <NavLink item={{ label: 'Import',       href: '/leads/import',  icon: PlusCircle }} active={isActive('/leads/import')} collapsed />
+            <NavLink item={{ label: 'Analytics',    href: '/analytics',     icon: BarChart2 }}  active={isActive('/analytics')} collapsed />
+            <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }}      active={isActive('/settings/team')} collapsed />
           </div>
         )}
 
