@@ -80,6 +80,7 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
   const [loadingCampaigns, setLoadingCampaigns] = useState(false)
   const [loadingActivity,  setLoadingActivity]  = useState(false)
   const [lastRefreshed,    setLastRefreshed]    = useState(new Date())
+  const [repView,          setRepView]          = useState<'table' | 'chart'>('table')
 
   // ── Fetch helpers ─────────────────────────────────────────────────────────
   const fetchOverview = useCallback(async (r: string) => {
@@ -218,10 +219,40 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
           loading={loadingOverview}
         />
 
-        {/* Team + campaigns — two column */}
+        {/* Rep performance + campaigns — two column */}
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <div className="xl:col-span-2">
-            <TeamPerformanceTable stats={teamStats} loading={loadingTeam} />
+            <div className="rounded-xl border border-border bg-card p-2">
+              <div className="mb-2 flex items-center justify-between px-2 pt-1">
+                <p className="text-sm font-semibold">Rep Performance</p>
+                <div className="inline-flex rounded-lg border border-border overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setRepView('table')}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium transition-colors',
+                      repView === 'table' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                    )}
+                  >
+                    Table
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRepView('chart')}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium transition-colors',
+                      repView === 'chart' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                    )}
+                  >
+                    Chart
+                  </button>
+                </div>
+              </div>
+              {repView === 'table'
+                ? <TeamPerformanceTable stats={teamStats} loading={loadingTeam} />
+                : <RepPerformanceChart stats={teamStats} loading={loadingTeam} />
+              }
+            </div>
           </div>
           <div>
             <ActiveCampaignsSummary
@@ -231,9 +262,6 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
             />
           </div>
         </div>
-
-        {/* Rep performance chart */}
-        <RepPerformanceChart stats={teamStats} loading={loadingTeam} />
 
         {/* Sending accounts health */}
         {isAdmin && (
