@@ -45,7 +45,6 @@ export function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  const supabase = createClient()
   const { score, label, color } = getPasswordStrength(password)
   const passwordsMatch = confirm.length > 0 && password === confirm
 
@@ -64,6 +63,7 @@ export function ResetPasswordForm() {
     setLoading(true)
     setError(null)
 
+    const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password })
 
     setLoading(false)

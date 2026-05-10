@@ -14,8 +14,6 @@ export function ForgotPasswordForm() {
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
 
-  const supabase = createClient()
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -25,6 +23,7 @@ export function ForgotPasswordForm() {
       process.env.NEXT_PUBLIC_APP_URL?.trim() ||
       (typeof window !== 'undefined' ? window.location.origin : '')
 
+    const supabase = createClient()
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${appOrigin}/auth/callback?next=/reset-password`,
     })
