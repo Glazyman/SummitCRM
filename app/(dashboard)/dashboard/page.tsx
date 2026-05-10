@@ -209,17 +209,31 @@ async function getDashboardMetrics(
       .single(),
   ])
 
-  // Calls logged this week (best-effort — join through leads)
+  // Calls logged this week (call logs + legacy bulk status-change fallback)
   let callsLogged = 0
   let callsToday = 0
   try {
-    const { count } = await supabase
-      .from('activities')
-      .select('id, leads!inner(workspace_id)', { count: 'exact', head: true })
-      .eq('leads.workspace_id', workspaceId)
-      .eq('type', 'call_logged')
-      .gte('created_at', weekAgo.toISOString())
-    callsLogged = count ?? 0
+    const [callsRes, statusActivitiesRes] = await Promise.all([
+      supabase
+        .from('call_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .gte('called_at', weekAgo.toISOString()),
+      supabase
+        .from('activity_logs')
+        .select('metadata')
+        .eq('workspace_id', workspaceId)
+        .eq('type', 'lead_status_changed')
+        .gte('created_at', weekAgo.toISOString()),
+    ])
+
+    const statusToCall = new Set(['called', 'voicemail', 'no_answer', 'wrong_number', 'sold_already'])
+    const synthetic = ((statusActivitiesRes.data ?? []) as Array<{ metadata: Record<string, unknown> | null }>)
+      .filter((row) => row.metadata?.bulk === true)
+      .filter((row) => typeof row.metadata?.to === 'string' && statusToCall.has(row.metadata.to as string))
+      .length
+
+    callsLogged = (callsRes.count ?? 0) + synthetic
   } catch {}
 
   try {
