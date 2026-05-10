@@ -104,14 +104,16 @@ export default async function LeadsPage() {
       const { data: callLogsRaw } = leadIds.length > 0
         ? await supabase
             .from('call_logs')
-            .select('lead_id, called_at')
+            .select('lead_id, called_at, outcome')
             .in('lead_id', leadIds)
             .order('called_at', { ascending: false })
-        : { data: [] as Array<{ lead_id: string; called_at: string }> }
+        : { data: [] as Array<{ lead_id: string; called_at: string; outcome: string | null }> }
 
       const lastContactedMap = new Map<string, string>()
-      for (const row of (callLogsRaw ?? []) as Array<{ lead_id: string; called_at: string }>) {
+      const lastCallOutcomeMap = new Map<string, string>()
+      for (const row of (callLogsRaw ?? []) as Array<{ lead_id: string; called_at: string; outcome: string | null }>) {
         if (!lastContactedMap.has(row.lead_id)) lastContactedMap.set(row.lead_id, row.called_at)
+        if (!lastCallOutcomeMap.has(row.lead_id)) lastCallOutcomeMap.set(row.lead_id, row.outcome ?? '')
       }
 
       leads = rawLeads.map((lead) => ({
@@ -121,6 +123,7 @@ export default async function LeadsPage() {
         batch_name:        lead.batch_id ? batchNames.get(lead.batch_id) ?? null : null,
         assigned_name:     lead.assigned_to ? usersById.get(lead.assigned_to) ?? null : null,
         last_contacted_at: lastContactedMap.get(lead.id) ?? null,
+        last_call_outcome: lastCallOutcomeMap.get(lead.id) || null,
         last_activity_at:  null,
         tags:              [],
         custom_fields:     lead.custom_fields ?? {},

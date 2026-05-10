@@ -8,6 +8,7 @@ import {
 } from 'recharts'
 
 type Period = 'today' | 'week' | 'month'
+type ViewMode = 'chart' | 'table'
 
 interface RepStat {
   id:                string
@@ -141,6 +142,7 @@ function RepCallBars({ reps }: { reps: RepStat[] }) {
 // ── Main component ────────────────────────────────────────────────────────
 export function RepPerformancePanel() {
   const [period, setPeriod]   = React.useState<Period>('week')
+  const [viewMode, setViewMode] = React.useState<ViewMode>('chart')
   const [reps, setReps]       = React.useState<RepStat[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError]     = React.useState<string | null>(null)
@@ -177,6 +179,28 @@ export function RepPerformancePanel() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setViewMode('chart')}
+              className={cn(
+                'px-3 py-1 text-xs font-medium transition-colors',
+                viewMode === 'chart' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              Chart
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={cn(
+                'px-3 py-1 text-xs font-medium transition-colors',
+                viewMode === 'table' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              Table
+            </button>
+          </div>
+          <div className="flex rounded-lg border border-border overflow-hidden">
             {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (
               <button key={p} type="button" onClick={() => setPeriod(p)}
                 className={cn('px-3 py-1 text-xs font-medium transition-colors',
@@ -203,37 +227,37 @@ export function RepPerformancePanel() {
         </div>
       ) : (
         <>
-          {/* Charts row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-border border-b border-border">
-            <div className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
-                <Phone className="h-3 w-3" /> Call Outcomes
-              </p>
-              <CallDonut reps={reps} />
-            </div>
-            <div className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Calls per Rep</p>
-              {reps.length === 0 ? (
-                <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">No data</div>
-              ) : (
-                <div className="mt-2">
-                  <RepCallBars reps={reps} />
-                  {/* Legend */}
-                  <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
-                    {Object.entries(OUTCOME_META).map(([, { label, color }]) => (
-                      <div key={label} className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <span className="h-2 w-2 rounded-full" style={{ background: color }} />
-                        {label}
-                      </div>
-                    ))}
+          {viewMode === 'chart' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-border border-b border-border">
+              <div className="p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
+                  <Phone className="h-3 w-3" /> Call Outcomes
+                </p>
+                <CallDonut reps={reps} />
+              </div>
+              <div className="p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Calls per Rep</p>
+                {reps.length === 0 ? (
+                  <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">No data</div>
+                ) : (
+                  <div className="mt-2">
+                    <RepCallBars reps={reps} />
+                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
+                      {Object.entries(OUTCOME_META).map(([, { label, color }]) => (
+                        <div key={label} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+                          {label}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Table */}
-          {reps.length === 0 ? (
+          {viewMode === 'table' && (reps.length === 0 ? (
             <div className="flex items-center justify-center py-10 text-muted-foreground text-sm">No reps found</div>
           ) : (
             <div className="overflow-x-auto">
@@ -297,7 +321,7 @@ export function RepPerformancePanel() {
                 </tbody>
               </table>
             </div>
-          )}
+          ))}
         </>
       )}
     </div>

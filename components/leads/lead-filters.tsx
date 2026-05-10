@@ -50,6 +50,7 @@ export function LeadFiltersPanel({
     filters.batchId ||
     filters.assignedTo ||
     filters.myLeads ||
+    filters.coldOnly ||
     filters.dateFrom ||
     filters.dateTo
 
@@ -139,6 +140,7 @@ export function LeadFiltersPanel({
                   filters.statuses.length > 0,
                   !!filters.batchId,
                   !!filters.assignedTo,
+                  filters.coldOnly,
                   !!filters.dateFrom || !!filters.dateTo,
                 ].filter(Boolean).length}
               </span>

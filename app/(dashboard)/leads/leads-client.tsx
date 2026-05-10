@@ -74,6 +74,17 @@ function applyFilters(leads: LeadRow[], filters: LeadFilters, currentUserId: str
     if (filters.assignedTo === 'unassigned' && lead.assigned_to) return false
     if (filters.assignedTo && filters.assignedTo !== 'unassigned' && lead.assigned_to !== filters.assignedTo) return false
 
+    // Cold leads: pending + older than 7 days + no-answer/voicemail or never contacted
+    if (filters.coldOnly) {
+      if (lead.interest_status !== 'pending') return false
+      const now = Date.now()
+      const createdMs = new Date(lead.created_at).getTime()
+      if (!Number.isFinite(createdMs) || now - createdMs < 7 * 24 * 60 * 60 * 1000) return false
+      const outcome = lead.last_call_outcome
+      const coldByCall = outcome === 'voicemail' || outcome === 'no_answer' || !lead.last_contacted_at
+      if (!coldByCall) return false
+    }
+
     // Date range
     if (filters.dateFrom) {
       const from = new Date(filters.dateFrom).getTime()
@@ -121,6 +132,7 @@ export function LeadsClient({
       batchId:    p.get('batch')      ?? null,
       assignedTo: p.get('assigned')   ?? null,
       myLeads:    p.get('my') === '1',
+      coldOnly:   p.get('cold') === '1',
       dateFrom:   p.get('from')       ?? '',
       dateTo:     p.get('to')         ?? '',
       sortBy:     (p.get('sort')      ?? 'created_at') as LeadFilters['sortBy'],
@@ -214,6 +226,7 @@ export function LeadsClient({
     if (filters.batchId)             params.set('batch',    filters.batchId)
     if (filters.assignedTo)          params.set('assigned', filters.assignedTo)
     if (filters.myLeads)             params.set('my',       '1')
+    if (filters.coldOnly)            params.set('cold',     '1')
     if (filters.dateFrom)            params.set('from',     filters.dateFrom)
     if (filters.dateTo)              params.set('to',       filters.dateTo)
     if (filters.sortBy !== 'created_at') params.set('sort', filters.sortBy)
@@ -430,6 +443,7 @@ export function LeadsClient({
         assigned_to:      lead.assigned_to ?? null,
         assigned_name:    teamMembers.find((m) => m.id === lead.assigned_to)?.name ?? null,
         last_contacted_at:null,
+        last_call_outcome:null,
         last_activity_at: null,
         tags:             [],
         custom_fields:    lead.custom_fields ?? {},
@@ -502,7 +516,7 @@ export function LeadsClient({
           <p className="mt-0.5 text-sm text-muted-foreground">
             {totalCount.toLocaleString()} lead{totalCount !== 1 ? 's' : ''}
             {filters.batchId && batches.find(b => b.id === filters.batchId) && ` · ${batches.find(b => b.id === filters.batchId)!.name}`}
-            {(filters.search || filters.statuses.length > 0) && ' matching filters'}
+            {(filters.search || filters.statuses.length > 0 || filters.coldOnly) && ' matching filters'}
           </p>
         </div>
 
@@ -544,6 +558,17 @@ export function LeadsClient({
         onChange={updateFilters}
         onClear={clearFilters}
       />
+
+      <div className="flex items-center">
+        <Button
+          type="button"
+          variant={filters.coldOnly ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => updateFilters({ coldOnly: !filters.coldOnly, page: 1 })}
+        >
+          Cold Leads
+        </Button>
+      </div>
 
       {/* ── Toolbar: results count + per-page + columns ── */}
       <div className="flex flex-col gap-2">

@@ -28,6 +28,7 @@ export interface LeadRow {
   assigned_to:      string | null
   assigned_name:    string | null  // joined from workspace_members
   last_contacted_at:string | null
+  last_call_outcome:string | null
   last_activity_at: string | null
   tags:             { id: string; name: string; color: string }[]
   custom_fields:    Record<string, string>
@@ -52,6 +53,7 @@ export interface LeadFilters {
   batchId:    string | null
   assignedTo: string | null
   myLeads:    boolean
+  coldOnly:   boolean
   dateFrom:   string          // ISO date string or ''
   dateTo:     string          // ISO date string or ''
   sortBy:     SortField
@@ -66,6 +68,7 @@ export const DEFAULT_FILTERS: LeadFilters = {
   batchId:    null,
   assignedTo: null,
   myLeads:    false,
+  coldOnly:   false,
   dateFrom:   '',
   dateTo:     '',
   sortBy:     'created_at',
