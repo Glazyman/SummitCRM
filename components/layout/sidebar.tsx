@@ -7,12 +7,12 @@ import {
   LayoutDashboard,
   Users,
   Settings,
-  Bell,
   PlusCircle,
   Building2,
   MoreHorizontal,
   Kanban,
   ListChecks,
+  BarChart2,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -30,6 +30,7 @@ interface NavItem {
 const mainNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Leads',     href: '/leads',     icon: Users },
+  { label: 'Import',    href: '/leads/import', icon: PlusCircle },
   { label: 'Pipeline',   href: '/pipeline',   icon: Kanban },
   { label: 'Activities', href: '/activities', icon: ListChecks },
 ]
@@ -88,7 +89,8 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
   }, [pathname]) // refresh count on every navigation
 
   function isActive(href: string) {
-    if (href === '/dashboard') return pathname === href
+    if (href === '/dashboard' || href === '/settings' || href === '/leads/import') return pathname === href
+    if (href === '/leads') return pathname === '/leads' || (pathname.startsWith('/leads/') && !pathname.startsWith('/leads/import'))
     return pathname.startsWith(href)
   }
 
@@ -152,14 +154,14 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
             className="mb-3 flex items-center gap-2 rounded-lg bg-primary px-2.5 py-2 text-[13px] font-medium text-primary-foreground shadow-primary-glow transition-colors hover:bg-primary/90"
           >
             <PlusCircle className="h-4 w-4" />
-            Quick Create
+            Import
           </Link>
         )}
         {collapsed && (
           <Link
             href="/leads/import"
             className="mb-3 flex items-center justify-center rounded-lg bg-primary p-2 text-primary-foreground shadow-primary-glow transition-colors hover:bg-primary/90"
-            title="Quick Create"
+            title="Import"
           >
             <PlusCircle className="h-4 w-4" />
           </Link>
@@ -175,11 +177,13 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
         {isAdmin && !collapsed && (
           <div className="mt-6">
             <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">Admin</p>
+            <NavLink item={{ label: 'Analytics', href: '/analytics', icon: BarChart2 }} active={isActive('/analytics')} />
             <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }} active={isActive('/settings/team')} />
           </div>
         )}
         {isAdmin && collapsed && (
           <div className="mt-4">
+            <NavLink item={{ label: 'Analytics', href: '/analytics', icon: BarChart2 }} active={isActive('/analytics')} collapsed />
             <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }} active={isActive('/settings/team')} collapsed />
           </div>
         )}
@@ -191,8 +195,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
               Documents
             </p>
             <div className="flex flex-col gap-1">
-              <NavLink item={{ label: 'Data Library', href: '/leads', icon: Building2 }} active={false} />
-              <NavLink item={{ label: 'Notifications', href: '/notifications', icon: Bell }} active={isActive('/notifications')} />
+              <NavLink item={{ label: 'Batches', href: '/batches', icon: Building2 }} active={isActive('/batches')} />
             </div>
           </div>
         )}

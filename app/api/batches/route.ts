@@ -2,6 +2,7 @@
  * GET  /api/batches — list all batches for the workspace
  * POST /api/batches — create a new batch
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -19,7 +20,7 @@ async function getWorkspaceMember() {
     .select('workspace_id, role, is_active')
     .eq('user_id', user.id)
     .eq('is_active', true)
-    .single() as { data: { workspace_id: string; role: string } | null }
+    .single()
 
   if (!member) return null
   return { user, member, admin }
@@ -36,18 +37,30 @@ export async function GET() {
       .from('lead_batches')
       .select('id, name, created_at')
       .eq('workspace_id', member.workspace_id)
-      .order('created_at', { ascending: false }) as {
-        data: Array<{ id: string; name: string; created_at: string }> | null
-        error: unknown
-      }
+      .order('created_at', { ascending: false })
 
     if (error) return apiServerError(error)
 
-    const batches = (data ?? []).map((b) => ({
+    const batchesWithCount = await Promise.all((data ?? []).map(async (b: any) => {
+      const { count } = await (admin as any)
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', member.workspace_id)
+        .eq('batch_id', b.id)
+        .is('deleted_at', null)
+      return {
+        id: b.id,
+        name: b.name,
+        leadCount: count ?? 0,
+        createdAt: b.created_at,
+      }
+    }))
+
+    const batches = batchesWithCount.map((b) => ({
       id: b.id,
       name: b.name,
-      leadCount: 0,
-      createdAt: b.created_at,
+      leadCount: b.leadCount,
+      createdAt: b.createdAt,
     }))
 
     return apiSuccess({ batches })
@@ -85,7 +98,7 @@ export async function POST(request: NextRequest) {
         name:         parsed.data.name,
       })
       .select('id, name')
-      .single() as { data: { id: string; name: string } | null; error: unknown }
+      .single()
 
     if (error || !batch) return apiServerError(error)
 

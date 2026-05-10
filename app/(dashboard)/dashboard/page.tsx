@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { OverdueFollowUpsWidget } from '@/components/notifications/overdue-followups-widget'
 import { RepPerformancePanel } from '@/components/dashboard/rep-performance'
 import { MyActivityPanel }     from '@/components/dashboard/my-activity'
-import { Users, Send, BarChart2, Bell, ArrowRight, CheckCircle2, Circle } from 'lucide-react'
+import { Users, Send, BarChart2, Bell } from 'lucide-react'
 import type { WorkspaceRole } from '@/types/database'
 
 export const metadata: Metadata = { title: 'Dashboard' }
@@ -13,9 +13,6 @@ export const metadata: Metadata = { title: 'Dashboard' }
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
-  const fullName = user?.user_metadata?.full_name as string | undefined
-  const firstName = fullName?.split(' ')[0]
 
   // Fetch role for contextual dashboard content
   const { data: member } = await supabase
@@ -27,7 +24,7 @@ export default async function DashboardPage() {
 
   const role = member?.role
   const metrics = member && user
-    ? await getDashboardMetrics(supabase, member.workspace_id, user.id, role)
+    ? await getDashboardMetrics(supabase, member.workspace_id, user.id)
     : emptyDashboardMetrics()
   const totalLeadsDescription =
     role === 'rep' || false ? 'assigned to you' : 'in workspace'
@@ -36,14 +33,7 @@ export default async function DashboardPage() {
     <div className="space-y-5">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-[-0.02em]">
-          {getGreeting()}, {firstName ?? 'there'}
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          {false
-            ? "Here's a read-only view of your workspace."
-            : "Here's what's happening in your workspace today."}
-        </p>
+        <h1 className="text-2xl font-semibold tracking-[-0.02em]">Dashboard</h1>
       </div>
 
       {/* Stats grid */}
@@ -106,43 +96,6 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Getting started checklist — only show for admin+ */}
-      {(role === 'admin' || role === 'super_admin') && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Getting started</CardTitle>
-            <CardDescription>
-              Complete these steps to set up your workspace for your team.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ol className="space-y-3">
-              <SetupStep
-                number={1}
-                title="Import your first leads"
-                description="Upload a CSV file to bring your prospects into the CRM."
-                href="/leads"
-                done={metrics.setup.hasLeads}
-              />
-              <SetupStep
-                number={2}
-                title="Invite your team"
-                description="Add reps and admins to your workspace."
-                href="/settings/team"
-                done={metrics.setup.hasTeamMembers}
-              />
-              <SetupStep
-                number={3}
-                title="Assign leads to reps"
-                description="Go to a lead and assign it to a rep so they can start calling."
-                href="/leads"
-                done={false}
-              />
-            </ol>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Rep: my activity breakdown */}
       {role === 'rep' && <MyActivityPanel />}
 
@@ -157,13 +110,6 @@ export default async function DashboardPage() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function getGreeting() {
-  const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
-}
-
 type DashboardMetrics = {
   totalLeads: number
   newLeads: number
@@ -171,10 +117,6 @@ type DashboardMetrics = {
   openRateLast30Days: number
   unreadNotifications: number
   followUpsDue: number
-  setup: {
-    hasLeads: boolean
-    hasTeamMembers: boolean
-  }
 }
 
 function emptyDashboardMetrics(): DashboardMetrics {
@@ -185,18 +127,13 @@ function emptyDashboardMetrics(): DashboardMetrics {
     openRateLast30Days: 0,
     unreadNotifications: 0,
     followUpsDue: 0,
-    setup: {
-      hasLeads: false,
-      hasTeamMembers: false,
-    },
   }
 }
 
 async function getDashboardMetrics(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
-  userId: string,
-  role: WorkspaceRole | undefined
+  userId: string
 ): Promise<DashboardMetrics> {
   const now = new Date()
 
@@ -204,7 +141,6 @@ async function getDashboardMetrics(
     leadsResult,
     newLeadsResult,
     followUpsDueResult,
-    membersResult,
   ] = await Promise.all([
     supabase
       .from('leads')
@@ -224,14 +160,7 @@ async function getDashboardMetrics(
       .eq('assigned_to', userId)
       .is('completed_at', null)
       .lte('due_at', now.toISOString()),
-    supabase
-      .from('workspace_members')
-      .select('user_id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .eq('is_active', true),
   ])
-
-  const canManageSetup = role === 'admin' || role === 'super_admin'
 
   return {
     totalLeads: leadsResult.count ?? 0,
@@ -240,10 +169,6 @@ async function getDashboardMetrics(
     openRateLast30Days: 0,
     unreadNotifications: 0,
     followUpsDue: followUpsDueResult.count ?? 0,
-    setup: {
-      hasLeads: (leadsResult.count ?? 0) > 0,
-      hasTeamMembers: canManageSetup && (membersResult.count ?? 0) > 1,
-    },
   }
 }
 
@@ -297,74 +222,4 @@ function StatCard({
   }
 
   return <Card>{content}</Card>
-}
-
-function SetupStep({
-  number,
-  title,
-  description,
-  href,
-  done,
-}: {
-  number: number
-  title: string
-  description: string
-  href: string
-  done: boolean
-}) {
-  return (
-    <li className="flex items-start gap-4" aria-label={`Step ${number}: ${title}`}>
-      <div className="mt-0.5 shrink-0">
-        {done
-          ? <CheckCircle2 className="h-5 w-5 text-foreground" />
-          : <Circle className="h-5 w-5 text-muted-foreground/40" />
-        }
-      </div>
-      <div className="min-w-0 flex-1">
-        <Link
-          href={href}
-          className={`text-sm font-medium hover:text-primary hover:underline ${done ? 'line-through text-muted-foreground' : ''}`}
-        >
-          {title}
-        </Link>
-        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-      </div>
-      {!done && (
-        <Link href={href} className="shrink-0 text-muted-foreground hover:text-foreground" aria-hidden="true">
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      )}
-    </li>
-  )
-}
-
-function QuickActionCard({
-  title,
-  description,
-  href,
-  icon: Icon,
-}: {
-  title: string
-  description: string
-  href: string
-  icon: React.ComponentType<{ className?: string }>
-  color: 'blue' | 'green' | 'purple' | 'amber'
-}) {
-  return (
-    <Link href={href}>
-      <Card className="transition-colors hover:border-foreground/30 hover:bg-secondary/40">
-        <CardContent className="pt-5">
-          <div className="flex items-start gap-4">
-            <div className="shrink-0 rounded-xl border border-border bg-secondary p-3 text-foreground">
-              <Icon className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-semibold">{title}</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  )
 }
