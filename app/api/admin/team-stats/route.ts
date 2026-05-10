@@ -84,17 +84,37 @@ export async function GET(req: Request) {
       { data: Array<{ assigned_to: string }> | null }
     ]
 
-    // Calls per rep (separate query — join syntax may vary)
+    // Calls per rep: call logs + legacy fallback from bulk status changes
     let callRows: Array<{ user_id: string }> = []
     try {
-      const cr = await adminClient
-        .from('activities')
-        .select('user_id, leads!inner(workspace_id)')
-        .eq('leads.workspace_id', wsId)
-        .eq('type', 'call_logged')
-        .gte('created_at', range.start)
-        .lte('created_at', range.end)
-      callRows = (cr.data ?? []) as Array<{ user_id: string }>
+      const [callLogsRes, statusActivitiesRes] = await Promise.all([
+        adminClient
+          .from('call_logs')
+          .select('logged_by')
+          .eq('workspace_id', wsId)
+          .gte('called_at', range.start)
+          .lte('called_at', range.end),
+        adminClient
+          .from('activity_logs')
+          .select('user_id, metadata')
+          .eq('workspace_id', wsId)
+          .eq('type', 'lead_status_changed')
+          .gte('created_at', range.start)
+          .lte('created_at', range.end),
+      ])
+
+      callRows = ((callLogsRes.data ?? []) as Array<{ logged_by: string | null }>)
+        .filter((r) => !!r.logged_by)
+        .map((r) => ({ user_id: r.logged_by as string }))
+
+      const statusToCall = new Set(['called', 'voicemail', 'no_answer', 'wrong_number', 'sold_already'])
+      const syntheticRows = ((statusActivitiesRes.data ?? []) as Array<{ user_id: string; metadata: Record<string, unknown> | null }>)
+        .filter((r) => !!r.user_id)
+        .filter((r) => r.metadata?.bulk === true)
+        .filter((r) => typeof r.metadata?.to === 'string' && statusToCall.has(r.metadata.to as string))
+        .map((r) => ({ user_id: r.user_id }))
+
+      callRows = [...callRows, ...syntheticRows]
     } catch {}
 
     const members      = membersRes.data       ?? []

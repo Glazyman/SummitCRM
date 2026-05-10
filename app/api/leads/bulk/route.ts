@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type { LeadStatus } from '@/types/database'
+import type { CallOutcome } from '@/types/database'
+
+const STATUS_TO_CALL_OUTCOME: Partial<Record<LeadStatus, CallOutcome>> = {
+  called:       'answered',
+  voicemail:    'voicemail',
+  no_answer:    'no_answer',
+  wrong_number: 'wrong_number',
+  sold_already: 'answered',
+}
 
 async function getContext() {
   const supabase = await createClient() as any
@@ -62,6 +71,28 @@ export async function PATCH(req: NextRequest) {
       metadata:     { to: status, bulk: true },
     }))
     await admin.from('activity_logs').insert(activityRows as never[])
+
+    const outcome = STATUS_TO_CALL_OUTCOME[status as LeadStatus]
+    if (outcome) {
+      const callRows = ids.map((id: string) => ({
+        lead_id:      id,
+        workspace_id: member.workspace_id,
+        logged_by:    user.id,
+        outcome,
+        duration_sec: null,
+        notes:        null,
+      }))
+      await admin.from('call_logs').insert(callRows as never[])
+
+      const callActivities = ids.map((id: string) => ({
+        workspace_id: member.workspace_id,
+        lead_id:      id,
+        user_id:      user.id,
+        type:         'call_logged',
+        metadata:     { outcome, duration_sec: null, auto_logged: true, bulk: true },
+      }))
+      await admin.from('activity_logs').insert(callActivities as never[])
+    }
   }
 
   return NextResponse.json({ updated: ids.length })

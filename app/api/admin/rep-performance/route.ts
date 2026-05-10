@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     const wsId   = member.workspace_id
 
     // Fetch everything in parallel
-    const [membersRes, usersRes, callsRes, followUpsRes, leadsRes] = await Promise.all([
+    const [membersRes, usersRes, callsRes, followUpsRes, leadsRes, statusActivitiesRes] = await Promise.all([
       admin.from('workspace_members').select('user_id, role').eq('workspace_id', wsId).eq('is_active', true),
       admin.auth.admin.listUsers(),
       admin.from('call_logs')
@@ -66,11 +66,18 @@ export async function GET(req: NextRequest) {
         .select('assigned_to, status')
         .eq('workspace_id', wsId)
         .is('deleted_at', null),
+      admin.from('activity_logs')
+        .select('user_id, metadata')
+        .eq('workspace_id', wsId)
+        .eq('type', 'lead_status_changed')
+        .gte('created_at', range.start)
+        .lte('created_at', range.end),
     ])
 
     const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
     const allUsers  = usersRes.data?.users ?? []
     const calls     = (callsRes.data ?? []) as Array<{ logged_by: string; outcome: string; called_at: string }>
+    const statusActivities = (statusActivitiesRes.data ?? []) as Array<{ user_id: string; metadata: Record<string, unknown> | null }>
     const followUps = (followUpsRes.data ?? []) as Array<{ assigned_to: string | null; completed_at: string | null; due_at: string }>
     const leads     = (leadsRes.data ?? []) as Array<{ assigned_to: string | null; status: string }>
 
@@ -80,6 +87,27 @@ export async function GET(req: NextRequest) {
     const nameById = new Map(
       allUsers.map(u => [u.id, (u.user_metadata?.full_name as string | undefined) ?? u.email ?? u.id])
     )
+
+    const statusToOutcome = new Map<string, string>([
+      ['called', 'answered'],
+      ['voicemail', 'voicemail'],
+      ['no_answer', 'no_answer'],
+      ['wrong_number', 'wrong_number'],
+      ['sold_already', 'answered'],
+    ])
+
+    const syntheticCallsByUser = new Map<string, string[]>()
+    for (const row of statusActivities) {
+      if (!row.user_id) continue
+      const md = row.metadata ?? {}
+      if (md.bulk !== true) continue
+      const nextStatus = typeof md.to === 'string' ? md.to : ''
+      const outcome = statusToOutcome.get(nextStatus)
+      if (!outcome) continue
+      const existing = syntheticCallsByUser.get(row.user_id) ?? []
+      existing.push(outcome)
+      syntheticCallsByUser.set(row.user_id, existing)
+    }
 
     // Aggregate per user
     const reps = members
@@ -92,6 +120,9 @@ export async function GET(req: NextRequest) {
         const callsByOutcome: Record<string, number> = {}
         for (const c of myCalls) {
           callsByOutcome[c.outcome] = (callsByOutcome[c.outcome] ?? 0) + 1
+        }
+        for (const outcome of (syntheticCallsByUser.get(uid) ?? [])) {
+          callsByOutcome[outcome] = (callsByOutcome[outcome] ?? 0) + 1
         }
 
         // Follow-ups
@@ -109,7 +140,7 @@ export async function GET(req: NextRequest) {
           id:               uid,
           name:             nameById.get(uid) ?? uid,
           role:             m.role,
-          calls:            myCalls.length,
+          calls:            myCalls.length + (syntheticCallsByUser.get(uid)?.length ?? 0),
           callsByOutcome,
           followUpsPending:  fuPending,
           followUpsOverdue:  fuOverdue,

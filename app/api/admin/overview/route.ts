@@ -136,17 +136,32 @@ export async function GET(req: Request) {
         { count: number | null },
       ]
 
-    // Calls count (separate query — join syntax may vary)
+    // Calls count: primary from call logs + legacy fallback from bulk status changes
     let callsCount = 0
     try {
-      const callsRes = await adminClient
-        .from('activities')
-        .select('id, leads!inner(workspace_id)', { count: 'exact', head: true })
-        .eq('leads.workspace_id', wsId)
-        .eq('type', 'call_logged')
-        .gte('created_at', range.start)
-        .lte('created_at', range.end)
-      callsCount = callsRes.count ?? 0
+      const [callsRes, statusActivitiesRes] = await Promise.all([
+        adminClient
+          .from('call_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', wsId)
+          .gte('called_at', range.start)
+          .lte('called_at', range.end),
+        adminClient
+          .from('activity_logs')
+          .select('metadata')
+          .eq('workspace_id', wsId)
+          .eq('type', 'lead_status_changed')
+          .gte('created_at', range.start)
+          .lte('created_at', range.end),
+      ])
+
+      const statusToCall = new Set(['called', 'voicemail', 'no_answer', 'wrong_number', 'sold_already'])
+      const synthetic = ((statusActivitiesRes.data ?? []) as Array<{ metadata: Record<string, unknown> | null }>)
+        .filter((row) => row.metadata?.bulk === true)
+        .filter((row) => typeof row.metadata?.to === 'string' && statusToCall.has(row.metadata.to as string))
+        .length
+
+      callsCount = (callsRes.count ?? 0) + synthetic
     } catch {}
 
     const emails      = emailsRes.data     ?? []
