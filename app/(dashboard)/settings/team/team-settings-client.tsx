@@ -19,6 +19,7 @@ interface Member {
   email:     string | null
   full_name: string | null
   is_me:     boolean
+  is_protected_owner?: boolean
 }
 
 interface PendingInvite {
@@ -548,7 +549,7 @@ export default function TeamSettingsClient({
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {isAdmin && !member.is_me ? (
+                    {isAdmin && !member.is_me && !member.is_protected_owner ? (
                       <>
                         <select
                           value={member.role}
@@ -568,12 +569,17 @@ export default function TeamSettingsClient({
                         </button>
                       </>
                     ) : (
-                      <span className={cn(
-                        'px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide border',
-                        ROLE_COLORS[member.role]
-                      )}>
-                        {ROLE_LABELS[member.role]}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          'px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide border',
+                          ROLE_COLORS[member.role]
+                        )}>
+                          {ROLE_LABELS[member.role]}
+                        </span>
+                        {member.is_protected_owner && (
+                          <span className="text-[10px] text-muted-foreground">Protected</span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

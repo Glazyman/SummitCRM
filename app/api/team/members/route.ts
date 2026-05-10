@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { WorkspaceRole } from '@/types/database'
 /* eslint-disable @typescript-eslint/no-explicit-any */
+const PROTECTED_OWNER_EMAIL = 'daniel@summitmergers.com'
 
 // GET /api/team/members — list all workspace members with their profile info
 export async function GET() {
@@ -59,6 +60,7 @@ export async function GET() {
       email:     u?.email ?? null,
       full_name: u?.full_name ?? null,
       is_me:     m.user_id === user.id,
+      is_protected_owner: (u?.email ?? '').toLowerCase() === PROTECTED_OWNER_EMAIL,
     }
   })
 
@@ -97,6 +99,14 @@ export async function DELETE(req: NextRequest) {
     .single()
 
   if (!targetMember) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+
+  try {
+    const targetUser = await admin.auth.admin.getUserById(targetMember.user_id)
+    const targetEmail = (targetUser.data.user?.email ?? '').toLowerCase()
+    if (targetEmail === PROTECTED_OWNER_EMAIL && targetMember.user_id !== user.id) {
+      return NextResponse.json({ error: 'This owner account is protected and cannot be removed by other admins.' }, { status: 403 })
+    }
+  } catch {}
 
   const { error } = await admin
     .from('workspace_members')
@@ -144,6 +154,22 @@ export async function PATCH(req: NextRequest) {
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
   }
+
+  const { data: targetMember } = await admin
+    .from('workspace_members')
+    .select('user_id')
+    .eq('id', member_id)
+    .eq('workspace_id', currentMember.workspace_id)
+    .single()
+  if (!targetMember) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+
+  try {
+    const targetUser = await admin.auth.admin.getUserById(targetMember.user_id)
+    const targetEmail = (targetUser.data.user?.email ?? '').toLowerCase()
+    if (targetEmail === PROTECTED_OWNER_EMAIL && targetMember.user_id !== user.id) {
+      return NextResponse.json({ error: 'This owner account is protected and cannot be changed by other admins.' }, { status: 403 })
+    }
+  } catch {}
 
   const { data: updated, error } = await admin
     .from('workspace_members')
