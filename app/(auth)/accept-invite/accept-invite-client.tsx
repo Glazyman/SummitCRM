@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 import type { WorkspaceRole } from '@/types/database'
 
 const ROLE_LABELS: Record<WorkspaceRole, string> = {
@@ -50,6 +51,7 @@ export default function AcceptInviteClient({ token, email, role, workspaceName }
 
     setSubmitting(true)
     try {
+      // Step 1 — create / update the account server-side
       const res = await fetch('/api/team/accept-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,6 +62,19 @@ export default function AcceptInviteClient({ token, email, role, workspaceName }
         setError(data.error ?? 'Failed to accept invitation')
         return
       }
+
+      // Step 2 — sign in from the browser so session cookies are set correctly
+      const supabase = createClient()
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password,
+      })
+      if (signInErr) {
+        setError('Account created but sign-in failed — please log in manually.')
+        router.replace('/login')
+        return
+      }
+
       router.replace('/dashboard')
     } finally {
       setSubmitting(false)

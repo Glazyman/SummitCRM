@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
 
 // POST /api/team/accept-invite — accept invite, create account, join workspace
 export async function POST(req: NextRequest) {
@@ -11,8 +10,7 @@ export async function POST(req: NextRequest) {
   if (!password)  return NextResponse.json({ error: 'password is required' }, { status: 400 })
   if (!full_name) return NextResponse.json({ error: 'full_name is required' }, { status: 400 })
 
-  const supabase = await createClient() as any
-  const admin    = createAdminClient() as any
+  const admin = createAdminClient() as any
 
   // Fetch invitation via admin client — user is unauthenticated so RLS would block
   const { data: invitation, error: invErr } = await admin
@@ -40,12 +38,12 @@ export async function POST(req: NextRequest) {
   let userId: string
 
   if (existingUser) {
-    // Update name if not set
-    if (!existingUser.user_metadata?.full_name) {
-      await admin.auth.admin.updateUserById(existingUser.id, {
-        user_metadata: { full_name: full_name },
-      })
-    }
+    // Always update password and name — this handles re-invited users whose
+    // auth account wasn't fully deleted (e.g. silent delete failure)
+    await admin.auth.admin.updateUserById(existingUser.id, {
+      password,
+      user_metadata: { full_name },
+    })
     userId = existingUser.id
   } else {
     // Create new user account
@@ -86,15 +84,7 @@ export async function POST(req: NextRequest) {
     .update({ accepted_at: new Date().toISOString() })
     .eq('id', invitation.id)
 
-  // Sign the user in
-  const { error: signInErr } = await supabase.auth.signInWithPassword({
-    email:    invitation.email,
-    password,
-  })
-  if (signInErr) {
-    // Account created, but sign-in failed — they can log in manually
-    return NextResponse.json({ success: true, redirect: '/login' })
-  }
-
-  return NextResponse.json({ success: true, redirect: '/dashboard' })
+  // Return the email so the client can sign in browser-side
+  // (server-side signInWithPassword doesn't reliably set cookies in API routes)
+  return NextResponse.json({ success: true, email: invitation.email })
 }
