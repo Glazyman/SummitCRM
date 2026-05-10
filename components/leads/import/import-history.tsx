@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import {
   CheckCircle2, XCircle, Clock, Download, ExternalLink,
-  ChevronDown, ChevronUp, RefreshCw,
+  ChevronDown, ChevronUp, RefreshCw, Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -53,6 +53,7 @@ const STATUS_CONFIG = {
 
 export function ImportHistory({ records, loading, onRefresh }: ImportHistoryProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   if (loading) {
     return (
@@ -191,6 +192,16 @@ export function ImportHistory({ records, loading, onRefresh }: ImportHistoryProp
                     : <ChevronDown className="h-3.5 w-3.5" />
                   }
                 </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                  title="Delete import history"
+                  disabled={deletingId === rec.id}
+                  onClick={() => handleDeleteImport(rec.id, rec.fileName, onRefresh, setDeletingId)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
             </div>
 
@@ -244,6 +255,16 @@ export function ImportHistory({ records, loading, onRefresh }: ImportHistoryProp
                       Error report
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    disabled={deletingId === rec.id}
+                    onClick={() => handleDeleteImport(rec.id, rec.fileName, onRefresh, setDeletingId)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Delete
+                  </Button>
                 </div>
               </div>
             )}
@@ -322,4 +343,33 @@ function formatDuration(start: string, end: string): string {
 function downloadErrorReport(importId: string) {
   // In production: fetch from /api/leads/import/{importId}/errors
   window.location.href = `/api/leads/import/${importId}/errors`
+}
+
+async function handleDeleteImport(
+  importId: string,
+  fileName: string,
+  onRefresh: (() => void) | undefined,
+  setDeletingId: (id: string | null) => void
+) {
+  const confirmed = window.confirm(`Delete import history for "${fileName}"? This cannot be undone.`)
+  if (!confirmed) return
+
+  setDeletingId(importId)
+  try {
+    const res = await fetch('/api/leads/imports', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ import_id: importId }),
+    })
+
+    const json = await res.json() as { error?: string }
+    if (!res.ok) throw new Error(json.error ?? 'Failed to delete import history')
+
+    onRefresh?.()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to delete import history'
+    window.alert(message)
+  } finally {
+    setDeletingId(null)
+  }
 }

@@ -7,9 +7,14 @@
  * Auth: rep+
  */
 import { NextRequest } from 'next/server'
+import { z } from 'zod'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError, apiUnauthorized, apiServerError } from '@/lib/utils/api'
+
+const deleteImportSchema = z.object({
+  import_id: z.string().uuid(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -112,6 +117,81 @@ export async function GET(request: NextRequest) {
         hasPreviousPage: page > 1,
       },
     })
+  } catch (err) {
+    return apiServerError(err)
+  }
+}
+
+/**
+ * DELETE /api/leads/imports
+ *
+ * Deletes one import history record for the current workspace.
+ *
+ * Auth: admin+
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return apiUnauthorized()
+
+    const admin = createAdminClient()
+    const { data: member, error: memberErr } = await (admin as any)
+      .from('workspace_members')
+      .select('workspace_id, role, is_active')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
+
+    if (memberErr || !member) {
+      return apiError('User is not an active member of any workspace', 403)
+    }
+
+    if (!['super_admin', 'admin'].includes(member.role)) {
+      return apiError('Only admins can delete import history', 403)
+    }
+
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return apiError('Invalid JSON body')
+    }
+
+    const parsed = deleteImportSchema.safeParse(body)
+    if (!parsed.success) return apiError(parsed.error.issues[0].message)
+
+    const { import_id: importId } = parsed.data
+
+    const { data: target, error: targetErr } = await admin
+      .from('lead_imports')
+      .select('id, workspace_id, storage_path')
+      .eq('id', importId)
+      .single() as {
+      data: { id: string; workspace_id: string; storage_path: string | null } | null
+      error: unknown
+    }
+
+    if (targetErr || !target) {
+      return apiError('Import not found', 404)
+    }
+
+    if (target.workspace_id !== member.workspace_id) {
+      return apiError('Import not found in your workspace', 404)
+    }
+
+    if (target.storage_path) {
+      await admin.storage.from('lead-imports').remove([target.storage_path])
+    }
+
+    const { error: delErr } = await admin
+      .from('lead_imports')
+      .delete()
+      .eq('id', importId)
+
+    if (delErr) return apiServerError(delErr)
+
+    return apiSuccess({ deleted: true })
   } catch (err) {
     return apiServerError(err)
   }
