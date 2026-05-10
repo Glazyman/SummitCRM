@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Activity, Clock, Phone, X, ExternalLink, ChevronDown } from 'lucide-react'
+import { Activity, Clock, Phone, X, ExternalLink, ChevronDown, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -39,8 +39,11 @@ export interface LeadFullPanelProps {
   currentUserId: string
   canEditBatch:  boolean
   onClose:       () => void
-  /** Propagate status/interest changes back to the leads table */
+  /** Propagate status/interest changes back to the parent list */
   onLeadChange:  (patch: { status?: LeadStatus; interest_status?: InterestStatus }) => void
+  /** When opened from the activities view — shows a Mark Done button in the header */
+  activityDone?:         boolean
+  onMarkActivityDone?:   () => void
 }
 
 interface PanelData {
@@ -59,6 +62,8 @@ export function LeadFullPanel({
   canEditBatch,
   onClose,
   onLeadChange,
+  activityDone,
+  onMarkActivityDone,
 }: LeadFullPanelProps) {
   const [data,      setData]      = React.useState<PanelData | null>(null)
   const [loading,   setLoading]   = React.useState(true)
@@ -219,6 +224,21 @@ export function LeadFullPanel({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {onMarkActivityDone && (
+            <button
+              type="button"
+              onClick={onMarkActivityDone}
+              className={cn(
+                'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-colors',
+                activityDone
+                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              )}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {activityDone ? 'Completed' : 'Mark Done'}
+            </button>
+          )}
           <Link
             href={`/leads/${leadId}`}
             className="flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
