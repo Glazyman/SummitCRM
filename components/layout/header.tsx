@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { LogOut, User, Menu, Settings, ChevronDown, Shield, Search } from 'lucide-react'
+import { LogOut, User, Menu, Settings, ChevronDown, Shield, Search, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -13,13 +13,13 @@ import type { WorkspaceRole } from '@/types/database'
 
 // ── Page title from pathname ───────────────────────────────────────────────
 const ROUTE_TITLES: Record<string, string> = {
-  '/dashboard':     'Dashboard',
-  '/leads':         'Leads',
-  '/campaigns':     'Campaigns',
-  '/analytics':     'Analytics',
-  '/notifications': 'Notifications',
-  '/settings':      'Settings',
-  '/admin':         'Admin',
+  '/dashboard':  'Dashboard',
+  '/leads':      'Leads',
+  '/activities': 'Activities',
+  '/analytics':  'Analytics',
+  '/settings':   'Settings',
+  '/admin':      'Admin',
+  '/pipeline':   'Pipeline',
 }
 
 function getPageTitle(pathname: string): string {
@@ -57,19 +57,22 @@ function RoleBadge({ role }: { role: WorkspaceRole }) {
 
 // ── Header ────────────────────────────────────────────────────────────────
 interface HeaderProps {
-  user: SupabaseUser | null
-  role?: WorkspaceRole | null
+  user:           SupabaseUser | null
+  role?:          WorkspaceRole | null
   workspaceName?: string | null
-  onMenuClick?: () => void
+  onMenuClick?:   () => void
 }
 
 export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) {
-  const router = useRouter()
+  const router   = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [searchOpen,   setSearchOpen]   = useState(false)
+  const [searchQuery,  setSearchQuery]  = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const searchRef   = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -77,15 +80,25 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
         setDropdownOpen(false)
       }
     }
-    if (dropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
+    if (dropdownOpen) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [dropdownOpen])
 
+  // Open search with ⌘K
   useEffect(() => {
-    setDropdownOpen(false)
-  }, [router])
+    function handler(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(true)
+        setTimeout(() => searchRef.current?.focus(), 50)
+      }
+      if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery('') }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
+
+  useEffect(() => { setDropdownOpen(false) }, [pathname])
 
   async function handleSignOut() {
     setDropdownOpen(false)
@@ -100,160 +113,178 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
   }
 
   function handleMobileMenu() {
-    if (onMenuClick) {
-      onMenuClick()
-      return
-    }
+    if (onMenuClick) { onMenuClick(); return }
     window.dispatchEvent(new Event('open-mobile-sidebar'))
   }
 
-  const fullName = user?.user_metadata?.full_name as string | undefined
-  const email = user?.email ?? ''
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    if (!searchQuery.trim()) return
+    router.push(`/leads?q=${encodeURIComponent(searchQuery.trim())}`)
+    setSearchOpen(false)
+    setSearchQuery('')
+  }
+
+  const fullName    = user?.user_metadata?.full_name as string | undefined
+  const email       = user?.email ?? ''
   const displayName = fullName ?? email
-  const pageTitle = getPageTitle(pathname)
+  const pageTitle   = getPageTitle(pathname)
 
   return (
-    <header
-      className="sticky top-0 z-10 flex h-[var(--header-height)] shrink-0 items-center gap-3 border-b border-border bg-background/95 px-5 backdrop-blur lg:px-6"
-    >
-      {/* Mobile menu button */}
-      <button
-        type="button"
-        onClick={handleMobileMenu}
-        className="mr-1 rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground lg:hidden"
-        aria-label="Open menu"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+    <>
+      <header className="sticky top-0 z-20 flex h-[var(--header-height)] shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur lg:px-5">
+        {/* Mobile menu */}
+        <button
+          type="button"
+          onClick={handleMobileMenu}
+          className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground lg:hidden"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
 
-      {/* Page title */}
-      <h1 className="text-[15px] font-semibold leading-none tracking-[-0.01em]">
-        {pageTitle}
-      </h1>
+        {/* Page title */}
+        <h1 className="text-[15px] font-semibold leading-none tracking-[-0.01em] min-w-0 truncate">
+          {pageTitle}
+        </h1>
 
-      {/* Search — pill shaped */}
-      <div className="ml-auto hidden w-72 items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-muted-foreground shadow-card md:flex">
-        <Search className="h-3.5 w-3.5 shrink-0" />
-        <input
-          className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
-          placeholder="Search leads, campaigns…"
-          readOnly
-        />
-        <kbd className="hidden rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground sm:block">
-          ⌘K
-        </kbd>
-      </div>
+        {/* Search bar — pushes right with ml-auto but doesn't crowd buttons */}
+        <form
+          onSubmit={handleSearch}
+          className="ml-auto hidden md:flex w-56 lg:w-72 items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-muted-foreground shadow-card"
+        >
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <input
+            ref={searchRef}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground min-w-0"
+            placeholder="Search leads…"
+          />
+          {searchQuery ? (
+            <button type="button" onClick={() => setSearchQuery('')} className="shrink-0 text-muted-foreground hover:text-foreground">
+              <X className="h-3 w-3" />
+            </button>
+          ) : (
+            <kbd className="hidden rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground sm:block shrink-0">
+              ⌘K
+            </kbd>
+          )}
+        </form>
 
-      {/* Right actions */}
-      <div className="flex items-center gap-1">
-        {/* Notifications */}
-        <div className="flex h-9 w-9 items-center justify-center">
-          {role === 'rep' ? <FollowUpBell /> : <NotificationBell />}
-        </div>
-
-        {/* User dropdown */}
-        <div className="relative ml-1" ref={dropdownRef}>
+        {/* Right actions — always visible, shrink-0 prevents squishing */}
+        <div className="flex shrink-0 items-center gap-1 ml-2">
+          {/* Mobile search button */}
           <button
             type="button"
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className={cn(
-              'flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm transition-colors',
-              'hover:bg-secondary',
-              dropdownOpen && 'bg-secondary'
-            )}
-            aria-expanded={dropdownOpen}
-            aria-haspopup="menu"
+            onClick={() => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 50) }}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors md:hidden"
           >
-            <Avatar name={displayName} size="sm" />
-            <span className="hidden max-w-[100px] truncate text-[13.5px] font-semibold md:block">
-              {fullName ?? email.split('@')[0]}
-            </span>
-            <ChevronDown className={cn(
-              'hidden h-3 w-3 text-muted-foreground transition-transform duration-150 md:block',
-              dropdownOpen && 'rotate-180'
-            )} />
+            <Search className="h-4 w-4" />
           </button>
 
-          {/* Dropdown panel */}
-          {dropdownOpen && (
-            <div
-              role="menu"
-              className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-popover shadow-card"
+          {/* Notifications */}
+          <div className="flex h-9 w-9 items-center justify-center relative z-30">
+            {role === 'rep' ? <FollowUpBell /> : <NotificationBell />}
+          </div>
+
+          {/* User dropdown */}
+          <div className="relative ml-1 z-30" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className={cn(
+                'flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm transition-colors',
+                'hover:bg-secondary',
+                dropdownOpen && 'bg-secondary'
+              )}
+              aria-expanded={dropdownOpen}
+              aria-haspopup="menu"
             >
-              {/* User info */}
-              <div className="px-3.5 py-3">
-                <div className="flex items-center gap-2.5">
-                  <Avatar name={displayName} size="md" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{fullName ?? 'User'}</p>
-                    <p className="truncate text-xs text-muted-foreground">{email}</p>
+              <Avatar name={displayName} size="sm" />
+              <span className="hidden max-w-[100px] truncate text-[13.5px] font-semibold md:block">
+                {fullName ?? email.split('@')[0]}
+              </span>
+              <ChevronDown className={cn(
+                'hidden h-3 w-3 text-muted-foreground transition-transform duration-150 md:block',
+                dropdownOpen && 'rotate-180'
+              )} />
+            </button>
+
+            {dropdownOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-popover shadow-card"
+              >
+                <div className="px-3.5 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <Avatar name={displayName} size="md" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{fullName ?? 'User'}</p>
+                      <p className="truncate text-xs text-muted-foreground">{email}</p>
+                    </div>
                   </div>
+                  {role && <div className="mt-2.5"><RoleBadge role={role} /></div>}
+                  {workspaceName && <p className="mt-1.5 truncate text-xs text-muted-foreground">{workspaceName}</p>}
                 </div>
-                {role && (
-                  <div className="mt-2.5">
-                    <RoleBadge role={role} />
-                  </div>
-                )}
-                {workspaceName && (
-                  <p className="mt-1.5 truncate text-xs text-muted-foreground">
-                    {workspaceName}
-                  </p>
-                )}
-              </div>
 
-              <div className="border-t border-border" />
+                <div className="border-t border-border" />
 
-              <div className="py-1" role="none">
-                <button
-                  role="menuitem"
-                  type="button"
-                  onClick={() => navigate('/settings')}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary"
-                >
-                  <Settings className="h-4 w-4 text-muted-foreground" />
-                  Settings
-                </button>
-
-                <button
-                  role="menuitem"
-                  type="button"
-                  onClick={() => navigate('/settings/profile')}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary"
-                >
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  Profile
-                </button>
-
-                {role && ['admin', 'super_admin'].includes(role) && (
-                  <button
-                    role="menuitem"
-                    type="button"
-                    onClick={() => navigate('/admin')}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary"
-                  >
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    Admin Panel
+                <div className="py-1" role="none">
+                  <button role="menuitem" type="button" onClick={() => navigate('/settings')}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary">
+                    <Settings className="h-4 w-4 text-muted-foreground" /> Settings
                   </button>
-                )}
-              </div>
+                  <button role="menuitem" type="button" onClick={() => navigate('/settings/profile')}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary">
+                    <User className="h-4 w-4 text-muted-foreground" /> Profile
+                  </button>
+                  {role && ['admin', 'super_admin'].includes(role) && (
+                    <button role="menuitem" type="button" onClick={() => navigate('/admin')}
+                      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary">
+                      <Shield className="h-4 w-4 text-muted-foreground" /> Admin Panel
+                    </button>
+                  )}
+                </div>
 
-              <div className="border-t border-border" />
-
-              <div className="py-1" role="none">
-                <button
-                  role="menuitem"
-                  type="button"
-                  onClick={handleSignOut}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </button>
+                <div className="border-t border-border" />
+                <div className="py-1" role="none">
+                  <button role="menuitem" type="button" onClick={handleSignOut}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-foreground hover:bg-secondary">
+                    <LogOut className="h-4 w-4" /> Sign Out
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile full-screen search overlay */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col p-4 md:hidden">
+          <form onSubmit={handleSearch} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-card">
+            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+            <input
+              ref={searchRef}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search leads…"
+              className="flex-1 bg-transparent text-sm outline-none"
+              autoFocus
+            />
+            <button type="button" onClick={() => { setSearchOpen(false); setSearchQuery('') }} className="text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </form>
+          {searchQuery.trim() && (
+            <button type="button" onClick={() => handleSearch({ preventDefault: () => {} } as any)}
+              className="mt-3 rounded-xl bg-primary text-primary-foreground py-3 text-sm font-medium">
+              Search for "{searchQuery}"
+            </button>
           )}
         </div>
-      </div>
-    </header>
+      )}
+    </>
   )
 }

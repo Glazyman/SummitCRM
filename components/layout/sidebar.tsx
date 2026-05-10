@@ -13,9 +13,10 @@ import {
   PlusCircle,
   Building2,
   MoreHorizontal,
-  Inbox,
   Kanban,
   ListChecks,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WorkspaceRole } from '@/types/database'
@@ -73,6 +74,15 @@ function getInitials(name: string | null | undefined, email: string | null | und
 export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarProps) {
   const pathname = usePathname()
   const [activitiesDue, setActivitiesDue] = React.useState<number | undefined>(undefined)
+  const [collapsed, setCollapsed]         = React.useState(() => {
+    try { return localStorage.getItem('sidebar_collapsed') === 'true' } catch { return false }
+  })
+
+  function toggleCollapsed() {
+    const next = !collapsed
+    setCollapsed(next)
+    try { localStorage.setItem('sidebar_collapsed', String(next)) } catch {}
+  }
 
   React.useEffect(() => {
     fetch('/api/activities/due')
@@ -99,55 +109,76 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
   const displayName = userName ?? userEmail?.split('@')[0] ?? 'You'
 
   return (
-    <aside className="flex h-full w-[var(--sidebar-width)] flex-col border-r border-border bg-background">
+    <aside className={cn(
+      'flex h-full flex-col border-r border-border bg-background transition-all duration-200',
+      collapsed ? 'w-[60px]' : 'w-[var(--sidebar-width)]'
+    )}>
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-4 pb-3 pt-4">
+      <div className="flex items-center gap-2.5 px-3 pb-3 pt-4">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold text-foreground shadow-card">
           {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
         </div>
-        <p className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-none tracking-[-0.02em]">
-          {workspaceName ?? 'Summit Mergers'}
-        </p>
+        {!collapsed && (
+          <p className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-none tracking-[-0.02em]">
+            {workspaceName ?? 'Summit Mergers'}
+          </p>
+        )}
         <button
           type="button"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground"
-          aria-label="Inbox"
+          onClick={toggleCollapsed}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          <Inbox className="h-3.5 w-3.5" />
+          {collapsed
+            ? <PanelLeftOpen className="h-3.5 w-3.5" />
+            : <PanelLeftClose className="h-3.5 w-3.5" />
+          }
         </button>
       </div>
 
       {/* Main nav */}
-      <nav className="flex flex-1 flex-col overflow-y-auto px-3 scrollbar-thin">
-        <Link
-          href="/leads/import"
-          className="mb-3 flex items-center gap-2 rounded-lg bg-primary px-2.5 py-2 text-[13px] font-medium text-primary-foreground shadow-primary-glow transition-colors hover:bg-primary/90"
-        >
-          <PlusCircle className="h-4 w-4" />
-          Quick Create
-        </Link>
+      <nav className="flex flex-1 flex-col overflow-y-auto px-2 scrollbar-thin">
+        {!collapsed && (
+          <Link
+            href="/leads/import"
+            className="mb-3 flex items-center gap-2 rounded-lg bg-primary px-2.5 py-2 text-[13px] font-medium text-primary-foreground shadow-primary-glow transition-colors hover:bg-primary/90"
+          >
+            <PlusCircle className="h-4 w-4" />
+            Quick Create
+          </Link>
+        )}
+        {collapsed && (
+          <Link
+            href="/leads/import"
+            className="mb-3 flex items-center justify-center rounded-lg bg-primary p-2 text-primary-foreground shadow-primary-glow transition-colors hover:bg-primary/90"
+            title="Quick Create"
+          >
+            <PlusCircle className="h-4 w-4" />
+          </Link>
+        )}
 
         <div className="flex flex-col gap-1">
           {visibleMain.map((item) => (
-            <NavLink key={item.href} item={item} active={isActive(item.href)} />
+            <NavLink key={item.href} item={item} active={isActive(item.href)} collapsed={collapsed} />
           ))}
         </div>
 
         {/* Settings section for admins */}
-        {isAdmin && (
+        {isAdmin && !collapsed && (
           <div className="mt-6">
-            <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">
-              Admin
-            </p>
-            <NavLink
-              item={{ label: 'Team Members', href: '/settings/team', icon: Users }}
-              active={isActive('/settings/team')}
-            />
+            <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">Admin</p>
+            <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }} active={isActive('/settings/team')} />
+          </div>
+        )}
+        {isAdmin && collapsed && (
+          <div className="mt-4">
+            <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }} active={isActive('/settings/team')} collapsed />
           </div>
         )}
 
-        {/* Documents section — admins only */}
-        {!isRep && (
+        {/* Documents section — admins only, hidden when collapsed */}
+        {!isRep && !collapsed && (
           <div className="mt-6">
             <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">
               Documents
@@ -162,33 +193,37 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
       </nav>
 
       {/* Bottom nav */}
-      <div className="flex flex-col gap-1 px-3 pb-3 pt-2">
+      <div className="flex flex-col gap-1 px-2 pb-3 pt-2">
         {bottomNav.map((item) => (
-          <NavLink key={item.href} item={item} active={isActive(item.href)} />
+          <NavLink key={item.href} item={item} active={isActive(item.href)} collapsed={collapsed} />
         ))}
       </div>
 
       {/* Footer — user info */}
-      <div className="flex items-center gap-2.5 border-t border-border px-4 py-3">
-        {/* Avatar */}
+      <div className={cn(
+        'flex items-center border-t border-border px-2 py-3',
+        collapsed ? 'justify-center' : 'gap-2.5'
+      )}>
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-[11px] font-semibold text-foreground">
           {initials}
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium leading-tight">{displayName}</p>
-          {userEmail && (
-            <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
-              {userEmail}
-            </p>
-          )}
-        </div>
-        <button
-          type="button"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-          aria-label="More options"
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
+        {!collapsed && (
+          <>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-medium leading-tight">{displayName}</p>
+              {userEmail && (
+                <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">{userEmail}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              aria-label="More options"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </>
+        )}
       </div>
     </aside>
   )
@@ -197,30 +232,36 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
 function NavLink({
   item,
   active,
+  collapsed,
 }: {
-  item: NavItem
-  active: boolean
+  item:      NavItem
+  active:    boolean
+  collapsed?: boolean
 }) {
   const Icon = item.icon
 
   return (
     <Link
       href={item.href}
+      title={collapsed ? item.label : undefined}
       className={cn(
-        'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors duration-100',
+        'flex items-center rounded-lg py-2 text-[13px] font-medium transition-colors duration-100',
+        collapsed ? 'justify-center px-2' : 'gap-2.5 px-2.5',
         active
           ? 'bg-primary text-primary-foreground shadow-primary-glow'
           : 'text-foreground/75 hover:bg-secondary hover:text-foreground'
       )}
     >
-      <Icon
-        className={cn(
-          'h-4 w-4 shrink-0',
-          active ? 'text-primary-foreground' : 'text-muted-foreground'
+      <span className="relative shrink-0">
+        <Icon className={cn('h-4 w-4', active ? 'text-primary-foreground' : 'text-muted-foreground')} />
+        {collapsed && item.badge != null && item.badge > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground">
+            {item.badge > 9 ? '9+' : item.badge}
+          </span>
         )}
-      />
-      <span className="flex-1">{item.label}</span>
-      {item.badge != null && item.badge > 0 && (
+      </span>
+      {!collapsed && <span className="flex-1">{item.label}</span>}
+      {!collapsed && item.badge != null && item.badge > 0 && (
         <span
           className={cn(
             'rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none',
