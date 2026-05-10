@@ -3,7 +3,16 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
-import type { LeadStatus, WorkspaceRole } from '@/types/database'
+import type { LeadStatus, WorkspaceRole, CallOutcome } from '@/types/database'
+
+// Statuses that represent a call attempt — auto-log a call_log row when set
+const STATUS_TO_CALL_OUTCOME: Partial<Record<LeadStatus, CallOutcome>> = {
+  called:       'answered',
+  voicemail:    'voicemail',
+  no_answer:    'no_answer',
+  wrong_number: 'wrong_number',
+  sold_already: 'answered',
+}
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -222,6 +231,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         type: 'lead_status_changed',
         metadata: { from: existing.status, to: patch.status },
       })
+
+      // Auto-log a call when switching to a call-related status
+      const callOutcome = STATUS_TO_CALL_OUTCOME[patch.status]
+      if (callOutcome) {
+        await adminClient.from('call_logs').insert({
+          lead_id:      id,
+          workspace_id: member.workspace_id,
+          logged_by:    user.id,
+          outcome:      callOutcome,
+          duration_sec: null,
+          notes:        null,
+        })
+        logInserts.push({
+          workspace_id: member.workspace_id,
+          lead_id:      id,
+          user_id:      user.id,
+          type:         'call_logged',
+          metadata:     { outcome: callOutcome, duration_sec: null, auto_logged: true },
+        })
+      }
     }
 
     if (patch.interest_status && patch.interest_status !== existing.interest_status) {
