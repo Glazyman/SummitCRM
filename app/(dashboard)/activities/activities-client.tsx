@@ -53,13 +53,23 @@ function fmtDate(iso: string) {
   const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const dueMidnight   = new Date(d.getFullYear(),   d.getMonth(),   d.getDate())
   const days = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / 86400000)
+  const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   if (days < 0)   return { label: `${Math.abs(days)}d overdue`, overdue: true }
-  if (days === 0) return { label: 'Today', overdue: false }
-  if (days === 1) return { label: 'Tomorrow', overdue: false }
-  return { label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), overdue: false }
+  if (days === 0) return { label: `Today · ${timeStr}`, overdue: false }
+  if (days === 1) return { label: `Tomorrow · ${timeStr}`, overdue: false }
+  return { label: `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${timeStr}`, overdue: false }
 }
 
 const selectCls = 'h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
+
+/** Tomorrow at 9 AM in local time, formatted for datetime-local inputs. */
+function defaultActivityDueAt(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(9, 0, 0, 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
@@ -93,7 +103,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
     priority:   'medium'   as Priority,
     title:      '',
     notes:      '',
-    dueAt:      new Date(Date.now() + 86400000).toISOString().slice(0, 16),
+    dueAt:      defaultActivityDueAt(),
     assignedTo: currentUserId,
   }))
 
@@ -175,7 +185,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
         if (json.data?.activities) setActivities(json.data.activities)
         setShowNew(false)
         setNewForm({ leadId: '', type: 'follow_up', priority: 'medium', title: '', notes: '',
-          dueAt: new Date(Date.now() + 86400000).toISOString().slice(0, 16), assignedTo: currentUserId })
+          dueAt: defaultActivityDueAt(), assignedTo: currentUserId })
       }
     } finally { setSaving(false) }
   }

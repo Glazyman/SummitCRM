@@ -9,7 +9,7 @@ type Params = { params: Promise<{ id: string }> }
 const createFollowUpSchema = z.object({
   title: z.string().trim().min(1).max(200),
   notes: z.string().max(2000).optional().nullable(),
-  due_at: z.string().datetime({ local: true }),
+  due_at: z.string().min(1),
   assigned_to: z.string().uuid().nullable().optional(),
 })
 

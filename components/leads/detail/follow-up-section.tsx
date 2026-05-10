@@ -225,7 +225,9 @@ function AddFollowUpModal({ open, teamMembers, currentUserId, isAdmin, onClose, 
       await onSave({
         title:       effectiveTitle,
         notes,
-        due_at:      dueAt,
+        // Convert the datetime-local value (local time in browser) to a proper UTC ISO
+        // string before sending. Without this, the server (UTC) would misparse it.
+        due_at:      new Date(dueAt).toISOString(),
         assigned_to: isAdmin ? assignedTo : currentUserId,
       })
     } catch (err) {
@@ -362,7 +364,7 @@ function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onCl
     if (!dueAt)        { setError('Please set a date.'); return }
     setSaving(true)
     try {
-      await onSave({ title: title.trim(), notes, due_at: dueAt, assigned_to: assignedTo })
+      await onSave({ title: title.trim(), notes, due_at: new Date(dueAt).toISOString(), assigned_to: assignedTo })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save.')
     } finally {
@@ -452,10 +454,11 @@ function toLocalDatetimeInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** Default follow-up time: tomorrow at the next round hour, in local time. */
+/** Default follow-up time: tomorrow at 9 AM in local time. */
 function defaultDueAt(): string {
-  const d = new Date(Date.now() + 24 * 3600000)
-  d.setMinutes(0, 0, 0)
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(9, 0, 0, 0)
   return toLocalDatetimeInput(d)
 }
 
