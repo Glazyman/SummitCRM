@@ -49,7 +49,7 @@ export async function GET() {
 
       admin
         .from('workspace_members')
-        .select('user_id, role, is_active, users:user_id(email, raw_user_meta_data)')
+        .select('user_id, role, is_active')
         .eq('workspace_id', member.workspace_id)
         .eq('is_active', true),
     ])
@@ -60,7 +60,6 @@ export async function GET() {
       user_id: string
       role: string
       is_active: boolean
-      users: Array<{ email: string | null; raw_user_meta_data: Record<string, unknown> | null }> | null
     }>
 
     const workspaceDefault = Number(ws?.settings?.daily_call_target)
@@ -70,11 +69,22 @@ export async function GET() {
 
     const overrideByUser = new Map(overrides.map((r) => [r.user_id, r.daily_target]))
 
+    const { data: usersData } = await admin.auth.admin.listUsers()
+    const usersById = new Map(
+      (usersData.users ?? []).map((u) => [
+        u.id,
+        {
+          email: u.email ?? null,
+          meta: (u.user_metadata ?? {}) as Record<string, unknown>,
+        },
+      ])
+    )
+
     const reps = members
       .filter((m) => m.role === 'rep')
       .map((m) => {
-        const userRow = m.users?.[0] ?? null
-        const meta = userRow?.raw_user_meta_data ?? {}
+        const userRow = usersById.get(m.user_id)
+        const meta = userRow?.meta ?? {}
         const fullName = (meta.full_name as string | undefined) ?? (meta.name as string | undefined) ?? null
         const override = overrideByUser.get(m.user_id) ?? null
         return {
