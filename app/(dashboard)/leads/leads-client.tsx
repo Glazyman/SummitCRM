@@ -176,6 +176,13 @@ export function LeadsClient({
     return DEFAULT_COLUMN_ORDER
   })
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
+  const [statusFollowUpPrompt, setStatusFollowUpPrompt] = React.useState<{
+    leadId: string
+    leadName: string
+    title: string
+    notes: string | null
+    due_at: string
+  } | null>(null)
   const [leadView, setLeadView] = React.useState<'table' | 'cards'>(() => {
     try {
       const saved = localStorage.getItem('leads_view_mode')
@@ -302,7 +309,7 @@ export function LeadsClient({
   }
 
   // ── Inline status change (optimistic + API) ──────────────────────────
-  async function handleStatusChange(leadId: string, status: LeadStatus) {
+  async function handleStatusChange(leadId: string, status: LeadStatus, source: 'list' | 'panel' = 'list') {
     const previous = leads
     setLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, status, updated_at: new Date().toISOString() } : l))
@@ -315,9 +322,38 @@ export function LeadsClient({
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error('Status update failed')
+      if (source === 'list' && json.follow_up_suggestion) {
+        const lead = leads.find((l) => l.id === leadId)
+        const leadName = lead ? ([lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email) : 'Lead'
+        setStatusFollowUpPrompt({
+          leadId,
+          leadName,
+          ...(json.follow_up_suggestion as { title: string; notes: string | null; due_at: string }),
+        })
+      }
     } catch (err) {
       console.error(err)
       setLeads(previous)
+    }
+  }
+
+  async function handleScheduleStatusFollowUp() {
+    if (!statusFollowUpPrompt) return
+    try {
+      const res = await fetch(`/api/leads/${statusFollowUpPrompt.leadId}/follow-ups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: statusFollowUpPrompt.title,
+          notes: statusFollowUpPrompt.notes,
+          due_at: statusFollowUpPrompt.due_at,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to schedule follow-up')
+      setStatusFollowUpPrompt(null)
+      router.refresh()
+    } catch (err) {
+      console.error(err)
     }
   }
 
@@ -560,6 +596,16 @@ export function LeadsClient({
         onClear={clearFilters}
       />
 
+      {statusFollowUpPrompt && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <span>{statusFollowUpPrompt.leadName}: schedule a follow-up for tomorrow morning?</span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleScheduleStatusFollowUp}>Schedule</Button>
+            <Button size="sm" variant="ghost" onClick={() => setStatusFollowUpPrompt(null)}>Dismiss</Button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center">
         <Button
           type="button"
@@ -750,7 +796,7 @@ export function LeadsClient({
             canEditBatch={isAdmin}
             onClose={() => setSelectedLeadId(null)}
             onLeadChange={(patch) => {
-              if (patch.status)          handleStatusChange(selectedLeadId, patch.status)
+              if (patch.status)          handleStatusChange(selectedLeadId, patch.status, 'panel')
               if (patch.interest_status) handleInterestChange(selectedLeadId, patch.interest_status)
             }}
           />
