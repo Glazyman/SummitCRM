@@ -185,7 +185,7 @@ export function LeadActionBar({
                 onClick={onDoNotContact}
                 icon={<BellOff className="h-3.5 w-3.5" />}
               >
-                Mark Do Not Contact
+                Mark Bad Lead
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {isAdmin && (
@@ -212,12 +212,12 @@ export function LeadActionBar({
         </div>
       )}
 
-      {/* Do Not Contact banner */}
+      {/* Bad Lead banner */}
       {lead.status === 'do_not_contact' && !lead.is_unsubscribed && (
         <div className="flex items-center gap-2 bg-secondary px-4 py-2 text-xs text-foreground sm:px-6">
           <BellOff className="h-3.5 w-3.5 shrink-0" />
           <span>
-            <strong>Do Not Contact</strong> — all outreach to this lead is blocked.
+            <strong>Bad Lead</strong> — all outreach to this lead is blocked.
           </span>
         </div>
       )}

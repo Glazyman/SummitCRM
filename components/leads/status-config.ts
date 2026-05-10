@@ -110,7 +110,7 @@ export const STATUS_CONFIG: Record<LeadStatus, StatusMeta> = {
     rank:  10,
   },
   do_not_contact: {
-    label: 'Do Not Contact',
+    label: 'Bad Lead',
     badge: 'bg-gray-800 text-white border-gray-900',
     pill:  'bg-gray-100 text-gray-800 hover:bg-gray-200',
     dot:   'bg-gray-700',
