@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { OverdueFollowUpsWidget } from '@/components/notifications/overdue-followups-widget'
 import { RepPerformancePanel } from '@/components/dashboard/rep-performance'
 import { MyActivityPanel }     from '@/components/dashboard/my-activity'
+import { CallsTodayCard }      from '@/components/dashboard/calls-today-card'
 import { QuickLogCallWidget }  from '@/components/dashboard/quick-log-call-widget'
 import { Users, PhoneCall, TrendingUp, Bell } from 'lucide-react'
 import type { WorkspaceRole } from '@/types/database'
@@ -106,6 +107,7 @@ export default async function DashboardPage() {
 
       {/* Rep: my activity breakdown */}
       {role === 'rep' && <MyActivityPanel />}
+      {role === 'rep' && <CallsTodayCard />}
 
       {/* Admin: rep performance table */}
       {(role === 'admin' || role === 'super_admin') && <RepPerformancePanel />}

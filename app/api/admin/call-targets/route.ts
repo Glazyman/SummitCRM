@@ -117,8 +117,6 @@ export async function PATCH(req: NextRequest) {
       overrides?: Array<{ user_id: string; daily_target: number | null }>
     }
 
-    const updates: PromiseLike<unknown>[] = []
-
     if (body.workspace_default_daily_target !== undefined) {
       const nextDefault = parsePositiveInt(body.workspace_default_daily_target)
       if (!nextDefault) {
@@ -133,12 +131,13 @@ export async function PATCH(req: NextRequest) {
 
       const ws = wsRes.data as { settings?: Record<string, unknown> } | null
       const nextSettings = { ...(ws?.settings ?? {}), daily_call_target: nextDefault }
-      updates.push(
-        admin
-          .from('workspaces')
-          .update({ settings: nextSettings })
-          .eq('id', member.workspace_id)
-      )
+      const updateDefaultRes = await admin
+        .from('workspaces')
+        .update({ settings: nextSettings })
+        .eq('id', member.workspace_id)
+      if (updateDefaultRes.error) {
+        return NextResponse.json({ error: updateDefaultRes.error.message }, { status: 500 })
+      }
     }
 
     if (body.overrides !== undefined) {
@@ -161,13 +160,14 @@ export async function PATCH(req: NextRequest) {
           return NextResponse.json({ error: 'All override user_id values must be active reps in this workspace' }, { status: 422 })
         }
         if (item.daily_target === null) {
-          updates.push(
-            admin
-              .from('rep_call_targets')
-              .delete()
-              .eq('workspace_id', member.workspace_id)
-              .eq('user_id', item.user_id)
-          )
+          const deleteRes = await admin
+            .from('rep_call_targets')
+            .delete()
+            .eq('workspace_id', member.workspace_id)
+            .eq('user_id', item.user_id)
+          if (deleteRes.error) {
+            return NextResponse.json({ error: deleteRes.error.message }, { status: 500 })
+          }
           continue
         }
 
@@ -176,24 +176,23 @@ export async function PATCH(req: NextRequest) {
           return NextResponse.json({ error: 'override daily_target must be an integer between 1 and 10000 or null' }, { status: 422 })
         }
 
-        updates.push(
-          admin
-            .from('rep_call_targets')
-            .upsert({
-              workspace_id: member.workspace_id,
-              user_id: item.user_id,
-              daily_target: parsed,
-              updated_at: new Date().toISOString(),
-            }, { onConflict: 'workspace_id,user_id' })
-        )
+        const upsertRes = await admin
+          .from('rep_call_targets')
+          .upsert({
+            workspace_id: member.workspace_id,
+            user_id: item.user_id,
+            daily_target: parsed,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'workspace_id,user_id' })
+        if (upsertRes.error) {
+          return NextResponse.json({ error: upsertRes.error.message }, { status: 500 })
+        }
       }
     }
 
-    if (updates.length === 0) {
+    if (body.workspace_default_daily_target === undefined && body.overrides === undefined) {
       return NextResponse.json({ error: 'No updates provided' }, { status: 400 })
     }
-
-    await Promise.all(updates)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[PATCH /api/admin/call-targets]', err)
