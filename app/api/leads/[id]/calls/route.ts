@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+function tomorrowAt(hour: number, minute: number) {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(hour, minute, 0, 0)
+  return d.toISOString()
+}
+
 // GET /api/leads/[id]/calls — list call logs for a lead
 export async function GET(
   _req: NextRequest,
@@ -72,5 +79,15 @@ export async function POST(
     },
   })
 
-  return NextResponse.json({ call }, { status: 201 })
+  const followUpSuggestion = (outcome === 'voicemail' || outcome === 'no_answer')
+    ? {
+        title: outcome === 'voicemail' ? 'Follow up after voicemail' : 'Follow up after no answer',
+        notes: outcome === 'voicemail'
+          ? 'Left voicemail. Try again tomorrow morning.'
+          : 'No answer. Retry tomorrow morning.',
+        due_at: tomorrowAt(10, 0),
+      }
+    : null
+
+  return NextResponse.json({ call, follow_up_suggestion: followUpSuggestion }, { status: 201 })
 }

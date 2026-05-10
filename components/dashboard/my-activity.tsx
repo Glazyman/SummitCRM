@@ -18,6 +18,12 @@ interface MyStats {
   followUpsCompleted: number
   leadsAssigned:     number
   leadsActive:       number
+  funnel?: {
+    calls_made: number
+    conversations: number
+    interested: number
+    follow_ups_set: number
+  }
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -183,24 +189,45 @@ export function MyActivityPanel() {
           <RefreshCw className="h-4 w-4 animate-spin" />
         </div>
       ) : stats ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
-          {/* Calls donut */}
-          <div className="p-5">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-              <Phone className="h-3 w-3" /> Calls {PERIOD_LABELS[period]}
-            </p>
-            <CallDonut stats={stats} />
+        <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
+            {/* Calls donut */}
+            <div className="p-5">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                <Phone className="h-3 w-3" /> Calls {PERIOD_LABELS[period]}
+              </p>
+              <CallDonut stats={stats} />
+            </div>
+
+            {/* Follow-up ring */}
+            <div className="p-5">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="h-3 w-3" /> Follow-up Completion
+              </p>
+              <FollowUpRing stats={stats} />
+            </div>
           </div>
 
-          {/* Follow-up ring */}
-          <div className="p-5">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-              <Calendar className="h-3 w-3" /> Follow-up Completion
-            </p>
-            <FollowUpRing stats={stats} />
+          <div className="border-t border-border px-5 py-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Daily Conversion Funnel</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <FunnelStat label="Calls made" value={stats.funnel?.calls_made ?? 0} />
+              <FunnelStat label="Conversations" value={stats.funnel?.conversations ?? 0} />
+              <FunnelStat label="Interested" value={stats.funnel?.interested ?? 0} />
+              <FunnelStat label="Follow-ups set" value={stats.funnel?.follow_ups_set ?? 0} />
+            </div>
           </div>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function FunnelStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums">{value}</p>
     </div>
   )
 }

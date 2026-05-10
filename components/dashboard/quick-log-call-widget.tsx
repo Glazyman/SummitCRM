@@ -17,6 +17,12 @@ type LeadHit = {
   company: string | null
 }
 
+type FollowUpSuggestion = {
+  title: string
+  notes: string | null
+  due_at: string
+}
+
 const OUTCOMES: Array<{ id: CallOutcome; label: string }> = [
   { id: 'answered', label: 'Answered' },
   { id: 'voicemail', label: 'Voicemail' },
@@ -38,6 +44,7 @@ export function QuickLogCallWidget() {
   const [minutes, setMinutes] = React.useState('')
   const [seconds, setSeconds] = React.useState('')
   const [notes, setNotes] = React.useState('')
+  const [followUpSuggestion, setFollowUpSuggestion] = React.useState<FollowUpSuggestion | null>(null)
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   React.useEffect(() => {
@@ -54,6 +61,7 @@ export function QuickLogCallWidget() {
     setMinutes('')
     setSeconds('')
     setNotes('')
+    setFollowUpSuggestion(null)
     setError(null)
     setSuccess(null)
   }
@@ -118,11 +126,40 @@ export function QuickLogCallWidget() {
       if (!res.ok) throw new Error(json.error ?? 'Failed to log call')
 
       setSuccess('Call logged.')
-      setTimeout(() => {
-        window.location.reload()
-      }, 500)
+      setFollowUpSuggestion((json.follow_up_suggestion ?? null) as FollowUpSuggestion | null)
+      if (!json.follow_up_suggestion) {
+        setTimeout(() => {
+          window.location.reload()
+        }, 500)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to log call')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function scheduleSuggestedFollowUp() {
+    if (!selectedLead || !followUpSuggestion) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/leads/${selectedLead.id}/follow-ups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: followUpSuggestion.title,
+          notes: followUpSuggestion.notes,
+          due_at: followUpSuggestion.due_at,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to schedule follow-up')
+      setSuccess('Call logged and follow-up scheduled.')
+      setFollowUpSuggestion(null)
+      setTimeout(() => window.location.reload(), 500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to schedule follow-up')
     } finally {
       setSubmitting(false)
     }
@@ -149,6 +186,17 @@ export function QuickLogCallWidget() {
           <DialogBody className="space-y-4">
             {error && <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
             {success && <div className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</div>}
+            {followUpSuggestion && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
+                <p className="font-medium text-amber-900">Suggested follow-up: tomorrow morning</p>
+                <p className="text-amber-800">Prevent this lead from going cold.</p>
+                <div className="mt-2">
+                  <Button size="sm" onClick={scheduleSuggestedFollowUp} disabled={submitting}>
+                    Schedule Follow-up
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="lead-search">Find lead</Label>

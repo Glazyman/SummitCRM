@@ -48,8 +48,10 @@ export async function GET(req: NextRequest) {
     const wsId   = member.workspace_id
     const uid    = user.id
     const now    = new Date()
+    const startOfToday = new Date(now)
+    startOfToday.setHours(0, 0, 0, 0)
 
-    const [callsRes, followUpsRes, leadsRes] = await Promise.all([
+    const [callsRes, followUpsRes, leadsRes, callsTodayRes, interestedTodayRes, followUpsSetTodayRes] = await Promise.all([
       admin.from('call_logs')
         .select('outcome, called_at')
         .eq('workspace_id', wsId)
@@ -64,16 +66,35 @@ export async function GET(req: NextRequest) {
         .eq('workspace_id', wsId)
         .eq('assigned_to', uid)
         .is('deleted_at', null),
+      admin.from('call_logs')
+        .select('outcome')
+        .eq('workspace_id', wsId)
+        .eq('logged_by', uid)
+        .gte('called_at', startOfToday.toISOString()),
+      admin.from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', wsId)
+        .eq('assigned_to', uid)
+        .eq('interest_status', 'interested')
+        .gte('updated_at', startOfToday.toISOString())
+        .is('deleted_at', null),
+      admin.from('follow_ups')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', wsId)
+        .eq('assigned_to', uid)
+        .gte('created_at', startOfToday.toISOString()),
     ])
 
     const calls     = (callsRes.data ?? []) as Array<{ outcome: string; called_at: string }>
     const followUps = (followUpsRes.data ?? []) as Array<{ completed_at: string | null; due_at: string }>
     const leads     = (leadsRes.data ?? []) as Array<{ status: string }>
+    const callsTodayRows = (callsTodayRes.data ?? []) as Array<{ outcome: string }>
 
     const callsByOutcome: Record<string, number> = {}
     for (const c of calls) callsByOutcome[c.outcome] = (callsByOutcome[c.outcome] ?? 0) + 1
 
     const terminal = new Set(['do_not_contact', 'wrong_number', 'sold_already'])
+    const conversationsToday = callsTodayRows.filter((c) => c.outcome === 'answered' || c.outcome === 'callback_requested').length
 
     return NextResponse.json({
       calls:              calls.length,
@@ -83,6 +104,12 @@ export async function GET(req: NextRequest) {
       followUpsCompleted: followUps.filter(f => f.completed_at && new Date(f.completed_at) >= new Date(range.start)).length,
       leadsAssigned:      leads.length,
       leadsActive:        leads.filter(l => !terminal.has(l.status)).length,
+      funnel: {
+        calls_made: callsTodayRows.length,
+        conversations: conversationsToday,
+        interested: interestedTodayRes.count ?? 0,
+        follow_ups_set: followUpsSetTodayRes.count ?? 0,
+      },
     })
   } catch (err) {
     console.error('[GET /api/rep/my-stats]', err)

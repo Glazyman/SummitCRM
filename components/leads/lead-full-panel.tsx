@@ -68,6 +68,7 @@ export function LeadFullPanel({
   const [data,      setData]      = React.useState<PanelData | null>(null)
   const [loading,   setLoading]   = React.useState(true)
   const [activeTab, setActiveTab] = React.useState<TabId>('activity')
+  const [followUpPrompt, setFollowUpPrompt] = React.useState<{ title: string; notes: string | null; due_at: string } | null>(null)
 
   React.useEffect(() => {
     let cancelled = false
@@ -211,6 +212,7 @@ export function LeadFullPanel({
     const res  = await fetch(`/api/leads/${leadId}/calls`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(call) })
     const json = await res.json()
     setData((d) => d ? { ...d, calls: [{ ...json.call, logger_name: 'You' }, ...d.calls] } : d)
+    setFollowUpPrompt((json.follow_up_suggestion ?? null) as { title: string; notes: string | null; due_at: string } | null)
 
     const outcomeToStatus: Partial<Record<typeof call.outcome, LeadStatus>> = {
       answered:           'called',
@@ -221,6 +223,31 @@ export function LeadFullPanel({
     }
     const newStatus = outcomeToStatus[call.outcome]
     if (newStatus) await handleStatusChange(newStatus)
+  }
+
+  async function scheduleSuggestedFollowUp() {
+    if (!followUpPrompt) return
+    const res = await fetch(`/api/leads/${leadId}/follow-ups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(followUpPrompt),
+    })
+    const json = await res.json()
+    if (res.ok && json.follow_up) {
+      setData((d) => d ? {
+        ...d,
+        followUps: [
+          {
+            ...json.follow_up,
+            is_completed: !!json.follow_up.completed_at,
+            assigned_name: 'You',
+          },
+          ...d.followUps,
+        ],
+      } : d)
+      setFollowUpPrompt(null)
+      setActiveTab('followups')
+    }
   }
 
   // ── Derived ───────────────────────────────────────────────────────────
@@ -296,6 +323,14 @@ export function LeadFullPanel({
 
           {/* Tabbed right column */}
           <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
+            {followUpPrompt && (
+              <div className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900 flex items-center justify-between gap-3">
+                <span>No answer/voicemail logged. Schedule a follow-up for tomorrow morning?</span>
+                <Button size="sm" className="h-7" onClick={scheduleSuggestedFollowUp}>
+                  Schedule
+                </Button>
+              </div>
+            )}
 
             {/* Tab bar + status/interest dropdowns */}
             <div className="flex shrink-0 items-center border-b border-border bg-card">
