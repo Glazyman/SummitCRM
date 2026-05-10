@@ -182,7 +182,6 @@ async function getDashboardMetrics(
     interestedResult,
     followUpsDueResult,
     workspaceResult,
-    overrideResult,
   ] = await Promise.all([
     supabase
       .from('leads')
@@ -208,12 +207,6 @@ async function getDashboardMetrics(
       .select('settings')
       .eq('id', workspaceId)
       .single(),
-    supabase
-      .from('rep_call_targets')
-      .select('daily_target')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', userId)
-      .maybeSingle(),
   ])
 
   // Calls logged this week (best-effort — join through leads)
@@ -240,7 +233,8 @@ async function getDashboardMetrics(
   } catch {}
 
   const workspaceDefault = Number((workspaceResult.data as { settings?: Record<string, unknown> } | null)?.settings?.daily_call_target)
-  const overrideTarget = Number((overrideResult.data as { daily_target?: number } | null)?.daily_target)
+  const overrideMap = (((workspaceResult.data as { settings?: Record<string, unknown> } | null)?.settings?.rep_daily_call_targets ?? {}) as Record<string, unknown>)
+  const overrideTarget = Number(overrideMap[userId])
   const defaultTarget = Number.isFinite(workspaceDefault) && workspaceDefault > 0 ? Math.floor(workspaceDefault) : 100
   const dailyCallTarget = Number.isFinite(overrideTarget) && overrideTarget > 0 ? Math.floor(overrideTarget) : defaultTarget
 

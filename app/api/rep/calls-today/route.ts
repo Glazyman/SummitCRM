@@ -37,9 +37,12 @@ export async function GET() {
       duration_sec: number | null
       notes: string | null
       called_at: string
-      lead: Array<{ id: string; first_name: string | null; last_name: string | null; email: string; company: string | null }> | null
+      lead:
+        | Array<{ id: string; first_name: string | null; last_name: string | null; email: string; company: string | null }>
+        | { id: string; first_name: string | null; last_name: string | null; email: string; company: string | null }
+        | null
     }>).map((row) => {
-      const lead = row.lead?.[0] ?? null
+      const lead = Array.isArray(row.lead) ? (row.lead[0] ?? null) : row.lead
       const name = lead ? ([lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email) : 'Lead'
       return {
         id: row.id,
