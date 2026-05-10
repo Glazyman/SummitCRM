@@ -91,51 +91,16 @@ export async function POST(req: NextRequest) {
     'http://localhost:3000'
   const inviteUrl = `${baseUrl}/accept-invite?token=${token}`
 
-  // Generate a Supabase magic link for new users (does NOT send any email)
-  let magicLink = inviteUrl
+  // Send invite email via Supabase auth for new users
   if (!existingUser) {
-    try {
-      const { data: linkData } = await admin.auth.admin.generateLink({
-        type: 'invite',
-        email: email.toLowerCase().trim(),
-        options: {
-          redirectTo: inviteUrl,
-          data: { invitation_token: token, workspace_name: workspace?.name ?? 'Summit Mergers CRM', role },
-        },
-      })
-      if (linkData?.properties?.action_link) {
-        magicLink = linkData.properties.action_link
-      }
-    } catch {}
-  }
-
-  // Send branded invite email via Resend
-  const workspaceName = workspace?.name ?? 'Summit Mergers CRM'
-  const appName       = process.env.NEXT_PUBLIC_APP_NAME ?? 'Summit Mergers CRM'
-  const resendKey     = process.env.RESEND_API_KEY
-  if (resendKey) {
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendKey}`,
-        'Content-Type':  'application/json',
+    await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: inviteUrl,
+      data: {
+        invitation_token: token,
+        workspace_name:   workspace?.name ?? 'Summit Mergers CRM',
+        role,
       },
-      body: JSON.stringify({
-        from:    `${appName} <onboarding@resend.dev>`,
-        to:      [email],
-        subject: `You've been invited to ${workspaceName}`,
-        html: `
-          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#111;">
-            <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;">${workspaceName}</h2>
-            <p style="margin:0 0 24px;font-size:15px;color:#555;">You've been invited to join <strong>${workspaceName}</strong> as a <strong>${role}</strong>.</p>
-            <a href="${magicLink}" style="display:inline-block;padding:12px 24px;background:#0a84ff;color:#fff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600;">Accept invitation</a>
-            <p style="margin:24px 0 0;font-size:13px;color:#888;">This invitation expires in 7 days. If you didn't expect this, you can ignore this email.</p>
-            <hr style="margin:24px 0;border:none;border-top:1px solid #eee;" />
-            <p style="margin:0;font-size:12px;color:#aaa;">Or copy this link: <a href="${magicLink}" style="color:#0a84ff;">${magicLink}</a></p>
-          </div>
-        `,
-      }),
-    }).catch(() => null) // Non-fatal
+    }).catch(() => null) // Non-fatal — they can still use the token link
   }
 
   // Log activity
