@@ -61,15 +61,16 @@ function RepCard({ rep, rank, onOpen }: { rep: RepRow; rank: number; onOpen: (re
   const fuTotal     = rep.follow_ups_pending + rep.follow_ups_completed
   const fuPct       = fuTotal > 0 ? Math.round(rep.follow_ups_completed / fuTotal * 100) : 0
   const maxOutcome  = Math.max(rep.calls_answered, rep.calls_voicemail, rep.calls_no_answer, rep.calls_wrong_number, 1)
+  const activeLeadPct = rep.leads_assigned > 0 ? Math.round((rep.leads_active / rep.leads_assigned) * 100) : 0
 
   return (
     <button
       type="button"
       onClick={() => onOpen(rep)}
-      className="w-full text-left rounded-2xl border border-border bg-card overflow-hidden transition-colors hover:border-foreground/25"
+      className="w-full text-left rounded-2xl border border-border bg-card overflow-hidden transition-all hover:border-foreground/25 hover:shadow-md"
     >
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/25">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
           {initials(rep.full_name, rep.user_email)}
         </div>
@@ -77,9 +78,25 @@ function RepCard({ rep, rank, onOpen }: { rep: RepRow; rank: number; onOpen: (re
           <p className="font-semibold truncate">{rep.full_name ?? rep.user_email}</p>
           <p className="text-xs text-muted-foreground capitalize">{rep.role === 'super_admin' ? 'Admin' : rep.role}</p>
         </div>
-        <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+        <span className="text-xs font-semibold text-muted-foreground bg-muted rounded-full px-2 py-0.5">
           #{rank}
         </span>
+      </div>
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-3 gap-2 px-4 py-3 border-b border-border bg-background">
+        <div className="rounded-lg border border-border px-2.5 py-2">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Calls</p>
+          <p className="text-base font-bold tabular-nums">{rep.calls}</p>
+        </div>
+        <div className="rounded-lg border border-border px-2.5 py-2">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Answer Rate</p>
+          <p className="text-base font-bold tabular-nums">{answerRate}%</p>
+        </div>
+        <div className="rounded-lg border border-border px-2.5 py-2">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Follow-up Done</p>
+          <p className="text-base font-bold tabular-nums">{fuPct}%</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 divide-x divide-border">
@@ -89,18 +106,7 @@ function RepCard({ rep, rank, onOpen }: { rep: RepRow; rank: number; onOpen: (re
             <Phone className="h-3 w-3" /> Calls
           </p>
           <RepDonut rep={rep} />
-          {/* Answer rate */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Answer rate</span>
-              <span className="font-bold" style={{ color: answerRate > 50 ? OUTCOME_COLORS.answered : undefined }}>
-                {answerRate}%
-              </span>
-            </div>
-            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${answerRate}%`, background: OUTCOME_COLORS.answered }} />
-            </div>
-          </div>
+
           {/* Outcome breakdown */}
           {rep.calls > 0 && (
             <div className="space-y-1">
@@ -172,7 +178,7 @@ function RepCard({ rep, rank, onOpen }: { rep: RepRow; rank: number; onOpen: (re
             <div className="space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Active</span>
-                <span className="font-medium">{rep.leads_active}</span>
+                <span className="font-medium">{rep.leads_active} ({activeLeadPct}%)</span>
               </div>
               <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                 <div className="h-full rounded-full bg-primary"
