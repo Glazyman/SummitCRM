@@ -185,6 +185,22 @@ export function LeadFullPanel({
     await fetch(`/api/leads/${leadId}/follow-ups/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ completed_at: completedAt }) }).catch(console.error)
   }
 
+  async function handleEditFollowUp(id: string, data: { title: string; notes: string; due_at: string; assigned_to: string }) {
+    const res  = await fetch(`/api/leads/${leadId}/follow-ups/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    })
+    const json = await res.json()
+    if (res.ok && json.follow_up) {
+      const member = teamMembers.find((m) => m.id === json.follow_up.assigned_to)
+      setData((d) => d ? {
+        ...d,
+        followUps: d.followUps.map((f) =>
+          f.id === id ? { ...f, ...json.follow_up, assigned_name: member?.name ?? f.assigned_name } : f
+        ),
+      } : d)
+    }
+  }
+
   async function handleDeleteFollowUp(id: string) {
     setData((d) => d ? { ...d, followUps: d.followUps.filter((f) => f.id !== id) } : d)
     await fetch(`/api/leads/${leadId}/follow-ups/${id}`, { method: 'DELETE' }).catch(console.error)
@@ -392,6 +408,7 @@ export function LeadFullPanel({
                   currentUserId={currentUserId}
                   isAdmin={isAdmin}
                   onAdd={handleAddFollowUp}
+                  onEdit={handleEditFollowUp}
                   onComplete={handleCompleteFollowUp}
                   onDelete={handleDeleteFollowUp}
                 />

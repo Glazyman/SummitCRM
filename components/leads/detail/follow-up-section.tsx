@@ -3,7 +3,7 @@
 import * as React from 'react'
 import {
   Calendar, Plus, CheckCircle2, Clock,
-  Trash2, User, Phone, Mail, FileText,
+  Trash2, Pencil, User, Phone, Mail, FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -13,21 +13,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Checkbox } from '@/components/ui/checkbox'
 import type { FollowUp, NewFollowUp, TeamMember } from './types'
 
+interface EditFollowUpData {
+  title:       string
+  notes:       string
+  due_at:      string
+  assigned_to: string
+}
+
 interface FollowUpSectionProps {
   followUps:     FollowUp[]
   teamMembers:   TeamMember[]
   currentUserId: string
   isAdmin?:      boolean
   onAdd:         (data: NewFollowUp) => Promise<void>
+  onEdit:        (id: string, data: EditFollowUpData) => Promise<void>
   onComplete:    (id: string) => void
   onDelete:      (id: string) => void
 }
 
 export function FollowUpSection({
   followUps, teamMembers, currentUserId, isAdmin,
-  onAdd, onComplete, onDelete,
+  onAdd, onEdit, onComplete, onDelete,
 }: FollowUpSectionProps) {
-  const [modalOpen, setModalOpen] = React.useState(false)
+  const [addOpen,  setAddOpen]  = React.useState(false)
+  const [editing,  setEditing]  = React.useState<FollowUp | null>(null)
 
   const pending   = followUps.filter((f) => !f.is_completed)
   const completed = followUps.filter((f) =>  f.is_completed)
@@ -42,32 +51,49 @@ export function FollowUpSection({
       ) : (
         <div className="space-y-2">
           {pending.map((f) => (
-            <FollowUpItem key={f.id} followUp={f} onComplete={onComplete} onDelete={onDelete} />
+            <FollowUpItem
+              key={f.id}
+              followUp={f}
+              onComplete={onComplete}
+              onDelete={onDelete}
+              onEdit={() => setEditing(f)}
+            />
           ))}
         </div>
       )}
 
-      <Button variant="outline" size="sm" className="w-full gap-1.5 border-dashed" onClick={() => setModalOpen(true)}>
+      <Button variant="outline" size="sm" className="w-full gap-1.5 border-dashed" onClick={() => setAddOpen(true)}>
         <Plus className="h-3.5 w-3.5" /> Add Follow-up
       </Button>
 
       {completed.length > 0 && <CompletedSection items={completed} onDelete={onDelete} />}
 
       <AddFollowUpModal
-        open={modalOpen}
+        open={addOpen}
         teamMembers={teamMembers}
         currentUserId={currentUserId}
         isAdmin={isAdmin}
-        onClose={() => setModalOpen(false)}
-        onSave={async (data) => { await onAdd(data); setModalOpen(false) }}
+        onClose={() => setAddOpen(false)}
+        onSave={async (data) => { await onAdd(data); setAddOpen(false) }}
       />
+
+      {editing && (
+        <EditFollowUpModal
+          followUp={editing}
+          teamMembers={teamMembers}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          onClose={() => setEditing(null)}
+          onSave={async (data) => { await onEdit(editing.id, data); setEditing(null) }}
+        />
+      )}
     </div>
   )
 }
 
 // ── Individual follow-up item ─────────────────────────────────────────────
-function FollowUpItem({ followUp, onComplete, onDelete }: {
-  followUp: FollowUp; onComplete: (id: string) => void; onDelete: (id: string) => void
+function FollowUpItem({ followUp, onComplete, onDelete, onEdit }: {
+  followUp: FollowUp; onComplete: (id: string) => void; onDelete: (id: string) => void; onEdit: () => void
 }) {
   const isOverdue = !followUp.is_completed && new Date(followUp.due_at) < new Date()
   return (
@@ -93,14 +119,24 @@ function FollowUpItem({ followUp, onComplete, onDelete }: {
         </div>
         {followUp.notes && <p className="text-xs text-muted-foreground leading-relaxed">{followUp.notes}</p>}
       </div>
-      <button
-        type="button"
-        onClick={() => onDelete(followUp.id)}
-        className="mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
-        aria-label="Delete"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      <div className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          aria-label="Edit"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(followUp.id)}
+          className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+          aria-label="Delete"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   )
 }
@@ -296,6 +332,111 @@ function AddFollowUpModal({ open, teamMembers, currentUserId, isAdmin, onClose, 
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving || !dueAt}>
             {saving ? 'Saving…' : 'Schedule'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Edit follow-up modal ──────────────────────────────────────────────────
+interface EditFollowUpModalProps {
+  followUp:      FollowUp
+  teamMembers:   TeamMember[]
+  currentUserId: string
+  isAdmin?:      boolean
+  onClose:       () => void
+  onSave:        (data: EditFollowUpData) => Promise<void>
+}
+
+function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onClose, onSave }: EditFollowUpModalProps) {
+  const [title,      setTitle]      = React.useState(followUp.title)
+  const [notes,      setNotes]      = React.useState(followUp.notes ?? '')
+  const [dueAt,      setDueAt]      = React.useState(followUp.due_at.slice(0, 16))
+  const [assignedTo, setAssignedTo] = React.useState(followUp.assigned_to ?? currentUserId)
+  const [saving,     setSaving]     = React.useState(false)
+  const [error,      setError]      = React.useState<string | null>(null)
+
+  async function handleSave() {
+    if (!title.trim()) { setError('Title is required.'); return }
+    if (!dueAt)        { setError('Please set a date.'); return }
+    setSaving(true)
+    try {
+      await onSave({ title: title.trim(), notes, due_at: dueAt, assigned_to: assignedTo })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open onClose={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="h-4 w-4 text-foreground" />
+            Edit Follow-up
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 px-6">
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Input
+              value={title}
+              onChange={(e) => { setTitle(e.target.value); setError(null) }}
+              placeholder="What needs to be done?"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Follow-up date & time <span className="text-destructive">*</span></Label>
+            <Input
+              type="datetime-local"
+              value={dueAt}
+              onChange={(e) => { setDueAt(e.target.value); setError(null) }}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Notes <span className="text-xs font-normal text-muted-foreground">(optional)</span></Label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any context or reminders…"
+              rows={2}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+            />
+          </div>
+
+          {isAdmin && (
+            <div className="space-y-1.5">
+              <Label>Assign to</Label>
+              <select
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Unassigned</option>
+                {teamMembers.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {error && (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving || !dueAt || !title.trim()}>
+            {saving ? 'Saving…' : 'Save changes'}
           </Button>
         </DialogFooter>
       </DialogContent>

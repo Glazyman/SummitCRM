@@ -321,6 +321,19 @@ export default function LeadDetailClient({
     }
   }
 
+  async function handleEditFollowUp(id: string, data: { title: string; notes: string; due_at: string; assigned_to: string }) {
+    const res = await requestJson<{ follow_up: FollowUp }>(`/api/leads/${lead.id}/follow-ups/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+    if (res.follow_up) {
+      const member = teamMembers.find((m) => m.id === res.follow_up.assigned_to)
+      setFollowUps((prev) => prev.map((f) =>
+        f.id === id ? { ...f, ...res.follow_up, assigned_name: member?.name ?? f.assigned_name } : f
+      ))
+    }
+  }
+
   // ── Utility ───────────────────────────────────────────────────────────
   function addActivity(partial: Pick<ActivityEntry, 'type' | 'metadata'>) {
     const currentUser = teamMembers.find((m) => m.id === currentUserId)
@@ -458,6 +471,7 @@ export default function LeadDetailClient({
                 teamMembers={teamMembers}
                 currentUserId={currentUserId}
                 onAdd={handleAddFollowUp}
+                onEdit={handleEditFollowUp}
                 onComplete={handleCompleteFollowUp}
                 onDelete={handleDeleteFollowUp}
               />
