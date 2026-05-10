@@ -75,12 +75,11 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
   const [activitiesDue, setActivitiesDue] = React.useState<number | undefined>(undefined)
 
   React.useEffect(() => {
-    if (role !== 'rep') return
     fetch('/api/activities/due')
       .then((r) => r.ok ? r.json() : null)
       .then((d) => d && setActivitiesDue(d.count ?? 0))
       .catch(() => {})
-  }, [role, pathname]) // refresh count on navigation
+  }, [pathname]) // refresh count on every navigation
 
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === href

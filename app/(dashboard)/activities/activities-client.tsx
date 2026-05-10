@@ -95,10 +95,16 @@ function ActivityPanel({
   const [leadStatus,   setLeadStatus]   = useState<LeadStatus | null>(null)
   const [leadInterest, setLeadInterest] = useState<InterestStatus | null>(null)
 
-  // Reschedule
+  // Reschedule — separate date and time
   const [rescheduling, setRescheduling] = useState(false)
-  const [newDue,       setNewDue]       = useState(activity.due_at.slice(0, 16))
+  const [newDate,      setNewDate]      = useState(activity.due_at.slice(0, 10))
+  const [newTime,      setNewTime]      = useState(activity.due_at.slice(11, 16))
   const [savingDue,    setSavingDue]    = useState(false)
+
+  // Activity notes editing
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [actNotes,     setActNotes]     = useState(activity.notes ?? '')
+  const [savingNotes,  setSavingNotes]  = useState(false)
 
   // Log call
   const [callOutcome,  setCallOutcome]  = useState<string | null>(null)
@@ -125,19 +131,35 @@ function ActivityPanel({
   }, [activity.lead?.id])
 
   async function handleReschedule() {
-    if (!newDue) return
+    if (!newDate || !newTime) return
+    const combined = new Date(`${newDate}T${newTime}:00`)
     setSavingDue(true)
     try {
       const res = await fetch(`/api/activities/${activity.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dueAt: new Date(newDue).toISOString() }),
+        body: JSON.stringify({ dueAt: combined.toISOString() }),
       })
       if (res.ok) {
-        onActivityUpdated?.(activity.id, { due_at: new Date(newDue).toISOString() })
+        onActivityUpdated?.(activity.id, { due_at: combined.toISOString() })
         setRescheduling(false)
       }
     } finally { setSavingDue(false) }
+  }
+
+  async function handleSaveNotes() {
+    setSavingNotes(true)
+    try {
+      const res = await fetch(`/api/activities/${activity.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: actNotes || null }),
+      })
+      if (res.ok) {
+        onActivityUpdated?.(activity.id, { notes: actNotes || null })
+        setEditingNotes(false)
+      }
+    } finally { setSavingNotes(false) }
   }
 
   async function handleLogCall() {
@@ -200,7 +222,7 @@ function ActivityPanel({
   const isOverdue = !done && dueDate < new Date()
 
   return (
-    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-border bg-card shadow-xl">
+    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-xl flex-col border-l border-border bg-card shadow-xl">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-5 py-4 shrink-0">
         <div className="flex items-center gap-2">
@@ -249,12 +271,13 @@ function ActivityPanel({
 
           {/* Reschedule picker */}
           {rescheduling && (
-            <div className="mt-3 space-y-2">
-              <div className="flex gap-2">
+            <div className="mt-3 space-y-3 rounded-xl border border-border bg-background p-3">
+              {/* Quick picks */}
+              <div className="grid grid-cols-3 gap-1.5">
                 {[
-                  { label: 'Today 5pm', offset: 0, hour: 17 },
-                  { label: 'Tomorrow', offset: 1, hour: 9 },
-                  { label: 'In 2 days', offset: 2, hour: 9 },
+                  { label: 'Today · 5pm',   offset: 0, hour: 17, min: 0 },
+                  { label: 'Tomorrow · 9am', offset: 1, hour: 9,  min: 0 },
+                  { label: 'In 2 days',      offset: 2, hour: 9,  min: 0 },
                 ].map(q => (
                   <button
                     key={q.label}
@@ -262,36 +285,87 @@ function ActivityPanel({
                     onClick={() => {
                       const d = new Date()
                       d.setDate(d.getDate() + q.offset)
-                      d.setHours(q.hour, 0, 0, 0)
-                      setNewDue(d.toISOString().slice(0, 16))
+                      d.setHours(q.hour, q.min, 0, 0)
+                      setNewDate(d.toISOString().slice(0, 10))
+                      setNewTime(`${String(q.hour).padStart(2,'0')}:${String(q.min).padStart(2,'0')}`)
                     }}
-                    className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                    className="rounded-lg border border-border bg-muted/40 px-2 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
                   >
                     {q.label}
                   </button>
                 ))}
               </div>
-              <input
-                type="datetime-local"
-                value={newDue}
-                onChange={e => setNewDue(e.target.value)}
-                className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
+              {/* Date + Time pickers */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                    <Calendar className="h-3 w-3" /> Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newDate}
+                    onChange={e => setNewDate(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" /> Time
+                  </label>
+                  <input
+                    type="time"
+                    value={newTime}
+                    onChange={e => setNewTime(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+              {newDate && newTime && (
+                <p className="text-xs text-muted-foreground">
+                  Scheduled for {new Date(`${newDate}T${newTime}`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at {new Date(`${newDate}T${newTime}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                </p>
+              )}
               <div className="flex gap-2">
                 <button type="button" onClick={() => setRescheduling(false)} className="flex-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:bg-muted">Cancel</button>
-                <button type="button" onClick={handleReschedule} disabled={savingDue} className="flex-1 rounded-lg bg-primary text-primary-foreground py-1.5 text-xs font-medium hover:bg-primary/90 disabled:opacity-50">
-                  {savingDue ? 'Saving…' : 'Save'}
+                <button type="button" onClick={handleReschedule} disabled={savingDue || !newDate || !newTime} className="flex-1 rounded-lg bg-primary text-primary-foreground py-1.5 text-xs font-medium hover:bg-primary/90 disabled:opacity-50">
+                  {savingDue ? 'Saving…' : 'Save Time'}
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* ── Task title ── */}
-        <div className="px-5 py-4 border-b border-border">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Task</p>
+        {/* ── Task + Notes ── */}
+        <div className="px-5 py-4 border-b border-border space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Task</p>
           <p className="font-semibold">{activity.title}</p>
-          {activity.notes && <p className="text-sm text-muted-foreground mt-0.5">{activity.notes}</p>}
+          {/* Notes */}
+          {editingNotes ? (
+            <div className="space-y-2">
+              <textarea
+                value={actNotes}
+                onChange={e => setActNotes(e.target.value)}
+                rows={3}
+                placeholder="Add notes…"
+                autoFocus
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => { setEditingNotes(false); setActNotes(activity.notes ?? '') }} className="flex-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:bg-muted">Cancel</button>
+                <button type="button" onClick={handleSaveNotes} disabled={savingNotes} className="flex-1 rounded-lg bg-primary text-primary-foreground py-1.5 text-xs font-medium hover:bg-primary/90 disabled:opacity-50">
+                  {savingNotes ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditingNotes(true)}
+              className="w-full text-left rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+            >
+              {actNotes || <span className="italic">Add notes…</span>}
+            </button>
+          )}
         </div>
 
         {/* ── Contact info ── */}
