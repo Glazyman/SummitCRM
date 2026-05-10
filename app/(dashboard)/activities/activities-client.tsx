@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
-import { BatchesView } from './activities-batches-view'
 import type { TeamMember } from '@/components/leads/detail/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -71,7 +70,6 @@ interface Props {
 }
 
 export function ActivitiesClient({ initialActivities, teamMembers, currentUserId, isAdmin }: Props) {
-  const [activeTab,       setActiveTab]       = useState<'activities' | 'batches'>('activities')
   const [activities,      setActivities]      = useState<Activity[]>(initialActivities)
   const [justCompleted,   setJustCompleted]   = useState<Set<string>>(new Set())
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
@@ -185,7 +183,6 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
   const openCount    = activities.filter((a) => !a.completed_at).length
   const overdueCount = activities.filter((a) => !a.completed_at && new Date(a.due_at) < new Date()).length
 
-  // Cast teamMembers to TeamMember shape for BatchesView
   const panelTeamMembers = (teamMembers as TeamMember[])
 
   return (
@@ -195,52 +192,15 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Activities</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {activeTab === 'activities'
-              ? <>{openCount} open{overdueCount > 0 && <span className="text-red-500 font-medium"> · {overdueCount} overdue</span>}</>
-              : 'Lead batches'
-            }
+            {openCount} open{overdueCount > 0 && <span className="text-red-500 font-medium"> · {overdueCount} overdue</span>}
           </p>
         </div>
-        {activeTab === 'activities' && (
-          <Button onClick={() => setShowNew(true)} className="gap-1.5">
-            <Plus className="h-4 w-4" /> New Activity
-          </Button>
-        )}
+        <Button onClick={() => setShowNew(true)} className="gap-1.5">
+          <Plus className="h-4 w-4" /> New Activity
+        </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-border -mt-2">
-        {([
-          { id: 'activities', label: 'Activities' },
-          ...(isAdmin ? [{ id: 'batches', label: 'Batches' }] : []),
-        ] as { id: 'activities' | 'batches'; label: string }[]).map(tab => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
-              activeTab === tab.id
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Batches tab */}
-      {activeTab === 'batches' && (
-        <BatchesView
-          isAdmin={isAdmin ?? false}
-          currentUserId={currentUserId}
-          teamMembers={panelTeamMembers}
-        />
-      )}
-
-      {/* Activities tab content below */}
-      {activeTab !== 'activities' ? null : <>
+      <>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
@@ -492,7 +452,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
         </DialogContent>
       </Dialog>
 
-      </> /* end activities tab */}
+      </>
     </div>
   )
 }

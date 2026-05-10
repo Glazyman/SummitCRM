@@ -278,7 +278,12 @@ function AnalyticsContent({ userRole, userId }: Props) {
         )}
 
         {activeTab === 'batches' && (
-          <BatchComparisonTable batches={batches} loading={loadingBatches} />
+          <BatchComparisonTable
+            batches={batches}
+            loading={loadingBatches}
+            isAdmin={isAdmin}
+            currentUserId={userId}
+          />
         )}
       </div>
     </div>
