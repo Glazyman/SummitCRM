@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Users, UserPlus, Shield, Mail, Check, X, Clock, RefreshCw, Trash2 } from 'lucide-react'
+import { Users, UserPlus, Shield, Mail, Check, X, Clock, RefreshCw, Trash2, Phone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,6 +35,14 @@ interface Props {
   currentUserId:      string
   isAdmin:            boolean
   pendingInvitations: PendingInvite[]
+}
+
+interface RepCallTargetRow {
+  user_id:                string
+  full_name:              string | null
+  email:                  string | null
+  override_daily_target:  number | null
+  effective_daily_target: number
 }
 
 const ROLE_LABELS: Record<WorkspaceRole, string> = {
@@ -153,6 +161,13 @@ export default function TeamSettingsClient({
   const [invites, setInvites]   = React.useState<PendingInvite[]>(initialInvites)
   const [loading, setLoading]   = React.useState(true)
   const [showInvite, setShowInvite] = React.useState(false)
+  const [targetLoading, setTargetLoading] = React.useState(true)
+  const [targetSaving, setTargetSaving] = React.useState(false)
+  const [targetError, setTargetError] = React.useState<string | null>(null)
+  const [targetSuccess, setTargetSuccess] = React.useState<string | null>(null)
+  const [workspaceDefaultTarget, setWorkspaceDefaultTarget] = React.useState(100)
+  const [repTargetDrafts, setRepTargetDrafts] = React.useState<Record<string, string>>({})
+  const [repTargetRows, setRepTargetRows] = React.useState<RepCallTargetRow[]>([])
 
   // Load members on mount
   React.useEffect(() => {
@@ -162,6 +177,81 @@ export default function TeamSettingsClient({
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
+
+  React.useEffect(() => {
+    if (!isAdmin) return
+    fetch('/api/admin/call-targets')
+      .then(async (r) => {
+        const json = await r.json()
+        if (!r.ok) throw new Error(json.error ?? 'Failed to load call targets')
+        setWorkspaceDefaultTarget(json.workspace_default_daily_target ?? 100)
+        setRepTargetRows(json.reps ?? [])
+        const nextDrafts: Record<string, string> = {}
+        for (const rep of (json.reps ?? []) as RepCallTargetRow[]) {
+          nextDrafts[rep.user_id] = rep.override_daily_target ? String(rep.override_daily_target) : ''
+        }
+        setRepTargetDrafts(nextDrafts)
+      })
+      .catch((err) => setTargetError(err instanceof Error ? err.message : 'Failed to load call targets'))
+      .finally(() => setTargetLoading(false))
+  }, [isAdmin])
+
+  async function saveCallTargets() {
+    setTargetError(null)
+    setTargetSuccess(null)
+
+    const parsedDefault = Number.parseInt(String(workspaceDefaultTarget), 10)
+    if (!Number.isInteger(parsedDefault) || parsedDefault < 1) {
+      setTargetError('Default daily target must be a whole number greater than 0.')
+      return
+    }
+
+    const overrides: Array<{ user_id: string; daily_target: number | null }> = []
+    for (const row of repTargetRows) {
+      const raw = (repTargetDrafts[row.user_id] ?? '').trim()
+      if (!raw) {
+        overrides.push({ user_id: row.user_id, daily_target: null })
+        continue
+      }
+      const parsed = Number.parseInt(raw, 10)
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        setTargetError('Rep override targets must be whole numbers greater than 0, or empty.')
+        return
+      }
+      overrides.push({ user_id: row.user_id, daily_target: parsed })
+    }
+
+    setTargetSaving(true)
+    try {
+      const res = await fetch('/api/admin/call-targets', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_default_daily_target: parsedDefault,
+          overrides,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to save call targets')
+      setTargetSuccess('Daily call targets saved.')
+
+      const refreshed = await fetch('/api/admin/call-targets')
+      const refreshedJson = await refreshed.json()
+      if (refreshed.ok) {
+        setWorkspaceDefaultTarget(refreshedJson.workspace_default_daily_target ?? parsedDefault)
+        setRepTargetRows(refreshedJson.reps ?? [])
+        const nextDrafts: Record<string, string> = {}
+        for (const rep of (refreshedJson.reps ?? []) as RepCallTargetRow[]) {
+          nextDrafts[rep.user_id] = rep.override_daily_target ? String(rep.override_daily_target) : ''
+        }
+        setRepTargetDrafts(nextDrafts)
+      }
+    } catch (err) {
+      setTargetError(err instanceof Error ? err.message : 'Failed to save call targets')
+    } finally {
+      setTargetSaving(false)
+    }
+  }
 
   async function handleInvite(email: string, role: WorkspaceRole): Promise<string | null> {
     const res = await fetch('/api/team/invite', {
@@ -304,6 +394,97 @@ export default function TeamSettingsClient({
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Daily call targets */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Phone className="w-4 h-4" /> Daily Call Targets
+            </CardTitle>
+            <CardDescription>
+              Set a workspace default (100 recommended) and optional per-rep overrides.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {targetError && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+                {targetError}
+              </div>
+            )}
+            {targetSuccess && (
+              <div className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground">
+                {targetSuccess}
+              </div>
+            )}
+
+            <div className="grid gap-2 max-w-xs">
+              <Label htmlFor="workspace-default-target">Workspace default daily target</Label>
+              <Input
+                id="workspace-default-target"
+                type="number"
+                min={1}
+                step={1}
+                value={workspaceDefaultTarget}
+                onChange={(e) => setWorkspaceDefaultTarget(Number.parseInt(e.target.value || '0', 10))}
+              />
+            </div>
+
+            {targetLoading ? (
+              <div className="text-sm text-muted-foreground">Loading rep targets…</div>
+            ) : repTargetRows.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No reps found yet.</div>
+            ) : (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="grid grid-cols-[1fr_130px_130px] gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border bg-muted/40">
+                  <span>Rep</span>
+                  <span>Override</span>
+                  <span>Effective</span>
+                </div>
+                <div className="divide-y divide-border">
+                  {repTargetRows.map((rep) => (
+                    <div key={rep.user_id} className="grid grid-cols-[1fr_130px_130px] gap-2 px-3 py-2 items-center">
+                      {(() => {
+                        const draft = (repTargetDrafts[rep.user_id] ?? '').trim()
+                        const draftNum = Number.parseInt(draft, 10)
+                        const effective = Number.isInteger(draftNum) && draftNum > 0 ? draftNum : workspaceDefaultTarget
+                        return (
+                          <>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{rep.full_name ?? rep.email ?? rep.user_id}</p>
+                        {rep.full_name && rep.email && (
+                          <p className="text-xs text-muted-foreground truncate">{rep.email}</p>
+                        )}
+                      </div>
+                      <Input
+                        type="number"
+                        min={1}
+                        step={1}
+                        placeholder="Default"
+                        value={repTargetDrafts[rep.user_id] ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setRepTargetDrafts((prev) => ({ ...prev, [rep.user_id]: v }))
+                        }}
+                      />
+                      <p className="text-sm">{effective}</p>
+                          </>
+                        )
+                      })()}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button onClick={saveCallTargets} disabled={targetSaving || targetLoading}>
+                {targetSaving ? 'Saving…' : 'Save Call Targets'}
+              </Button>
             </div>
           </CardContent>
         </Card>

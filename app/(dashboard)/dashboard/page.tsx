@@ -38,7 +38,7 @@ export default async function DashboardPage() {
 
       {/* Stats grid */}
       {role === 'rep' ? (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Total Leads"
             value={formatNumber(metrics.totalLeads)}
@@ -61,6 +61,13 @@ export default async function DashboardPage() {
             description="pending today"
             icon={Bell}
             color="amber"
+          />
+          <StatCard
+            title="Calls Today"
+            value={`${formatNumber(metrics.callsToday)} / ${formatNumber(metrics.dailyCallTarget)}`}
+            description="daily call target"
+            icon={PhoneCall}
+            color="purple"
           />
         </div>
       ) : (
@@ -115,6 +122,8 @@ type DashboardMetrics = {
   newLeads:         number
   interestedLeads:  number
   callsLogged:      number
+  callsToday:       number
+  dailyCallTarget:  number
   unreadNotifications: number
   followUpsDue:     number
 }
@@ -125,6 +134,8 @@ function emptyDashboardMetrics(): DashboardMetrics {
     newLeads:            0,
     interestedLeads:     0,
     callsLogged:         0,
+    callsToday:          0,
+    dailyCallTarget:     100,
     unreadNotifications: 0,
     followUpsDue:        0,
   }
@@ -144,6 +155,8 @@ async function getDashboardMetrics(
 
   const weekAgo = new Date(now)
   weekAgo.setDate(weekAgo.getDate() - 7)
+  const startOfToday = new Date(now)
+  startOfToday.setHours(0, 0, 0, 0)
 
   const isAdmin = ['admin', 'super_admin'].includes(role)
 
@@ -164,6 +177,8 @@ async function getDashboardMetrics(
     newLeadsResult,
     interestedResult,
     followUpsDueResult,
+    workspaceResult,
+    overrideResult,
   ] = await Promise.all([
     supabase
       .from('leads')
@@ -184,10 +199,22 @@ async function getDashboardMetrics(
       .eq('interest_status', 'interested')
       .is('deleted_at', null),
     followUpsDueQuery,
+    supabase
+      .from('workspaces')
+      .select('settings')
+      .eq('id', workspaceId)
+      .single(),
+    supabase
+      .from('rep_call_targets')
+      .select('daily_target')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .maybeSingle(),
   ])
 
   // Calls logged this week (best-effort — join through leads)
   let callsLogged = 0
+  let callsToday = 0
   try {
     const { count } = await supabase
       .from('activities')
@@ -198,11 +225,28 @@ async function getDashboardMetrics(
     callsLogged = count ?? 0
   } catch {}
 
+  try {
+    const { count } = await supabase
+      .from('call_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('logged_by', userId)
+      .gte('called_at', startOfToday.toISOString())
+    callsToday = count ?? 0
+  } catch {}
+
+  const workspaceDefault = Number((workspaceResult.data as { settings?: Record<string, unknown> } | null)?.settings?.daily_call_target)
+  const overrideTarget = Number((overrideResult.data as { daily_target?: number } | null)?.daily_target)
+  const defaultTarget = Number.isFinite(workspaceDefault) && workspaceDefault > 0 ? Math.floor(workspaceDefault) : 100
+  const dailyCallTarget = Number.isFinite(overrideTarget) && overrideTarget > 0 ? Math.floor(overrideTarget) : defaultTarget
+
   return {
     totalLeads:          leadsResult.count     ?? 0,
     newLeads:            newLeadsResult.count   ?? 0,
     interestedLeads:     interestedResult.count ?? 0,
     callsLogged,
+    callsToday,
+    dailyCallTarget,
     unreadNotifications: 0,
     followUpsDue:        followUpsDueResult.count ?? 0,
   }
@@ -210,10 +254,6 @@ async function getDashboardMetrics(
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value)
-}
-
-function formatPercent(value: number) {
-  return `${value}%`
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────
