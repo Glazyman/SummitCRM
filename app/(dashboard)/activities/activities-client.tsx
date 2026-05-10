@@ -1,13 +1,17 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Phone, ArrowUpRight, CheckCircle2, Circle, Clock,
   AlertCircle, Minus, ChevronDown, Plus, X,
-  User, Mail, Building2, ExternalLink,
+  User, Mail, Building2, ExternalLink, Calendar, PhoneMissed,
+  PhoneOff, PhoneCall, Voicemail, RotateCcw,
 } from 'lucide-react'
+import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } from '@/components/leads/status-config'
+import type { LeadStatus } from '@/components/leads/types'
+import type { InterestStatus } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -66,23 +70,139 @@ function fmtDate(iso: string) {
 const selectCls = 'h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
 
 // ── Activity side panel ────────────────────────────────────────────────────────
+const CALL_OUTCOMES = [
+  { id: 'answered',           label: 'Answered',  icon: PhoneCall,   color: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 data-[sel=true]:bg-emerald-500 data-[sel=true]:text-white data-[sel=true]:border-emerald-600' },
+  { id: 'voicemail',          label: 'Voicemail', icon: Voicemail,   color: 'bg-purple-500/10 text-purple-700 border-purple-300 data-[sel=true]:bg-purple-500 data-[sel=true]:text-white data-[sel=true]:border-purple-600' },
+  { id: 'no_answer',          label: 'No Answer', icon: PhoneMissed, color: 'bg-orange-500/10 text-orange-700 border-orange-300 data-[sel=true]:bg-orange-500 data-[sel=true]:text-white data-[sel=true]:border-orange-600' },
+  { id: 'wrong_number',       label: 'Wrong #',   icon: PhoneOff,    color: 'bg-red-500/10 text-red-700 border-red-300 data-[sel=true]:bg-red-500 data-[sel=true]:text-white data-[sel=true]:border-red-600' },
+] as const
+
 function ActivityPanel({
   activity,
   onClose,
   onDone,
+  onActivityUpdated,
 }: {
-  activity: Activity
-  onClose:  () => void
-  onDone:   () => void
+  activity:           Activity
+  onClose:            () => void
+  onDone:             () => void
+  onActivityUpdated?: (id: string, patch: Partial<Activity>) => void
 }) {
   const done = !!activity.completed_at
-  const due  = fmtDate(activity.due_at)
   const name = leadName(activity.lead)
 
+  // Lead status/interest (fetched on open)
+  const [leadStatus,   setLeadStatus]   = useState<LeadStatus | null>(null)
+  const [leadInterest, setLeadInterest] = useState<InterestStatus | null>(null)
+
+  // Reschedule
+  const [rescheduling, setRescheduling] = useState(false)
+  const [newDue,       setNewDue]       = useState(activity.due_at.slice(0, 16))
+  const [savingDue,    setSavingDue]    = useState(false)
+
+  // Log call
+  const [callOutcome,  setCallOutcome]  = useState<string | null>(null)
+  const [callNotes,    setCallNotes]    = useState('')
+  const [loggingCall,  setLoggingCall]  = useState(false)
+  const [callLogged,   setCallLogged]   = useState(false)
+
+  // Status/interest saving
+  const [savingStatus,   setSavingStatus]   = useState(false)
+  const [savingInterest, setSavingInterest] = useState(false)
+
+  // Fetch lead status/interest
+  useEffect(() => {
+    if (!activity.lead?.id) return
+    fetch(`/api/leads/${activity.lead.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.lead) {
+          setLeadStatus(d.lead.status ?? null)
+          setLeadInterest(d.lead.interest_status ?? null)
+        }
+      })
+      .catch(() => {})
+  }, [activity.lead?.id])
+
+  async function handleReschedule() {
+    if (!newDue) return
+    setSavingDue(true)
+    try {
+      const res = await fetch(`/api/activities/${activity.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dueAt: new Date(newDue).toISOString() }),
+      })
+      if (res.ok) {
+        onActivityUpdated?.(activity.id, { due_at: new Date(newDue).toISOString() })
+        setRescheduling(false)
+      }
+    } finally { setSavingDue(false) }
+  }
+
+  async function handleLogCall() {
+    if (!callOutcome || !activity.lead?.id) return
+    setLoggingCall(true)
+    try {
+      await fetch(`/api/leads/${activity.lead.id}/calls`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outcome: callOutcome, notes: callNotes || null, duration_sec: null }),
+      })
+      // Auto-update lead status based on outcome
+      const outcomeToStatus: Record<string, LeadStatus> = {
+        answered: 'called', voicemail: 'voicemail', no_answer: 'no_answer', wrong_number: 'wrong_number',
+      }
+      const newStatus = outcomeToStatus[callOutcome]
+      if (newStatus) {
+        await fetch(`/api/leads/${activity.lead.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        })
+        setLeadStatus(newStatus)
+      }
+      setCallLogged(true)
+      setCallOutcome(null)
+      setCallNotes('')
+      setTimeout(() => setCallLogged(false), 2500)
+    } finally { setLoggingCall(false) }
+  }
+
+  async function handleStatusChange(s: LeadStatus) {
+    if (!activity.lead?.id) return
+    setSavingStatus(true)
+    setLeadStatus(s)
+    try {
+      await fetch(`/api/leads/${activity.lead.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: s }),
+      })
+    } finally { setSavingStatus(false) }
+  }
+
+  async function handleInterestChange(s: InterestStatus) {
+    if (!activity.lead?.id) return
+    setSavingInterest(true)
+    setLeadInterest(s)
+    try {
+      await fetch(`/api/leads/${activity.lead.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interest_status: s }),
+      })
+    } finally { setSavingInterest(false) }
+  }
+
+  // Calendar display helpers
+  const dueDate  = new Date(activity.due_at)
+  const dayName  = dueDate.toLocaleDateString('en-US', { weekday: 'short' })
+  const monthDay = dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const timeStr  = dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  const isOverdue = !done && dueDate < new Date()
+
   return (
-    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-border bg-card shadow-xl animate-dropdown-in">
+    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-border bg-card shadow-xl">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+      <div className="flex items-center justify-between border-b border-border px-5 py-4 shrink-0">
         <div className="flex items-center gap-2">
           <span className={cn(
             'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium',
@@ -91,27 +211,92 @@ function ActivityPanel({
             {activity.type === 'callback' ? <Phone className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
             {activity.type === 'callback' ? 'Call Back' : 'Follow-up'}
           </span>
-          <span className={cn('text-xs font-medium', due.overdue ? 'text-red-500' : 'text-muted-foreground')}>
-            <Clock className="inline h-3 w-3 mr-0.5" />{due.label}
-          </span>
+          {done && <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle2 className="h-3 w-3" />Completed</span>}
         </div>
-        <button type="button" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+        <button type="button" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted transition-colors">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-        {/* Task */}
-        <div className="space-y-1">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Task</p>
-          <p className="font-semibold">{activity.title}</p>
-          {activity.notes && <p className="text-sm text-muted-foreground">{activity.notes}</p>}
+      <div className="flex-1 overflow-y-auto">
+        {/* ── Calendar block ── */}
+        <div className={cn('px-5 py-4 border-b border-border', isOverdue ? 'bg-red-50 dark:bg-red-950/20' : 'bg-muted/30')}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                'flex h-12 w-12 flex-col items-center justify-center rounded-xl border-2 text-center',
+                isOverdue ? 'border-red-400 bg-red-500 text-white' : 'border-border bg-card'
+              )}>
+                <span className="text-[10px] font-semibold uppercase leading-none">{dayName}</span>
+                <span className="text-lg font-bold leading-tight">{dueDate.getDate()}</span>
+              </div>
+              <div>
+                <p className={cn('text-sm font-semibold', isOverdue && 'text-red-600')}>{monthDay}</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" />{timeStr}
+                  {isOverdue && <span className="text-red-500 font-medium ml-1">· Overdue</span>}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRescheduling(!rescheduling)}
+              className="flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <RotateCcw className="h-3 w-3" /> Reschedule
+            </button>
+          </div>
+
+          {/* Reschedule picker */}
+          {rescheduling && (
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                {[
+                  { label: 'Today 5pm', offset: 0, hour: 17 },
+                  { label: 'Tomorrow', offset: 1, hour: 9 },
+                  { label: 'In 2 days', offset: 2, hour: 9 },
+                ].map(q => (
+                  <button
+                    key={q.label}
+                    type="button"
+                    onClick={() => {
+                      const d = new Date()
+                      d.setDate(d.getDate() + q.offset)
+                      d.setHours(q.hour, 0, 0, 0)
+                      setNewDue(d.toISOString().slice(0, 16))
+                    }}
+                    className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="datetime-local"
+                value={newDue}
+                onChange={e => setNewDue(e.target.value)}
+                className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setRescheduling(false)} className="flex-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:bg-muted">Cancel</button>
+                <button type="button" onClick={handleReschedule} disabled={savingDue} className="flex-1 rounded-lg bg-primary text-primary-foreground py-1.5 text-xs font-medium hover:bg-primary/90 disabled:opacity-50">
+                  {savingDue ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Lead contact info */}
-        {activity.lead ? (
-          <div className="rounded-xl border border-border p-4 space-y-3">
+        {/* ── Task title ── */}
+        <div className="px-5 py-4 border-b border-border">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Task</p>
+          <p className="font-semibold">{activity.title}</p>
+          {activity.notes && <p className="text-sm text-muted-foreground mt-0.5">{activity.notes}</p>}
+        </div>
+
+        {/* ── Contact info ── */}
+        {activity.lead && (
+          <div className="px-5 py-4 border-b border-border space-y-3">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-semibold">{name}</p>
@@ -121,50 +306,133 @@ function ActivityPanel({
                   </p>
                 )}
               </div>
-              <Link
-                href={`/leads/${activity.lead.id}`}
-                className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
-                onClick={onClose}
-              >
+              <Link href={`/leads/${activity.lead.id}`} onClick={onClose}
+                className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0">
                 <ExternalLink className="h-3.5 w-3.5" /> View lead
               </Link>
             </div>
+            {activity.lead.phone && (
+              <a href={`tel:${activity.lead.phone}`} className="flex items-center gap-2.5 text-sm hover:text-primary transition-colors">
+                <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />{activity.lead.phone}
+              </a>
+            )}
+            {activity.lead.email && (
+              <a href={`mailto:${activity.lead.email}`} className="flex items-center gap-2.5 text-sm text-primary hover:underline">
+                <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{activity.lead.email}</span>
+              </a>
+            )}
+          </div>
+        )}
 
-            <div className="space-y-2 border-t border-border pt-3">
-              {activity.lead.phone && (
-                <a href={`tel:${activity.lead.phone}`} className="flex items-center gap-2.5 text-sm hover:text-primary transition-colors">
-                  <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  {activity.lead.phone}
-                </a>
-              )}
-              {activity.lead.email && (
-                <a href={`mailto:${activity.lead.email}`} className="flex items-center gap-2.5 text-sm text-primary hover:underline">
-                  <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{activity.lead.email}</span>
-                </a>
-              )}
+        {/* ── Log a call ── */}
+        <div className="px-5 py-4 border-b border-border space-y-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Log Call</p>
+          <div className="grid grid-cols-2 gap-2">
+            {CALL_OUTCOMES.map(o => {
+              const Icon = o.icon
+              const selected = callOutcome === o.id
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  data-sel={selected}
+                  onClick={() => setCallOutcome(selected ? null : o.id)}
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all',
+                    o.color
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0" />{o.label}
+                </button>
+              )
+            })}
+          </div>
+          {callOutcome && (
+            <>
+              <textarea
+                placeholder="Notes (optional)…"
+                value={callNotes}
+                onChange={e => setCallNotes(e.target.value)}
+                rows={2}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <button
+                type="button"
+                onClick={handleLogCall}
+                disabled={loggingCall}
+                className="w-full rounded-lg bg-primary text-primary-foreground py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                {loggingCall ? 'Logging…' : callLogged ? '✓ Call logged!' : 'Log Call'}
+              </button>
+            </>
+          )}
+          {callLogged && !callOutcome && (
+            <p className="text-xs text-emerald-600 font-medium flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" />Call logged successfully</p>
+          )}
+        </div>
+
+        {/* ── Status & Interest ── */}
+        {activity.lead && (
+          <div className="px-5 py-4 border-b border-border space-y-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Lead Status</p>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-1.5">
+                {ALL_STATUSES.map(s => {
+                  const m = STATUS_CONFIG[s]
+                  const sel = leadStatus === s
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => handleStatusChange(s)}
+                      disabled={savingStatus}
+                      className={cn(
+                        'rounded-lg border px-2.5 py-1.5 text-xs font-medium text-left transition-all',
+                        sel ? m.badge : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      {m.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Interest Level</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {ALL_INTEREST_STATUSES.map(s => {
+                  const m = INTEREST_CONFIG[s]
+                  const sel = leadInterest === s
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => handleInterestChange(s)}
+                      disabled={savingInterest}
+                      className={cn(
+                        'rounded-lg border px-2 py-1.5 text-xs font-medium text-center transition-all',
+                        sel ? m.badge : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      {m.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No lead linked.</p>
         )}
       </div>
 
-      {/* Footer — Done button */}
-      <div className="border-t border-border px-5 py-4">
+      {/* ── Footer ── */}
+      <div className="border-t border-border px-5 py-4 shrink-0">
         {done ? (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-emerald-600">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="font-medium">Completed</span>
-            </div>
-            <button
-              type="button"
-              onClick={onDone}
-              className="w-full text-sm text-muted-foreground hover:text-foreground underline underline-offset-2"
-            >
-              Mark as open again
-            </button>
+            <div className="flex items-center gap-2 text-sm text-emerald-600"><CheckCircle2 className="h-4 w-4" /><span className="font-medium">Completed</span></div>
+            <button type="button" onClick={onDone} className="w-full text-sm text-muted-foreground hover:text-foreground underline underline-offset-2">Mark as open again</button>
           </div>
         ) : (
           <button
@@ -172,8 +440,7 @@ function ActivityPanel({
             onClick={onDone}
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-3 text-sm font-semibold hover:bg-primary/90 transition-colors"
           >
-            <CheckCircle2 className="h-4 w-4" />
-            Mark Done
+            <CheckCircle2 className="h-4 w-4" /> Mark Done
           </button>
         )}
       </div>
@@ -494,6 +761,10 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
             activity={selectedActivity}
             onClose={() => setSelectedActivity(null)}
             onDone={() => toggleDone(selectedActivity)}
+            onActivityUpdated={(id, patch) => {
+              setActivities(prev => prev.map(a => a.id === id ? { ...a, ...patch } : a))
+              setSelectedActivity(prev => prev?.id === id ? { ...prev, ...patch } : prev)
+            }}
           />
         </>
       )}
