@@ -76,15 +76,6 @@ export interface CampaignSummary {
   created_at:   string
 }
 
-// ── /api/admin/ai-usage ───────────────────────────────────────────────────
-export interface AiUsageSummary {
-  total_tokens:    number
-  total_cost_usd:  number
-  total_calls:     number
-  budget:          number
-  budget_used_pct: number
-}
-
 // ── /api/admin/activity ───────────────────────────────────────────────────
 export interface ActivityEvent {
   id:         string

@@ -214,16 +214,52 @@ export function buildGmailComposeUrl(opts: {
   return `https://mail.google.com/mail/?${parts.join('&')}`
 }
 
-/** Open a Gmail draft for this lead's snapshot in a new tab. */
-export function openSnapshotEmail(input: SnapshotInput): void {
-  const body    = buildSnapshot(input)
-  const company = clean(input.lead.company)
-  const subject = company ? `${company} – Snapshot` : 'Deal Snapshot'
-  const url     = buildGmailComposeUrl({ subject, body })
-  if (typeof window !== 'undefined' && typeof console !== 'undefined') {
-    console.log('[Intake Snapshot] subject:', subject)
-    console.log('[Intake Snapshot] body:\n' + body)
-    console.log('[Intake Snapshot] url length:', url.length)
+/**
+ * Open a Gmail draft for this lead's snapshot in a new tab.
+ *
+ * Tries the AI-polished version via /api/ai/snapshot-email first, falls back
+ * to the deterministic template if AI is unavailable or errors. Opens an
+ * about:blank tab synchronously (to avoid popup blockers) and navigates it
+ * once the body is ready.
+ */
+export async function openSnapshotEmail(input: SnapshotInput): Promise<void> {
+  // Open a tab immediately — Safari/Chrome block window.open from async
+  // callbacks unless it happens inside the user-gesture stack.
+  const tab = typeof window !== 'undefined'
+    ? window.open('about:blank', '_blank', 'noopener,noreferrer')
+    : null
+
+  let subject: string
+  let body:    string
+  let source:  'ai' | 'template' = 'template'
+
+  try {
+    const res = await fetch('/api/ai/snapshot-email', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(input),
+    })
+    if (!res.ok) throw new Error(`AI snapshot returned ${res.status}`)
+    const data = await res.json() as { subject?: string; body?: string }
+    if (!data.subject || !data.body) throw new Error('AI snapshot missing fields')
+    subject = data.subject
+    body    = data.body
+    source  = 'ai'
+  } catch (err) {
+    if (typeof console !== 'undefined') {
+      console.warn('[Intake Snapshot] AI unavailable, using template fallback:', err)
+    }
+    body = buildSnapshot(input)
+    const company = clean(input.lead.company)
+    subject = company ? `${company} – Snapshot` : 'Deal Snapshot'
   }
-  window.open(url, '_blank', 'noopener,noreferrer')
+
+  const url = buildGmailComposeUrl({ subject, body })
+  if (typeof console !== 'undefined') {
+    console.log(`[Intake Snapshot] source: ${source}, url length: ${url.length}`)
+    console.log('[Intake Snapshot] body:\n' + body)
+  }
+
+  if (tab) tab.location.href = url
+  else if (typeof window !== 'undefined') window.open(url, '_blank', 'noopener,noreferrer')
 }

@@ -1,195 +1,137 @@
 /**
  * lib/ai/prompts.ts
  *
- * All prompt builders for the AI enrichment system.
- *
- * Design principles:
- *  1. System prompt = persona + output schema + constraints
- *  2. User prompt  = data only (no instructions mixed in)
- *  3. Always request JSON output — use response_format: json_object
- *  4. Always set max_tokens to prevent runaway completions
- *  5. Negative instructions prevent common AI failure modes
- *  6. Never include PII beyond what is needed for the specific task
+ * Prompt builder for the snapshot-email task. The AI rewrites the
+ * intake answers into a Summit-Mergers-style company snapshot,
+ * synthesising "KEY HIGHLIGHTS" bullets from the data.
  */
 
-import type { AiTone } from './types'
-
-// ── Lead data shape used across all prompts ───────────────────────────────
-export interface LeadPromptData {
-  first_name:  string | null
-  last_name:   string | null
-  title:       string | null
-  company:     string | null
-  website:     string | null
-  email:       string
-  industry?:   string | null
-  linkedin?:   string | null
-  notes?:      string   // recent notes as context
+export interface SnapshotLead {
+  first_name: string | null
+  last_name:  string | null
+  email:      string
+  phone:      string | null
+  company:    string | null
+  website:    string | null
 }
 
-export interface SenderPromptData {
-  name:    string
-  email:   string
-  company: string
+export interface SnapshotQuestion {
+  id:     string
+  label:  string
+  type:   'text' | 'textarea' | 'yesno'
+  custom?: boolean
 }
 
-// ── Tone descriptors used in prompts ──────────────────────────────────────
-const TONE_DESCRIPTORS: Record<AiTone, string> = {
-  professional: 'professional, concise, and respectful. Use formal but approachable language.',
-  casual:       'casual and conversational. Write like a colleague reaching out, not a sales rep.',
-  direct:       'direct and to-the-point. No fluff. Get to the value proposition in the first two sentences.',
-  friendly:     'warm and friendly. Show genuine curiosity about their work before mentioning your product.',
+export interface SnapshotPromptInput {
+  lead:      SnapshotLead
+  answers:   Record<string, string>
+  questions: SnapshotQuestion[]
 }
 
-// ── Email draft prompt ────────────────────────────────────────────────────
-export function buildEmailDraftPrompt(
-  lead:         LeadPromptData,
-  sender:       SenderPromptData,
-  tone:         AiTone,
-  templateHint: string,
-  context:      string,
-): { system: string; user: string } {
-  const leadName = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'there'
+// ── Style example — embedded so the model has a concrete target. ─────────
+const STYLE_EXAMPLE = `A1 HEATING AND COOLING
+Residential HVAC – Install & Service
+West Virginia / Ohio | www.a1heatingandcooling.com
 
-  const system = `You are an expert B2B cold outreach copywriter.
-Write a personalised cold email in a ${TONE_DESCRIPTORS[tone]}
-Rules:
-- Maximum 150 words in the body. Brevity is more persuasive.
-- Be specific to the lead's company (${lead.company ?? 'their company'}) and role (${lead.title ?? 'their role'}).
-- Do NOT use generic filler phrases like "I hope this finds you well", "I wanted to reach out", "touching base", or "synergy".
-- Do NOT include "{{" or "}}" placeholders — personalise directly.
-- The email must feel human-written, not AI-generated.
-- Open with a genuine observation about their work, role, or company.
-- One clear call to action: a short call or reply.
-- Sign off with the sender's first name only.
-Output strict JSON matching this schema:
-{
-  "subject": "string (max 60 chars, no clickbait, no all-caps)",
-  "body_html": "string (clean HTML, use <p> for paragraphs, <strong> for emphasis only when needed)",
-  "body_text": "string (plain text version)"
-}`
+──────────────────────────────────
 
-  const user = `Sender:
-- Name: ${sender.name}
-- Email: ${sender.email}
-- Company: ${sender.company}
+FINANCIAL OVERVIEW
+  Revenue:          $2.0M
+  EBITDA:           ~$600K (30%)
+  EBITDA Margin:    ~30%
 
-Lead:
-- Name: ${leadName}
-- Title: ${lead.title ?? 'Unknown'}
-- Company: ${lead.company ?? 'Unknown'}
-- Website: ${lead.website ?? 'Not provided'}
-${lead.industry ? `- Industry: ${lead.industry}` : ''}
-${lead.notes ? `\nRecent notes about this lead:\n${lead.notes}` : ''}
-${templateHint ? `\nBase template / angle to personalise:\n${templateHint}` : ''}
-${context ? `\nAdditional instructions from the user:\n${context}` : ''}`
+OPERATIONS
+  Employees:        5+ (Non-Union)
+  Market Focus:     95% Residential / 5% Commercial
+  Service Area:     West Virginia & Ohio
+  Years in Business: 39
 
-  return { system, user }
-}
+SERVICE MIX
+  Install & Retrofit:     50%
+  Service & Maintenance:  50%
 
-// ── Subject line prompt ───────────────────────────────────────────────────
-export function buildSubjectLinePrompt(
-  lead:      LeadPromptData,
-  emailBody: string,
-  count:     number,
-): { system: string; user: string } {
-  const system = `You are a B2B cold email subject line specialist.
-Generate exactly ${count} subject line options.
-Rules:
-- Each under 60 characters
-- No clickbait, no emojis, no all-caps words
-- No questions that feel manipulative ("Are you struggling with...?")
-- Specific to the lead's company or role, not generic
-- Conversational tone — sounds like a peer reaching out
-- Variety: options should have meaningfully different angles
-Output strict JSON: { "subjects": ["string", "string", "string"] }`
+PROJECT SIZE
+  Average Job:      $300 – $12K
+  Largest Project:  $30K
 
-  const user = `Lead: ${lead.first_name ?? ''} ${lead.last_name ?? ''} — ${lead.title ?? ''} at ${lead.company ?? 'their company'}
-${emailBody ? `\nEmail body context:\n${emailBody.slice(0, 500)}` : ''}`
+OWNERSHIP & TRANSITION
+  Owner:            Husband & wife (Beckie Wells)
+  Key Employees:    None
+  Transition Plan:  Owners planning to retire
 
-  return { system, user }
-}
+──────────────────────────────────
 
-// ── Follow-up suggestion prompt ───────────────────────────────────────────
-export function buildFollowUpPrompt(
-  lead:           LeadPromptData,
-  activityHistory:string,
-): { system: string; user: string } {
-  const system = `You are an expert cold outreach coach helping a sales rep plan their next follow-up.
-Based on the lead's engagement history, suggest:
-1. The optimal number of days to wait before following up
-2. A brief, non-pushy follow-up email
-Rules:
-- If no engagement (no opens, no replies): suggest 3–5 days
-- If opened but no reply: suggest 2–3 days, reference the open subtly
-- If replied: do not suggest a follow-up — return suggested_days: -1 and a note in reason
-- Keep the email under 100 words
-- Do NOT be aggressive or use urgency tactics
-Output strict JSON:
-{
-  "suggested_days": number,
-  "reason": "string (1 sentence explaining timing)",
-  "subject": "string",
-  "body_text": "string"
-}`
+KEY HIGHLIGHTS
+  - Nearly 4 decades of operating history and brand recognition
+  - Strong EBITDA margins (30%)
+  - Balanced revenue split between install and service/maintenance
+  - Lean operation with 5+ employees
+  - Clean transition — owners retiring, no key employee risk
+  - Established presence across West Virginia and Ohio
 
-  const user = `Lead: ${lead.first_name ?? ''} ${lead.last_name ?? ''} — ${lead.title ?? ''} at ${lead.company ?? ''}
+──────────────────────────────────
 
-Outreach history (most recent first):
-${activityHistory || 'No prior outreach recorded.'}`
+CONTACT
+  (304) 481-1320
+  NWells@a1heatingandcooling.com`
 
-  return { system, user }
-}
+export function buildSnapshotPrompt({ lead, answers, questions }: SnapshotPromptInput): {
+  system: string
+  user:   string
+} {
+  // Render the raw intake as a label-value block — labels come from the
+  // question definitions so custom questions flow through automatically.
+  const intakeLines = questions
+    .map((q) => {
+      const v = (answers[q.id] ?? '').trim()
+      if (!v) return null
+      return `- ${q.label} (${q.id}): ${v.replace(/\n+/g, ' / ')}`
+    })
+    .filter((l): l is string => Boolean(l))
+    .join('\n')
 
-// ── Lead summary prompt ───────────────────────────────────────────────────
-export function buildLeadSummaryPrompt(
-  lead: LeadPromptData,
-): { system: string; user: string } {
-  const system = `You are a B2B sales intelligence assistant.
-Generate a concise profile summary for a lead that helps a sales rep personalise their outreach.
-Output strict JSON:
-{
-  "summary": "string (2–3 sentences, focus on role, company, and likely pain points)",
-  "key_facts": ["string", "string", "string"]
-}
-Rules for key_facts:
-- 3 specific, actionable insights
-- Based only on the data provided — do not hallucinate
-- Focus on what makes this lead a good fit for outreach
-- If data is sparse, note what is missing`
+  const profileLines = [
+    `- Company: ${lead.company  ?? '(none)'}`,
+    `- Website: ${lead.website  ?? '(none)'}`,
+    `- Contact: ${[lead.first_name, lead.last_name].filter(Boolean).join(' ') || '(none)'}`,
+    `- Phone:   ${lead.phone    ?? '(none)'}`,
+    `- Email:   ${lead.email}`,
+  ].join('\n')
 
-  const user = `Lead:
-- Name: ${[lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'Unknown'}
-- Title: ${lead.title ?? 'Unknown'}
-- Company: ${lead.company ?? 'Unknown'}
-- Website: ${lead.website ?? 'Not provided'}
-${lead.industry ? `- Industry: ${lead.industry}` : ''}
-${lead.notes ? `\nNotes:\n${lead.notes.slice(0, 400)}` : ''}`
+  const system =
+`You are a senior M&A analyst at Summit Mergers writing a one-page company snapshot for an HVAC acquisition memo.
 
-  return { system, user }
-}
+Voice: plain, factual, confident. No fluff, no hype, no sales language.
+Constraint: use ONLY the facts the user provides. Never invent metrics, history, customers, or context that isn't in the input.
 
-// ── Batch email personalisation prompt ────────────────────────────────────
-export function buildBatchEmailPrompt(
-  lead:         LeadPromptData,
-  sender:       SenderPromptData,
-  tone:         AiTone,
-  templateHint: string,
-): { system: string; user: string } {
-  // Same as draft but tighter constraints for batch (cost control)
-  const system = `You are a cold outreach copywriter. Write a personalised cold email.
-Tone: ${TONE_DESCRIPTORS[tone]}
-Rules:
-- Maximum 120 words in the body
-- Personalise to the specific person and company
-- No generic phrases, no filler, no "I hope this email finds you well"
-- One clear call to action
-Output strict JSON: { "subject": "string", "body_html": "string", "body_text": "string" }`
+Format requirements (match exactly):
+- Plain text only — no markdown, no backticks.
+- ALL-CAPS section headers, no leading whitespace.
+- Two-space indentation for data rows under each header.
+- Align values in a column by padding labels with spaces (look at the example).
+- Use the long-dash divider "──────────────────────────────────" between major blocks.
+- KEY HIGHLIGHTS section has 5-7 bullets, each starting with "  - ".
+- Bullets synthesise the strongest, most defensible selling points from the data — operating history, margin quality, revenue mix, service area, transition story, etc.
+- Do NOT add headers for empty data (skip the section if no fields apply).
+- Final block is CONTACT — name, phone, email (skip rows that are blank).
 
-  const user = `Sender: ${sender.name} <${sender.email}> at ${sender.company}
-Lead: ${[lead.first_name, lead.last_name].filter(Boolean).join(' ')} — ${lead.title ?? ''} at ${lead.company ?? ''}
-${lead.website ? `Website: ${lead.website}` : ''}
-${templateHint ? `Base template:\n${templateHint}` : ''}`
+Output ONLY the snapshot text — no commentary, no preamble, no trailing explanation.`
+
+  const user =
+`Here is the company information.
+
+LEAD PROFILE
+${profileLines}
+
+INTAKE ANSWERS
+${intakeLines || '(no answers filled in)'}
+
+STYLE EXAMPLE (format target, not content)
+\`\`\`
+${STYLE_EXAMPLE}
+\`\`\`
+
+Write the snapshot for this company now. Plain text only.`
 
   return { system, user }
 }

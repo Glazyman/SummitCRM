@@ -4,7 +4,6 @@ export { QuickActionsBar }                           from './quick-actions-bar'
 export { TeamPerformanceTable }                      from './team-performance-table'
 export { SendingAccountHealthTable }                 from './sending-account-health-table'
 export { ActiveCampaignsSummary }                    from './active-campaigns-summary'
-export { AiUsageWidget }                             from './ai-usage-widget'
 export { WorkspaceActivityFeed }                     from './workspace-activity-feed'
 export { LeadPipelineBreakdown }                     from './lead-pipeline-breakdown'
 export { RepPerformanceChart }                       from './rep-performance-chart'
@@ -12,5 +11,5 @@ export { RepPerformanceLineChart }                   from './rep-performance-lin
 export type {
   DateRange, DateRangePreset, OverviewData, OverviewTotals,
   RepStat, SendingAccountHealth, CampaignSummary,
-  AiUsageSummary, ActivityEvent,
+  ActivityEvent,
 } from './types'

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Bell, User, Cpu } from 'lucide-react'
+import { Users, Bell, User } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Settings' }
 
@@ -27,13 +27,6 @@ const ALL_SECTIONS = [
     icon:        Bell,
     title:       'Notifications',
     description: 'Configure your notification preferences.',
-    adminOnly:   true,
-  },
-  {
-    href:        '/settings/ai-usage',
-    icon:        Cpu,
-    title:       'AI Usage',
-    description: 'Monitor AI token consumption and set budget limits.',
     adminOnly:   true,
   },
 ]
