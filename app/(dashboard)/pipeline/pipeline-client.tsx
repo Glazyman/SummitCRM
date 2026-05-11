@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Plus, GripVertical, Search, Columns3, List,
+  MoreHorizontal, TrendingUp, Users, CheckCircle2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -117,8 +118,12 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
   const totalLeads = leads.length
   const unassigned = leadsByStage.get(null)?.length ?? 0
 
+  // ── Derived stats ─────────────────────────────────────────────────────
+  const contactedCount  = leads.filter(l => ['called','voicemail','no_answer','contacted','replied'].includes(l.status)).length
+  const interestedCount = leads.filter(l => l.interest_status === 'interested').length
+
   return (
-    <div className="flex flex-col h-full min-h-screen">
+    <div className="flex flex-col h-full min-h-screen bg-background">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border bg-card sticky top-0 z-10">
@@ -131,7 +136,6 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <input
@@ -142,90 +146,96 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
               className="h-9 w-52 rounded-lg border border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
             />
           </div>
-
-          {/* View toggle — segmented control */}
           <div className="flex rounded-lg border border-border overflow-hidden">
-            <button
-              type="button"
+            <button type="button"
               onClick={() => { setPipelineView('kanban'); try { localStorage.setItem('pipeline_view_mode', 'kanban') } catch {} }}
-              className={cn(
-                'flex h-9 items-center gap-1.5 px-3.5 text-sm font-medium transition-colors',
-                pipelineView === 'kanban'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-              )}
-            >
+              className={cn('flex h-9 items-center gap-1.5 px-3.5 text-sm font-medium transition-colors',
+                pipelineView === 'kanban' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}>
               <Columns3 className="h-4 w-4" /> Kanban
             </button>
             <div className="w-px bg-border" />
-            <button
-              type="button"
+            <button type="button"
               onClick={() => { setPipelineView('list'); try { localStorage.setItem('pipeline_view_mode', 'list') } catch {} }}
-              className={cn(
-                'flex h-9 items-center gap-1.5 px-3.5 text-sm font-medium transition-colors',
-                pipelineView === 'list'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-              )}
-            >
+              className={cn('flex h-9 items-center gap-1.5 px-3.5 text-sm font-medium transition-colors',
+                pipelineView === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}>
               <List className="h-4 w-4" /> List
             </button>
           </div>
-
-          {/* Add Lead */}
           <Button asChild size="sm">
-            <Link href="/leads">
-              <Plus className="h-4 w-4" /> Add Lead
-            </Link>
+            <Link href="/leads"><Plus className="h-4 w-4" /> Add Lead</Link>
           </Button>
         </div>
       </div>
 
+      {/* ── KPI stat cards ── */}
+      <div className="grid grid-cols-3 gap-4 px-6 py-5 border-b border-border bg-card">
+        <StatCard
+          icon={<TrendingUp className="h-4 w-4" />}
+          label="Total Leads"
+          value={totalLeads.toLocaleString()}
+          sub={`${stages.length} stages`}
+        />
+        <StatCard
+          icon={<Users className="h-4 w-4" />}
+          label="Contacted"
+          value={contactedCount.toLocaleString()}
+          sub={`${totalLeads > 0 ? Math.round((contactedCount / totalLeads) * 100) : 0}% of pipeline`}
+        />
+        <StatCard
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          label="Interested"
+          value={interestedCount.toLocaleString()}
+          sub={`${totalLeads > 0 ? Math.round((interestedCount / totalLeads) * 100) : 0}% conversion rate`}
+          accent
+        />
+      </div>
+
       {/* ── Views ── */}
       {pipelineView === 'kanban' ? (
-      <div className="flex-1 overflow-x-auto bg-secondary/40">
-        <div className="flex gap-4 px-6 py-6 min-h-full items-start"
-          style={{ minWidth: `${stages.length * 304 + 96}px` }}>
+      <div className="flex-1 overflow-x-auto">
+        <div className="flex gap-5 px-6 py-6 min-h-full items-start"
+          style={{ minWidth: `${stages.length * 300 + 96}px` }}>
 
           {stages.map(stage => {
             const stageLeads = leadsByStage.get(stage.id) ?? []
             const isOver     = dragOverStage === stage.id
 
             return (
-              <div key={stage.id} className="flex flex-col w-72 shrink-0">
+              <div key={stage.id} className="flex flex-col w-[276px] shrink-0">
 
-                {/* ── Column header ── */}
-                <div className="flex items-center gap-2 mb-3 px-1">
+                {/* Column header */}
+                <div className="flex items-center gap-2 mb-3">
                   <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
-                  <span className="text-sm font-semibold truncate">{stage.name}</span>
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-secondary border border-border px-1.5 text-[11px] font-bold text-muted-foreground tabular-nums">
+                  <span className="text-sm font-semibold">{stage.name}</span>
+                  <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-bold text-muted-foreground tabular-nums">
                     {stageLeads.length}
                   </span>
-                  {stage.is_won  && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500 text-white shrink-0">WON</span>}
-                  {stage.is_lost && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-red-500 text-white shrink-0">LOST</span>}
+                  {stage.is_won  && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500 text-white">WON</span>}
+                  {stage.is_lost && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-red-500 text-white">LOST</span>}
                 </div>
 
-                {/* ── Cards area ── */}
+                {/* Drop zone */}
                 <div
                   className={cn(
-                    'flex-1 rounded-2xl p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-218px)] transition-colors',
-                    isOver
-                      ? 'bg-primary/8 ring-2 ring-primary/25 ring-inset'
-                      : 'bg-secondary/60',
+                    'flex flex-col gap-3 flex-1 min-h-[120px] rounded-2xl p-1 transition-colors',
+                    isOver && 'bg-primary/5 ring-2 ring-primary/20 ring-inset',
                   )}
                   onDragOver={e => handleDragOver(e, stage.id)}
                   onDragLeave={handleDragLeave}
                   onDrop={e => handleDrop(e, stage.id)}
                 >
-                  {stageLeads.length === 0 ? (
-                    <div className={cn(
-                      'flex items-center justify-center h-16 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition-colors',
-                      isOver ? 'border-primary/40 text-primary' : 'border-border/60',
-                    )}>
-                      {isOver ? 'Drop here' : 'No leads'}
-                    </div>
-                  ) : (
-                    stageLeads.map(lead => (
+                  <div className="flex flex-col gap-3 flex-1 overflow-y-auto max-h-[calc(100vh-300px)]">
+                    {stageLeads.length === 0 && (
+                      <div className={cn(
+                        'flex items-center justify-center h-20 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition-colors',
+                        isOver ? 'border-primary/40 text-primary' : 'border-border/50',
+                      )}>
+                        {isOver ? 'Drop here' : 'No leads'}
+                      </div>
+                    )}
+                    {stageLeads.map(lead => (
                       <KanbanCard
                         key={lead.id}
                         lead={lead}
@@ -235,13 +245,13 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
                         onDragEnd={handleDragEnd}
                         onOpen={() => { if (!didDragRef.current) setSelectedLeadId(lead.id) }}
                       />
-                    ))
-                  )}
+                    ))}
+                  </div>
 
                   {/* Add lead */}
                   <Link
-                    href={`/leads`}
-                    className="flex items-center gap-1.5 w-full px-3 py-2 rounded-xl border border-dashed border-border/70 text-xs font-medium text-muted-foreground hover:bg-card hover:border-border hover:text-foreground transition-all"
+                    href="/leads"
+                    className="flex items-center gap-1.5 w-full px-3 py-2.5 rounded-xl border border-dashed border-border/60 text-xs font-medium text-muted-foreground hover:bg-card hover:border-border hover:text-foreground transition-all"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add lead
                   </Link>
@@ -334,11 +344,14 @@ function KanbanCard({
 }) {
   const name         = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
   const initials     = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-  const statusMeta   = STATUS_CONFIG[lead.status as LeadStatus]
   const interestMeta = INTEREST_CONFIG[lead.interest_status as InterestStatus]
-  const timeLabel    = lead.last_contacted_at
-    ? `Contacted ${timeAgo(lead.last_contacted_at)}`
-    : `Added ${timeAgo(lead.created_at)}`
+  const dateLabel    = lead.last_contacted_at
+    ? new Date(lead.last_contacted_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : new Date(lead.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+
+  // Deterministic pastel for the avatar background
+  const avatarColors = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444']
+  const avatarBg = avatarColors[(name.charCodeAt(0) ?? 0) % avatarColors.length]
 
   return (
     <div
@@ -347,76 +360,110 @@ function KanbanCard({
       onDragEnd={onDragEnd}
       onClick={onOpen}
       className={cn(
-        'group relative bg-card rounded-xl border border-border/60 shadow-sm',
+        'group bg-card rounded-xl border border-border/50 shadow-sm',
         'cursor-pointer select-none transition-all duration-150',
         isDragging
           ? 'opacity-40 scale-[0.97] shadow-none cursor-grabbing'
-          : 'hover:shadow-md hover:border-border',
+          : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-border hover:-translate-y-px',
       )}
     >
-      {/* Stage color top bar */}
-      <div className="h-[3px] rounded-t-xl w-full" style={{ backgroundColor: stageColor }} />
+      <div className="p-4">
 
-      <div className="p-3.5">
-        {/* Company + drag handle */}
-        <div className="flex items-center justify-between gap-2 mb-1.5">
-          <p className="text-[11px] font-medium text-muted-foreground truncate">
-            {lead.company ?? <span className="italic">No company</span>}
+        {/* Row 1: name + ··· menu */}
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <p className="text-[13px] font-semibold text-foreground leading-snug line-clamp-2">
+            {name}
           </p>
-          <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground/20 group-hover:text-muted-foreground/60 transition-colors cursor-grab" />
+          <button
+            type="button"
+            onClick={e => e.stopPropagation()}
+            className="shrink-0 mt-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
         </div>
 
-        {/* Contact name */}
-        <p className="text-sm font-semibold text-foreground truncate leading-snug mb-0.5">
-          {name}
+        {/* Row 2: company */}
+        <p className="text-[11px] text-muted-foreground truncate mb-3">
+          {lead.company ?? <span className="italic opacity-60">No company</span>}
         </p>
 
-        {/* Title / role if available */}
-        {lead.title && (
-          <p className="text-[11px] text-muted-foreground truncate mb-2">{lead.title}</p>
-        )}
-
-        {/* Status + time row */}
-        <div className="flex items-center gap-1.5 mt-2 mb-3">
-          {statusMeta && (
-            <span className={cn(
-              'inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold border leading-none',
-              statusMeta.badge,
-            )}>
-              {statusMeta.label}
-            </span>
+        {/* Row 3: status dot + date  (mirrors "$value · date" from screenshot) */}
+        <div className="flex items-center gap-1.5 mb-3.5">
+          <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: stageColor }} />
+          <span className="text-xs text-muted-foreground">{dateLabel}</span>
+          {lead.phone && (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <a
+                href={`tel:${lead.phone}`}
+                onClick={e => e.stopPropagation()}
+                className="text-xs text-muted-foreground hover:text-primary transition-colors truncate"
+              >
+                {lead.phone}
+              </a>
+            </>
           )}
-          <span className="text-[11px] text-muted-foreground">·</span>
-          <span className="text-[11px] text-muted-foreground truncate">{timeLabel}</span>
         </div>
 
         {/* Divider */}
-        <div className="border-t border-border/60 mb-2.5" />
+        <div className="border-t border-border/60 mb-3" />
 
-        {/* Footer: initials + interest badge */}
+        {/* Footer: avatar + name + interest badge */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            {/* Initials avatar */}
             <div
               className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
-              style={{ backgroundColor: stageColor }}
+              style={{ backgroundColor: avatarBg }}
             >
               {initials}
             </div>
-            <span className="text-xs font-medium truncate text-foreground/80">
+            <span className="text-xs text-muted-foreground truncate">
               {lead.first_name ?? lead.email.split('@')[0]}
             </span>
           </div>
+
           {interestMeta && (
             <span className={cn(
-              'inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold border leading-none shrink-0',
+              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border shrink-0',
               interestMeta.badge,
             )}>
+              <span className={cn('h-1.5 w-1.5 rounded-full', interestMeta.dot)} />
               {interestMeta.label}
             </span>
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────
+function StatCard({ icon, label, value, sub, accent }: {
+  icon:   React.ReactNode
+  label:  string
+  value:  string
+  sub:    string
+  accent?: boolean
+}) {
+  return (
+    <div className={cn(
+      'rounded-xl border p-4 transition-colors',
+      accent
+        ? 'border-emerald-200 bg-emerald-50/60'
+        : 'border-border bg-background',
+    )}>
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+        <span className={accent ? 'text-emerald-600' : ''}>{icon}</span>
+        {label}
+      </div>
+      <p className={cn(
+        'text-2xl font-bold tracking-tight',
+        accent ? 'text-emerald-700' : 'text-foreground',
+      )}>
+        {value}
+      </p>
+      <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
     </div>
   )
 }
