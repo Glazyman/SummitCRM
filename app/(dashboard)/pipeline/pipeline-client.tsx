@@ -135,12 +135,9 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
   const dealsWon        = leads.filter(l => l.pipeline_stage_id && wonStageIds.has(l.pipeline_stage_id)).length
   const dealsInProgress = leads.filter(l => l.pipeline_stage_id && !wonStageIds.has(l.pipeline_stage_id) && !lostStageIds.has(l.pipeline_stage_id)).length
 
-  // Pipeline value = sum of questionnaire revenue for all in-pipeline leads
-  const pipelineValue = leads
-    .filter(l => l.pipeline_stage_id !== null)
-    .reduce((sum, l) => sum + (l.pipeline_value ?? 0), 0)
-
-  const pipelineValueHasData = pipelineValue > 0
+  // Pipeline value = sum of questionnaire revenue across ALL leads with data
+  const pipelineValue = leads.reduce((sum, l) => sum + (l.pipeline_value ?? 0), 0)
+  const pipelineLeadsWithValue = leads.filter(l => (l.pipeline_value ?? 0) > 0).length
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
@@ -209,9 +206,9 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
           <StatCard
             icon={<DollarSign className="h-4 w-4" />}
             label="Pipeline Value"
-            value={pipelineValueHasData ? fmtMoney(pipelineValue) : '—'}
-            sub={{ bold: pipelineValueHasData ? '' : 'Fill questionnaire', rest: pipelineValueHasData ? 'from questionnaire' : 'to track value' }}
-            accent={pipelineValueHasData}
+            value={pipelineValue > 0 ? fmtMoney(pipelineValue) : '—'}
+            sub={{ bold: pipelineLeadsWithValue > 0 ? `${pipelineLeadsWithValue}` : '', rest: pipelineLeadsWithValue > 0 ? `lead${pipelineLeadsWithValue !== 1 ? 's' : ''} with revenue` : 'No revenue on file yet' }}
+            accent={pipelineValue > 0}
           />
           <StatCard
             icon={<Trophy className="h-4 w-4" />}
