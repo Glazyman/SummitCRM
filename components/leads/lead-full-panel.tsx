@@ -47,6 +47,8 @@ export interface LeadFullPanelProps {
   /** When opened from the activities view — shows a Mark Done button in the header */
   activityDone?:         boolean
   onMarkActivityDone?:   () => void
+  /** Override panel positioning (e.g. shift left when a sibling panel is open) */
+  style?: React.CSSProperties
 }
 
 interface PanelData {
@@ -74,6 +76,7 @@ export function LeadFullPanel({
   onLeadChange,
   activityDone,
   onMarkActivityDone,
+  style,
 }: LeadFullPanelProps) {
   const [data,             setData]             = React.useState<PanelData | null>(null)
   const [loading,          setLoading]          = React.useState(true)
@@ -272,7 +275,7 @@ export function LeadFullPanel({
   const pendingFollowUps = data?.followUps.filter((f) => !f.is_completed).length ?? 0
 
   return (
-    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-4xl flex-col border-l border-border bg-background shadow-2xl">
+    <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-4xl flex-col border-l border-border bg-background shadow-2xl" style={style}>
 
       {/* ── Header ── */}
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-5 py-3">

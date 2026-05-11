@@ -33,7 +33,12 @@ export interface CalendarActivity {
 
 interface Props {
   activities: CalendarActivity[]
+  /** Called when a day cell or event pill is clicked — opens the day detail panel */
+  onDayOpen: (d: Date) => void
+  /** Called only from the Day-tab view — opens the lead panel directly */
   onActivityClick: (a: CalendarActivity) => void
+  /** Highlights a day in the grid (the one whose panel is open) */
+  selectedDay?: Date | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -43,17 +48,16 @@ const MONTH_NAMES = [
   'July','August','September','October','November','December',
 ]
 
-function toLocalDateKey(date: Date): string {
+export function toLocalDateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
 }
 
-function todayKey(): string { return toLocalDateKey(new Date()) }
+export function todayKey(): string { return toLocalDateKey(new Date()) }
 
-// Start of week for a given date (Monday = 0)
 function startOfWeek(date: Date): Date {
   const d = new Date(date)
-  const day = d.getDay() // 0=Sun
-  const diff = day === 0 ? -6 : 1 - day // adjust to Mon
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
   d.setDate(d.getDate() + diff)
   d.setHours(0, 0, 0, 0)
   return d
@@ -65,36 +69,33 @@ function addDays(date: Date, n: number): Date {
   return d
 }
 
-function fmtTime(iso: string): string {
+export function fmtTime(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
-// Activity pill color by type
 function pillClasses(a: CalendarActivity, compact = false) {
   const done = !!a.completed_at
   const base = compact ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-1'
   if (done) return cn(base, 'bg-muted text-muted-foreground line-through')
   if (a.type === 'callback') return cn(base, 'bg-blue-100 text-blue-800')
-  // follow_up — shade by priority
   if (a.priority === 'high')   return cn(base, 'bg-red-100 text-red-800')
   if (a.priority === 'low')    return cn(base, 'bg-emerald-100 text-emerald-800')
   return cn(base, 'bg-violet-100 text-violet-800')
 }
 
-function leadName(lead: Lead | null) {
+export function leadName(lead: Lead | null) {
   if (!lead) return ''
   return [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function ActivitiesCalendar({ activities, onActivityClick }: Props) {
+export function ActivitiesCalendar({ activities, onDayOpen, onActivityClick, selectedDay }: Props) {
   const [view, setView] = useState<ViewMode>('month')
   const [cursor, setCursor] = useState(() => {
     const d = new Date(); d.setHours(0,0,0,0); return d
   })
 
-  // Group activities by local date key
   const byDate = useMemo(() => {
     const map = new Map<string, CalendarActivity[]>()
     for (const a of activities) {
@@ -106,7 +107,6 @@ export function ActivitiesCalendar({ activities, onActivityClick }: Props) {
     return map
   }, [activities])
 
-  // ── Navigation ──
   function prev() {
     if (view === 'month') setCursor(d => { const n = new Date(d); n.setMonth(n.getMonth()-1); return n })
     else if (view === 'week') setCursor(d => addDays(d, -7))
@@ -119,7 +119,6 @@ export function ActivitiesCalendar({ activities, onActivityClick }: Props) {
   }
   function goToday() { const d = new Date(); d.setHours(0,0,0,0); setCursor(d) }
 
-  // ── Title ──
   const title = view === 'month'
     ? `${MONTH_NAMES[cursor.getMonth()]} ${cursor.getFullYear()}`
     : view === 'week'
@@ -134,8 +133,7 @@ export function ActivitiesCalendar({ activities, onActivityClick }: Props) {
 
   return (
     <div className="flex flex-col rounded-[24px] border border-border bg-card shadow-card overflow-hidden">
-
-      {/* ── Calendar header ── */}
+      {/* Calendar header */}
       <div className="flex items-center gap-3 border-b border-border px-5 py-3">
         <button
           onClick={goToday}
@@ -152,8 +150,6 @@ export function ActivitiesCalendar({ activities, onActivityClick }: Props) {
           </button>
         </div>
         <span className="text-[15px] font-bold tracking-[-0.02em]">{title}</span>
-
-        {/* View switcher */}
         <div className="ml-auto flex items-center rounded-full border border-border bg-background p-0.5 text-[13px] font-medium">
           {(['month','week','day'] as ViewMode[]).map((v) => (
             <button
@@ -170,39 +166,54 @@ export function ActivitiesCalendar({ activities, onActivityClick }: Props) {
         </div>
       </div>
 
-      {/* ── View body ── */}
-      {view === 'month' && <MonthView cursor={cursor} byDate={byDate} onDayClick={setCursor} onActivityClick={onActivityClick} />}
-      {view === 'week'  && <WeekView  cursor={cursor} byDate={byDate} onDayClick={setCursor} onActivityClick={onActivityClick} />}
-      {view === 'day'   && <DayView   cursor={cursor} byDate={byDate} onActivityClick={onActivityClick} />}
+      {/* View body */}
+      {view === 'month' && (
+        <MonthView
+          cursor={cursor}
+          byDate={byDate}
+          selectedDay={selectedDay ?? null}
+          onDayOpen={onDayOpen}
+        />
+      )}
+      {view === 'week' && (
+        <WeekView
+          cursor={cursor}
+          byDate={byDate}
+          selectedDay={selectedDay ?? null}
+          onDayOpen={onDayOpen}
+        />
+      )}
+      {view === 'day' && (
+        <DayView
+          cursor={cursor}
+          byDate={byDate}
+          onActivityClick={onActivityClick}
+        />
+      )}
     </div>
   )
 }
 
 // ── Month view ────────────────────────────────────────────────────────────────
 function MonthView({
-  cursor, byDate, onDayClick, onActivityClick,
+  cursor, byDate, selectedDay, onDayOpen,
 }: {
   cursor: Date
   byDate: Map<string, CalendarActivity[]>
-  onDayClick: (d: Date) => void
-  onActivityClick: (a: CalendarActivity) => void
+  selectedDay: Date | null
+  onDayOpen: (d: Date) => void
 }) {
-  const today = todayKey()
+  const today        = todayKey()
+  const selectedKey  = selectedDay ? toLocalDateKey(selectedDay) : null
 
-  // Build 6-week grid starting from Monday
   const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
   const gridStart    = startOfWeek(firstOfMonth)
-  const days: Date[] = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
-  const weeks: Date[][] = Array.from({ length: 6 }, (_, w) => days.slice(w*7, w*7+7))
-
-  // Drop trailing empty weeks
-  const trimmedWeeks = weeks.filter((week) =>
-    week.some((d) => d.getMonth() === cursor.getMonth())
-  )
+  const days         = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
+  const weeks        = Array.from({ length: 6 }, (_, w) => days.slice(w*7, w*7+7))
+  const trimmedWeeks = weeks.filter(week => week.some(d => d.getMonth() === cursor.getMonth()))
 
   return (
     <div className="flex-1 overflow-auto">
-      {/* Day-of-week header */}
       <div className="grid grid-cols-7 border-b border-border">
         {DAY_NAMES_SHORT.map((d) => (
           <div key={d} className="px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
@@ -210,49 +221,50 @@ function MonthView({
           </div>
         ))}
       </div>
-
-      {/* Weeks */}
       <div className="grid" style={{ gridTemplateRows: `repeat(${trimmedWeeks.length}, minmax(100px, 1fr))` }}>
         {trimmedWeeks.map((week, wi) => (
           <div key={wi} className="grid grid-cols-7">
             {week.map((day, di) => {
-              const key       = toLocalDateKey(day)
-              const isToday   = key === today
-              const isOther   = day.getMonth() !== cursor.getMonth()
-              const dayActs   = byDate.get(key) ?? []
-              const visible   = dayActs.slice(0, 2)
-              const overflow  = dayActs.length - visible.length
-              const isLast    = wi === trimmedWeeks.length - 1
+              const key        = toLocalDateKey(day)
+              const isToday    = key === today
+              const isSelected = key === selectedKey
+              const isOther    = day.getMonth() !== cursor.getMonth()
+              const dayActs    = byDate.get(key) ?? []
+              const visible    = dayActs.slice(0, 2)
+              const overflow   = dayActs.length - visible.length
+              const isLast     = wi === trimmedWeeks.length - 1
 
               return (
                 <div
                   key={di}
-                  onClick={() => onDayClick(day)}
+                  onClick={() => onDayOpen(day)}
                   className={cn(
-                    'relative flex flex-col gap-1 p-2 border-b border-r border-border cursor-pointer',
-                    'transition-colors hover:bg-secondary/40 min-h-[100px]',
-                    isOther && 'bg-muted/20',
-                    di === 6 && 'border-r-0',
-                    isLast  && 'border-b-0',
+                    'relative flex flex-col gap-1 p-2 border-b border-r border-border cursor-pointer min-h-[100px]',
+                    'transition-colors hover:bg-secondary/40',
+                    isOther    && 'bg-muted/20',
+                    isSelected && !isOther && 'bg-primary/5 ring-2 ring-inset ring-primary/20',
+                    di === 6   && 'border-r-0',
+                    isLast     && 'border-b-0',
                   )}
                 >
-                  {/* Date number */}
                   <div className="flex items-center">
                     <span className={cn(
                       'flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold leading-none',
-                      isToday  ? 'bg-foreground text-background' : '',
-                      isOther  ? 'text-muted-foreground/50' : 'text-foreground',
+                      isToday ? 'bg-foreground text-background' : isOther ? 'text-muted-foreground/50' : 'text-foreground',
                     )}>
                       {day.getDate()}
                     </span>
+                    {dayActs.length > 0 && (
+                      <span className="ml-1 text-[10px] font-semibold text-muted-foreground">
+                        {dayActs.length}
+                      </span>
+                    )}
                   </div>
-
-                  {/* Events */}
                   <div className="flex flex-col gap-0.5">
                     {visible.map((a) => (
                       <button
                         key={a.id}
-                        onClick={(e) => { e.stopPropagation(); onActivityClick(a) }}
+                        onClick={(e) => { e.stopPropagation(); onDayOpen(new Date(a.due_at)) }}
                         className={cn(
                           'flex w-full items-center gap-1 rounded-md truncate text-left leading-snug',
                           pillClasses(a, true),
@@ -277,34 +289,36 @@ function MonthView({
 }
 
 // ── Week view ─────────────────────────────────────────────────────────────────
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 7) // 7am – 8pm
+const HOURS = Array.from({ length: 14 }, (_, i) => i + 7)
 
 function WeekView({
-  cursor, byDate, onDayClick, onActivityClick,
+  cursor, byDate, selectedDay, onDayOpen,
 }: {
   cursor: Date
   byDate: Map<string, CalendarActivity[]>
-  onDayClick: (d: Date) => void
-  onActivityClick: (a: CalendarActivity) => void
+  selectedDay: Date | null
+  onDayOpen: (d: Date) => void
 }) {
-  const today  = todayKey()
-  const start  = startOfWeek(cursor)
-  const week   = Array.from({ length: 7 }, (_, i) => addDays(start, i))
+  const today       = todayKey()
+  const selectedKey = selectedDay ? toLocalDateKey(selectedDay) : null
+  const start       = startOfWeek(cursor)
+  const week        = Array.from({ length: 7 }, (_, i) => addDays(start, i))
 
   return (
     <div className="flex flex-1 flex-col overflow-auto">
-      {/* Day headers */}
       <div className="grid border-b border-border" style={{ gridTemplateColumns: '52px repeat(7, 1fr)' }}>
         <div className="border-r border-border" />
         {week.map((day, i) => {
-          const key     = toLocalDateKey(day)
-          const isToday = key === today
+          const key        = toLocalDateKey(day)
+          const isToday    = key === today
+          const isSelected = key === selectedKey
           return (
             <div
               key={i}
-              onClick={() => onDayClick(day)}
+              onClick={() => onDayOpen(day)}
               className={cn(
-                'flex flex-col items-center gap-0.5 py-2 cursor-pointer hover:bg-secondary/40 transition-colors',
+                'flex flex-col items-center gap-0.5 py-2 cursor-pointer transition-colors',
+                isSelected ? 'bg-primary/5' : 'hover:bg-secondary/40',
                 i < 6 && 'border-r border-border',
               )}
             >
@@ -321,8 +335,6 @@ function WeekView({
           )
         })}
       </div>
-
-      {/* Time grid */}
       <div className="flex flex-1 overflow-auto">
         <div className="flex flex-col shrink-0 w-[52px] border-r border-border">
           {HOURS.map((h) => (
@@ -338,18 +350,22 @@ function WeekView({
             const key  = toLocalDateKey(day)
             const acts = byDate.get(key) ?? []
             return (
-              <div key={di} className={cn('relative flex-1 border-b border-border', di < 6 && 'border-r border-border')}>
+              <div
+                key={di}
+                className={cn('relative flex-1 border-b border-border', di < 6 && 'border-r border-border')}
+                onClick={() => onDayOpen(day)}
+              >
                 {HOURS.map((h) => (
                   <div key={h} className="h-14 border-b border-border last:border-b-0" />
                 ))}
                 {acts.map((a) => {
                   const d    = new Date(a.due_at)
                   const hour = d.getHours() + d.getMinutes() / 60
-                  const top  = Math.max(0, (hour - 7)) * 56 // 56px per hour
+                  const top  = Math.max(0, (hour - 7)) * 56
                   return (
                     <button
                       key={a.id}
-                      onClick={() => onActivityClick(a)}
+                      onClick={(e) => { e.stopPropagation(); onDayOpen(new Date(a.due_at)) }}
                       style={{ top }}
                       className={cn(
                         'absolute left-1 right-1 rounded-lg px-1.5 py-1 text-left text-[10px] font-medium leading-tight cursor-pointer hover:shadow-sm transition-all',
@@ -373,7 +389,7 @@ function WeekView({
   )
 }
 
-// ── Day view ──────────────────────────────────────────────────────────────────
+// ── Day view (tab) ────────────────────────────────────────────────────────────
 function DayView({
   cursor, byDate, onActivityClick,
 }: {
@@ -386,7 +402,6 @@ function DayView({
 
   return (
     <div className="flex flex-1 flex-col overflow-auto">
-      {/* Date header */}
       <div className="border-b border-border px-5 py-3">
         <span className="text-[13px] font-semibold text-muted-foreground">
           {cursor.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -395,8 +410,6 @@ function DayView({
           {acts.length} {acts.length === 1 ? 'activity' : 'activities'}
         </span>
       </div>
-
-      {/* Time grid */}
       <div className="flex flex-1">
         <div className="flex flex-col shrink-0 w-[52px] border-r border-border">
           {HOURS.map((h) => (
@@ -407,7 +420,6 @@ function DayView({
             </div>
           ))}
         </div>
-
         <div className="relative flex-1">
           {HOURS.map((h) => (
             <div key={h} className="h-16 border-b border-border" />
@@ -438,7 +450,6 @@ function DayView({
               </button>
             )
           })}
-
           {acts.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center">
               <p className="text-sm text-muted-foreground">No activities scheduled</p>

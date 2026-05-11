@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { CalendarPicker, TimePicker, splitDateTime, joinDateTime, toLocalDatetimeInput } from '@/components/ui/calendar-picker'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
-import { ActivitiesCalendar } from './activities-calendar'
+import { ActivitiesCalendar, toLocalDateKey, fmtTime } from './activities-calendar'
 import type { TeamMember } from '@/components/leads/detail/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -90,6 +90,8 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
   const [showNew,         setShowNew]         = useState(false)
   const [saving,          setSaving]          = useState(false)
   const [pageView,        setPageView]        = useState<'list' | 'calendar'>('list')
+  const [calendarDay,     setCalendarDay]     = useState<Date | null>(null)
+  const [calendarLeadId,  setCalendarLeadId]  = useState<string | null>(null)
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   useEffect(() => {
@@ -241,7 +243,12 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
       {pageView === 'calendar' && (
         <ActivitiesCalendar
           activities={activities}
-          onActivityClick={(a) => setSelectedActivity(a)}
+          selectedDay={calendarDay}
+          onDayOpen={(d) => { setCalendarDay(d); setCalendarLeadId(null) }}
+          onActivityClick={(a) => {
+            // Day-tab direct click → open lead panel
+            if (a.lead) { setCalendarLeadId(a.lead.id); setCalendarDay(new Date(a.due_at)) }
+          }}
         />
       )}
 
@@ -431,7 +438,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
         </table>
       </div>
 
-      {/* Lead full panel — opened when clicking an activity row */}
+      {/* Lead full panel — opened when clicking an activity row (list view) */}
       {selectedActivity?.lead && (
         <>
           <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setSelectedActivity(null)} />
@@ -537,6 +544,111 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
       </Dialog>
 
       </>}</>
+
+      {/* ── Calendar day detail panel ── */}
+      {pageView === 'calendar' && calendarDay && (() => {
+        const dayKey  = toLocalDateKey(calendarDay)
+        const dayActs = activities.filter(a => toLocalDateKey(new Date(a.due_at)) === dayKey)
+        const dateLabel = calendarDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+        const panelW = 380
+        return (
+          <>
+            {/* Backdrop — closes day panel (and lead panel) */}
+            <div
+              className="fixed inset-0 z-40 bg-black/20"
+              onClick={() => { setCalendarDay(null); setCalendarLeadId(null) }}
+            />
+
+            {/* Day detail panel */}
+            <div
+              className="fixed top-0 right-0 z-50 flex h-full flex-col border-l border-border bg-card shadow-2xl"
+              style={{ width: panelW }}
+            >
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">Day view</p>
+                  <h3 className="mt-0.5 text-[15px] font-bold tracking-[-0.02em]">{dateLabel}</h3>
+                </div>
+                <button
+                  onClick={() => { setCalendarDay(null); setCalendarLeadId(null) }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+                {dayActs.length === 0 && (
+                  <p className="py-8 text-center text-sm text-muted-foreground">No activities on this day.</p>
+                )}
+                {dayActs.map((a) => {
+                  const done = !!a.completed_at
+                  const typeColor = a.type === 'callback'
+                    ? 'bg-blue-100 text-blue-800'
+                    : a.priority === 'high' ? 'bg-red-100 text-red-800'
+                    : a.priority === 'low'  ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-violet-100 text-violet-800'
+                  const isOpenLead = calendarLeadId === a.lead?.id
+                  return (
+                    <div
+                      key={a.id}
+                      className={cn(
+                        'rounded-2xl border border-border bg-background p-4 transition-colors',
+                        isOpenLead && 'border-foreground/20 ring-2 ring-foreground/10',
+                        done && 'opacity-60',
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[11px] font-semibold text-muted-foreground">{fmtTime(a.due_at)}</span>
+                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', typeColor)}>
+                          {a.type === 'callback' ? 'Call Back' : 'Follow-up'}
+                        </span>
+                        {done && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 ml-auto" />}
+                      </div>
+                      <p className={cn('text-[13px] font-semibold leading-snug', done && 'line-through text-muted-foreground')}>
+                        {a.title}
+                      </p>
+                      {a.notes && (
+                        <p className="mt-1 text-[12px] text-muted-foreground line-clamp-2">{a.notes}</p>
+                      )}
+                      {a.lead && (
+                        <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-semibold truncate">{leadName(a.lead)}</p>
+                            {a.lead.company && (
+                              <p className="text-[11px] text-muted-foreground truncate">{a.lead.company}</p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => setCalendarLeadId(a.lead!.id)}
+                            className="shrink-0 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold text-foreground hover:shadow-sm transition-all"
+                          >
+                            Open Lead →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Lead panel — opens to the LEFT of the day panel */}
+            {calendarLeadId && (
+              <LeadFullPanel
+                leadId={calendarLeadId}
+                teamMembers={panelTeamMembers}
+                isAdmin={isAdmin ?? false}
+                currentUserId={currentUserId}
+                canEditBatch={isAdmin ?? false}
+                onClose={() => setCalendarLeadId(null)}
+                onLeadChange={() => {}}
+                style={{ right: panelW, zIndex: 51 }}
+              />
+            )}
+          </>
+        )
+      })()}
     </div>
   )
 }
