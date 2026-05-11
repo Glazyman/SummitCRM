@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Search, Columns3, List,
-  MoreHorizontal, TrendingUp, Users, CheckCircle2, Activity,
-  DollarSign, Calendar, Phone,
+  MoreHorizontal, TrendingUp, DollarSign, Calendar, Phone,
+  BarChart3, Trophy, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -26,10 +26,19 @@ interface PipelineLead {
   pipeline_stage_id: string | null; assigned_to: string | null
   batch_id: string | null; created_at: string; updated_at: string
   last_contacted_at: string | null
+  /** Parsed revenue from questionnaire (0 if not filled) */
+  pipeline_value: number
 }
 interface Props {
   stages: PipelineStage[]; initialLeads: PipelineLead[]
   workspaceId: string; isAdmin: boolean; currentUserId: string
+}
+
+function fmtMoney(n: number): string {
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`
+  if (n >= 1_000_000)     return `$${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (n >= 1_000)         return `$${(n / 1_000).toFixed(0)}K`
+  return `$${n.toLocaleString()}`
 }
 
 function timeAgo(iso: string) {
@@ -116,11 +125,22 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
     }
   }
 
-  const totalLeads      = leads.length
-  const inPipeline      = leads.filter(l => l.pipeline_stage_id !== null).length
-  const contactedCount  = leads.filter(l => ['called','voicemail','no_answer','contacted','replied'].includes(l.status)).length
-  const interestedCount = leads.filter(l => l.interest_status === 'interested').length
-  const unassigned      = leadsByStage.get(null)?.length ?? 0
+  const totalLeads    = leads.filter(l => l.pipeline_stage_id !== null).length
+  const unassigned    = leadsByStage.get(null)?.length ?? 0
+
+  // Won stage IDs and lost stage IDs from stage metadata
+  const wonStageIds  = new Set(stages.filter(s => s.is_won).map(s => s.id))
+  const lostStageIds = new Set(stages.filter(s => s.is_lost).map(s => s.id))
+
+  const dealsWon        = leads.filter(l => l.pipeline_stage_id && wonStageIds.has(l.pipeline_stage_id)).length
+  const dealsInProgress = leads.filter(l => l.pipeline_stage_id && !wonStageIds.has(l.pipeline_stage_id) && !lostStageIds.has(l.pipeline_stage_id)).length
+
+  // Pipeline value = sum of questionnaire revenue for all in-pipeline leads
+  const pipelineValue = leads
+    .filter(l => l.pipeline_stage_id !== null)
+    .reduce((sum, l) => sum + (l.pipeline_value ?? 0), 0)
+
+  const pipelineValueHasData = pipelineValue > 0
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
@@ -133,31 +153,30 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             icon={<TrendingUp className="h-4 w-4" />}
-            label="Total Leads"
+            label="Total Deals"
             value={totalLeads.toLocaleString()}
-            sub={{ bold: `${stages.length} stages`, rest: 'in workspace' }}
+            sub={{ bold: `${stages.length} stages`, rest: `· ${unassigned} unassigned` }}
           />
           <StatCard
-            icon={<Activity className="h-4 w-4" />}
-            label="In Pipeline"
-            value={inPipeline.toLocaleString()}
-            sub={{ bold: `${unassigned}`, rest: 'unassigned' }}
-            deltaUp={inPipeline > 0}
+            icon={<DollarSign className="h-4 w-4" />}
+            label="Pipeline Value"
+            value={pipelineValueHasData ? fmtMoney(pipelineValue) : '—'}
+            sub={{ bold: pipelineValueHasData ? '' : 'Fill questionnaire', rest: pipelineValueHasData ? 'from questionnaire' : 'to track value' }}
+            accent={pipelineValueHasData}
           />
           <StatCard
-            icon={<Users className="h-4 w-4" />}
-            label="Contacted"
-            value={contactedCount.toLocaleString()}
-            sub={{ bold: `${totalLeads > 0 ? Math.round((contactedCount / totalLeads) * 100) : 0}%`, rest: 'of pipeline' }}
-            deltaUp={contactedCount > 0}
+            icon={<Trophy className="h-4 w-4" />}
+            label="Deals Won"
+            value={dealsWon.toLocaleString()}
+            sub={{ bold: wonStageIds.size > 0 ? stages.find(s => s.is_won)?.name ?? 'Won stage' : 'No won stage', rest: '' }}
+            deltaUp={dealsWon > 0}
           />
           <StatCard
-            icon={<CheckCircle2 className="h-4 w-4" />}
-            label="Interested"
-            value={interestedCount.toLocaleString()}
-            sub={{ bold: `${totalLeads > 0 ? Math.round((interestedCount / totalLeads) * 100) : 0}%`, rest: 'conversion rate' }}
-            deltaUp={interestedCount > 0}
-            accent
+            icon={<BarChart3 className="h-4 w-4" />}
+            label="Deals in Progress"
+            value={dealsInProgress.toLocaleString()}
+            sub={{ bold: `${totalLeads > 0 ? Math.round((dealsInProgress / Math.max(totalLeads,1)) * 100) : 0}%`, rest: 'of pipeline' }}
+            deltaUp={dealsInProgress > 0}
           />
         </div>
 
