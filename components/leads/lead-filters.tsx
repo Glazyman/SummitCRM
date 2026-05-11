@@ -1,9 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react'
+import { Search, X, SlidersHorizontal, ChevronDown, User, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { CalendarPicker } from '@/components/ui/calendar-picker'
 import { STATUS_CONFIG, ALL_STATUSES } from './status-config'
@@ -22,9 +21,6 @@ interface LeadFiltersProps {
   onClear:     () => void
 }
 
-/**
- * Collapsible filter panel: search, status chips, batch, assignee, date range, My Leads toggle.
- */
 export function LeadFiltersPanel({
   filters,
   batches,
@@ -46,15 +42,17 @@ export function LeadFiltersPanel({
     searchTimer.current = setTimeout(() => onChange({ search: v, page: 1 }), 300)
   }
 
-  // Track if any non-search filter is active
-  const hasActiveFilters =
-    filters.statuses.length > 0 ||
-    filters.batchId ||
-    filters.assignedTo ||
-    filters.myLeads ||
-    filters.coldOnly ||
-    filters.dateFrom ||
-    filters.dateTo
+  // Count active filters (for the badge)
+  const activeFilterCount = [
+    filters.statuses.length > 0,
+    !!filters.batchId,
+    !!filters.assignedTo,
+    filters.coldOnly,
+    !!filters.dateFrom || !!filters.dateTo,
+    filters.myLeads,
+  ].filter(Boolean).length
+
+  const hasActiveFilters = activeFilterCount > 0
 
   function toggleStatus(status: LeadStatus) {
     const next = filters.statuses.includes(status)
@@ -63,10 +61,49 @@ export function LeadFiltersPanel({
     onChange({ statuses: next, page: 1 })
   }
 
+  // Active filter chips (shown below the top bar when filters are on but panel is collapsed)
+  const activeChips: { label: string; onRemove: () => void }[] = []
+
+  if (filters.myLeads) {
+    activeChips.push({ label: 'My Leads', onRemove: () => onChange({ myLeads: false, page: 1 }) })
+  }
+  if (filters.statuses.length > 0) {
+    if (filters.statuses.length === 1) {
+      activeChips.push({
+        label: STATUS_CONFIG[filters.statuses[0]].label,
+        onRemove: () => onChange({ statuses: [], page: 1 }),
+      })
+    } else {
+      activeChips.push({
+        label: `${filters.statuses.length} statuses`,
+        onRemove: () => onChange({ statuses: [], page: 1 }),
+      })
+    }
+  }
+  if (filters.batchId) {
+    const name = batches.find((b) => b.id === filters.batchId)?.name ?? 'Batch'
+    activeChips.push({ label: name, onRemove: () => onChange({ batchId: null, page: 1 }) })
+  }
+  if (filters.assignedTo) {
+    const rep = teamMembers.find((m) => m.id === filters.assignedTo)?.name
+    const label = rep ?? (filters.assignedTo === 'unassigned' ? 'Unassigned' : 'Rep')
+    activeChips.push({ label, onRemove: () => onChange({ assignedTo: null, page: 1 }) })
+  }
+  if (filters.dateFrom || filters.dateTo) {
+    const from = filters.dateFrom ? shortDate(filters.dateFrom) : '…'
+    const to   = filters.dateTo   ? shortDate(filters.dateTo)   : '…'
+    activeChips.push({
+      label: filters.dateFrom && filters.dateTo ? `${from} → ${to}` : filters.dateFrom ? `From ${from}` : `To ${to}`,
+      onRemove: () => onChange({ dateFrom: '', dateTo: '', page: 1 }),
+    })
+  }
+
   return (
-    <div className="space-y-3">
-      {/* Top row: search + batch (for reps) + filter toggle */}
+    <div className="space-y-2">
+
+      {/* ── Top bar ── */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+
         {/* Search */}
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -77,26 +114,25 @@ export function LeadFiltersPanel({
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search name, email, or company…"
             className={cn(
-              'h-9 w-full rounded-lg border border-input bg-background pl-9 pr-4 text-sm',
-              'placeholder:text-muted-foreground',
-              'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0',
-              'transition-all duration-150'
+              'h-9 w-full rounded-lg border border-input bg-background pl-9 pr-9 text-sm',
+              'placeholder:text-muted-foreground transition-colors',
+              'focus:outline-none focus:ring-2 focus:ring-ring',
             )}
           />
           {localSearch && (
             <button
               type="button"
               onClick={() => { setLocalSearch(''); onChange({ search: '', page: 1 }); searchRef.current?.focus() }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
 
-        {/* Batch — upfront for reps (their primary organizer by industry) */}
+        {/* Rep batch (upfront for reps) */}
         {isRep && batches.length > 0 && (
-          <div className="sm:w-44">
+          <div className="w-full sm:w-40">
             <SelectMenu
               value={filters.batchId ?? ''}
               onChange={(v) => onChange({ batchId: v || null, page: 1 })}
@@ -104,100 +140,127 @@ export function LeadFiltersPanel({
               nullLabel="All batches"
               size="sm"
               options={batches.map((b) => ({ value: b.id, label: b.name }))}
-              className={cn(filters.batchId && 'border-primary/50 bg-primary/5 text-primary')}
             />
           </div>
         )}
 
-        <div className="flex items-center gap-2">
-          {/* My Leads toggle — hidden for reps (they only see their own leads) */}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {/* My Leads pill */}
           {!isRep && (
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-sm transition-colors hover:bg-muted">
-              <ToggleSwitch
-                checked={filters.myLeads}
-                onChange={(v) => onChange({ myLeads: v, page: 1 })}
-              />
-              <span className="font-medium">My Leads</span>
-            </label>
+            <button
+              type="button"
+              onClick={() => onChange({ myLeads: !filters.myLeads, page: 1 })}
+              className={cn(
+                'flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-all',
+                filters.myLeads
+                  ? 'border-primary/50 bg-primary/5 text-primary shadow-sm'
+                  : 'border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground',
+              )}
+            >
+              <User className="h-3.5 w-3.5" />
+              My Leads
+            </button>
           )}
 
-          {/* Expand filters */}
-          <Button
-            variant="outline"
-            size="sm"
+          {/* Filters toggle */}
+          <button
+            type="button"
             onClick={() => setExpanded(!expanded)}
             className={cn(
-              'gap-1.5',
-              hasActiveFilters && 'border-primary/50 bg-primary/5 text-primary hover:bg-primary/10'
+              'flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-all',
+              expanded || hasActiveFilters
+                ? 'border-primary/50 bg-primary/5 text-primary shadow-sm'
+                : 'border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground',
             )}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Filters
-            {hasActiveFilters && (
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                {[
-                  filters.statuses.length > 0,
-                  !!filters.batchId,
-                  !!filters.assignedTo,
-                  filters.coldOnly,
-                  !!filters.dateFrom || !!filters.dateTo,
-                ].filter(Boolean).length}
+            {activeFilterCount > 0 && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                {activeFilterCount}
               </span>
             )}
-            <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', expanded && 'rotate-180')} />
-          </Button>
+            <ChevronDown className={cn(
+              'h-3.5 w-3.5 transition-transform duration-150',
+              expanded && 'rotate-180',
+            )} />
+          </button>
 
+          {/* Clear — only when something is active */}
           {(hasActiveFilters || filters.search) && (
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
+              type="button"
               onClick={() => { setLocalSearch(''); onClear() }}
-              className="text-muted-foreground hover:text-foreground"
+              className="flex h-9 items-center gap-1 rounded-lg border border-border bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:border-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
               Clear
-            </Button>
+            </button>
           )}
         </div>
       </div>
 
-      {/* Expanded filter panel */}
+      {/* ── Active filter chips (when panel is collapsed) ── */}
+      {!expanded && activeChips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {activeChips.map((chip) => (
+            <span
+              key={chip.label}
+              className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 py-0.5 pl-2.5 pr-1.5 text-xs font-medium text-primary"
+            >
+              {chip.label}
+              <button
+                type="button"
+                onClick={chip.onRemove}
+                className="flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-primary/20 transition-colors"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ── Expanded filter panel ── */}
       {expanded && (
-        <div className="rounded-xl border border-border bg-muted/20 p-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
 
-            {/* Status multi-select */}
-            <div className="space-y-2 sm:col-span-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</label>
-              <div className="flex flex-wrap gap-1.5">
-                {ALL_STATUSES.map((status) => {
-                  const meta   = STATUS_CONFIG[status]
-                  const active = filters.statuses.includes(status)
-                  return (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => toggleStatus(status)}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
-                        'transition-all duration-100',
-                        active
-                          ? cn(meta.badge, 'shadow-sm')
-                          : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-                      )}
-                    >
-                      <span className={cn('h-1.5 w-1.5 rounded-full', active ? meta.dot : 'bg-current/40')} />
-                      {meta.label}
-                    </button>
-                  )
-                })}
-              </div>
+          {/* Status row */}
+          <div className="px-5 pt-4 pb-3">
+            <p className="mb-2.5 text-xs font-semibold text-muted-foreground">Status</p>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_STATUSES.map((status) => {
+                const meta   = STATUS_CONFIG[status]
+                const active = filters.statuses.includes(status)
+                return (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => toggleStatus(status)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all',
+                      active
+                        ? cn(meta.badge, 'shadow-sm scale-[1.02]')
+                        : 'border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', active ? meta.dot : 'bg-muted-foreground/40')} />
+                    {meta.label}
+                  </button>
+                )
+              })}
             </div>
+          </div>
 
-            {/* Batch — only in expanded panel for admins; reps have it upfront */}
+          {/* Divider */}
+          <div className="mx-5 border-t border-border" />
+
+          {/* Second row: batch / assigned / date range */}
+          <div className="grid grid-cols-1 gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4">
+
             {!isRep && (
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Batch</label>
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-muted-foreground">Batch</p>
                 <SelectMenu
                   value={filters.batchId ?? ''}
                   onChange={(v) => onChange({ batchId: v || null, page: 1 })}
@@ -209,10 +272,9 @@ export function LeadFiltersPanel({
               </div>
             )}
 
-            {/* Assigned to (admin/manager only) */}
             {isAdmin && (
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Assigned To</label>
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-muted-foreground">Assigned To</p>
                 <SelectMenu
                   value={filters.assignedTo ?? ''}
                   onChange={(v) => onChange({ assignedTo: v || null, page: 1 })}
@@ -228,22 +290,29 @@ export function LeadFiltersPanel({
               </div>
             )}
 
-            {/* Date range */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Created From</label>
-              <CalendarPicker
-                value={filters.dateFrom}
-                onChange={(v) => onChange({ dateFrom: v, page: 1 })}
-                className="h-9"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Created To</label>
-              <CalendarPicker
-                value={filters.dateTo}
-                onChange={(v) => onChange({ dateTo: v, page: 1 })}
-                className="h-9"
-              />
+            {/* Date range — side by side with arrow separator */}
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
+              <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                <CalendarDays className="h-3 w-3" />
+                Date range
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <CalendarPicker
+                    value={filters.dateFrom}
+                    onChange={(v) => onChange({ dateFrom: v, page: 1 })}
+                    className="h-9"
+                  />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground shrink-0">→</span>
+                <div className="flex-1">
+                  <CalendarPicker
+                    value={filters.dateTo}
+                    onChange={(v) => onChange({ dateTo: v, page: 1 })}
+                    className="h-9"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -252,27 +321,7 @@ export function LeadFiltersPanel({
   )
 }
 
-// ── Toggle switch ─────────────────────────────────────────────────────────
-function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full border-2 border-transparent',
-        'transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        checked ? 'bg-primary' : 'bg-input'
-      )}
-    >
-      <span
-        className={cn(
-          'pointer-events-none inline-block h-3 w-3 rounded-full bg-white shadow-sm',
-          'transition-transform duration-200',
-          checked ? 'translate-x-3' : 'translate-x-0'
-        )}
-      />
-    </button>
-  )
+// ── Helpers ────────────────────────────────────────────────────────────────
+function shortDate(iso: string): string {
+  return new Date(iso + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
