@@ -8,6 +8,7 @@ import {
   Clock, Search, Columns3, List,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import {
   INTEREST_CONFIG,
   STATUS_CONFIG,
@@ -131,47 +132,63 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
     <div className="flex flex-col h-full min-h-screen">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4 px-6 py-3 border-b border-border/70 glass-panel sticky top-0 z-10">
+      <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border bg-card sticky top-0 z-10">
         <div>
-          <h1 className="text-[15px] font-semibold tracking-tight">Sales Pipeline</h1>
-          <p className="text-[11px] text-muted-foreground/90">
+          <h1 className="text-base font-semibold tracking-tight">Sales Pipeline</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
             {totalLeads.toLocaleString()} leads · {stages.length} stages
-            {unassigned > 0 && <span className="text-amber-500 font-medium"> · {unassigned} unassigned</span>}
+            {unassigned > 0 && <span className="text-amber-500 font-medium"> · {unassigned.toLocaleString()} unassigned</span>}
           </p>
         </div>
+
         <div className="flex items-center gap-2">
+          {/* Search */}
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-            <input type="text" placeholder="Search leads…" value={search}
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search leads…"
+              value={search}
               onChange={e => setSearch(e.target.value)}
-            className="h-8 w-48 rounded-xl border border-border/80 bg-white/75 pl-8 pr-3 text-[13px] text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring transition-colors" />
+              className="h-9 w-52 rounded-lg border border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+            />
           </div>
-          <div className="flex rounded-xl border border-border/80 overflow-hidden bg-white/70">
+
+          {/* View toggle — segmented control */}
+          <div className="flex rounded-lg border border-border overflow-hidden">
             <button
               type="button"
               onClick={() => { setPipelineView('kanban'); try { localStorage.setItem('pipeline_view_mode', 'kanban') } catch {} }}
               className={cn(
-                'h-8 px-3 text-[12px] font-semibold flex items-center gap-1.5 transition-colors',
-                pipelineView === 'kanban' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                'flex h-9 items-center gap-1.5 px-3.5 text-sm font-medium transition-colors',
+                pipelineView === 'kanban'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
-              <Columns3 className="h-3.5 w-3.5" /> Kanban
+              <Columns3 className="h-4 w-4" /> Kanban
             </button>
+            <div className="w-px bg-border" />
             <button
               type="button"
               onClick={() => { setPipelineView('list'); try { localStorage.setItem('pipeline_view_mode', 'list') } catch {} }}
               className={cn(
-                'h-8 px-3 text-[12px] font-semibold flex items-center gap-1.5 transition-colors',
-                pipelineView === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                'flex h-9 items-center gap-1.5 px-3.5 text-sm font-medium transition-colors',
+                pipelineView === 'list'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
-              <List className="h-3.5 w-3.5" /> List
+              <List className="h-4 w-4" /> List
             </button>
           </div>
-          <Link href="/leads"
-            className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl bg-primary text-primary-foreground text-[13px] font-semibold hover:bg-primary/90 transition-colors shadow-primary-glow">
-            <Plus className="h-3.5 w-3.5" /> Add Lead
-          </Link>
+
+          {/* Add Lead */}
+          <Button asChild size="sm">
+            <Link href="/leads">
+              <Plus className="h-4 w-4" /> Add Lead
+            </Link>
+          </Button>
         </div>
       </div>
 
