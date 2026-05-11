@@ -127,14 +127,14 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
         type="button"
         onClick={toggleCollapsed}
         className={cn(
-          'absolute -right-2.5 top-6 z-30',
-          'flex h-5 w-5 items-center justify-center',
+          'absolute -right-3 top-[68px] z-30',
+          'flex h-6 w-6 items-center justify-center',
           'text-muted-foreground transition-colors hover:text-foreground'
         )}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
       </button>
 
       {/* Brand */}
