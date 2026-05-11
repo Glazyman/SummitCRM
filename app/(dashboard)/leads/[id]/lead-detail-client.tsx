@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Activity, Clock, Phone } from 'lucide-react'
+import { Activity, Clock, Phone, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LeadActionBar }    from '@/components/leads/detail/lead-action-bar'
 import { LeadProfileCard }  from '@/components/leads/detail/lead-profile-card'
@@ -10,17 +10,20 @@ import { ActivityTimeline } from '@/components/leads/detail/activity-timeline'
 import { NoteEditor }       from '@/components/leads/detail/note-editor'
 import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
 import { CallHistory }      from '@/components/leads/detail/call-history'
+import { Questionnaire }   from '@/components/leads/detail/questionnaire'
+import type { QuestionnaireData } from '@/components/leads/detail/questionnaire'
 import type {
-  LeadDetail, ActivityEntry, EmailHistoryItem,
+  LeadDetail, ActivityEntry,
   FollowUp, NewFollowUp, TeamMember, LeadStatus,
 } from '@/components/leads/detail/types'
 import type { CallLogItem, NewCall } from '@/components/leads/detail/call-history'
 
 // ── Tab config ────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'activity',  label: 'Activity',   Icon: Activity },
-  { id: 'followups', label: 'Follow-ups', Icon: Clock    },
-  { id: 'calls',     label: 'Calls',      Icon: Phone    },
+  { id: 'activity',      label: 'Activity',      Icon: Activity      },
+  { id: 'followups',     label: 'Follow-ups',    Icon: Clock         },
+  { id: 'calls',         label: 'Calls',         Icon: Phone         },
+  { id: 'questionnaire', label: 'Questionnaire', Icon: ClipboardList },
 ] as const
 
 type TabId = typeof TABS[number]['id']
@@ -37,7 +40,6 @@ function tomorrowAt11LocalIso() {
 interface LeadDetailClientProps {
   lead:          LeadDetail
   activity:      ActivityEntry[]
-  emails:        EmailHistoryItem[]
   followUps:     FollowUp[]
   calls:         CallLogItem[]
   teamMembers:   TeamMember[]
@@ -59,12 +61,30 @@ export default function LeadDetailClient({
   const router = useRouter()
 
   // ── State ──────────────────────────────────────────────────────────────
-  const [lead,      setLead]     = React.useState(initialLead)
-  const [activity,  setActivity] = React.useState(initialActivity)
-  const [followUps, setFollowUps]= React.useState(initialFollowUps)
-  const [calls,     setCalls]    = React.useState<CallLogItem[]>(initialCalls)
-  const [activeTab, setActiveTab]= React.useState<TabId>('activity')
-  const [followUpPrompt, setFollowUpPrompt] = React.useState<FollowUpSuggestion | null>(null)
+  const [lead,              setLead]              = React.useState(initialLead)
+  const [activity,          setActivity]          = React.useState(initialActivity)
+  const [followUps,         setFollowUps]         = React.useState(initialFollowUps)
+  const [calls,             setCalls]             = React.useState<CallLogItem[]>(initialCalls)
+  const [activeTab,         setActiveTab]         = React.useState<TabId>('activity')
+  const [followUpPrompt,    setFollowUpPrompt]    = React.useState<FollowUpSuggestion | null>(null)
+  const [questionnaireData, setQuestionnaireData] = React.useState<QuestionnaireData | null>(null)
+
+  // Load questionnaire on mount
+  React.useEffect(() => {
+    fetch(`/api/leads/${initialLead.id}/questionnaire`)
+      .then((r) => r.json())
+      .then((d) => { if (d.questionnaire) setQuestionnaireData(d.questionnaire) })
+      .catch(() => {})
+  }, [initialLead.id])
+
+  async function handleSaveQuestionnaire(qData: QuestionnaireData) {
+    await fetch(`/api/leads/${lead.id}/questionnaire`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(qData),
+    })
+    setQuestionnaireData(qData)
+  }
 
   // ── Lead mutations ───────────────────────────────────────────────────
   async function handleSaveProfile(patch: Partial<LeadDetail>) {
@@ -540,6 +560,19 @@ export default function LeadDetailClient({
                 calls={calls}
                 onLogCall={handleLogCall}
                 currentUserId={currentUserId}
+              />
+            </Section>
+
+            <Section
+              title="Questionnaire"
+              icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
+              visible={activeTab === 'questionnaire'}
+              alwaysVisible
+            >
+              <Questionnaire
+                leadId={lead.id}
+                data={questionnaireData}
+                onSave={handleSaveQuestionnaire}
               />
             </Section>
           </div>

@@ -184,7 +184,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
       <LeadDetailClient
         lead={lead}
         activity={[...activity, ...notes].sort((a, b) => b.created_at.localeCompare(a.created_at))}
-        emails={emails}
+
         followUps={followUps}
         calls={calls}
         teamMembers={teamMembers}

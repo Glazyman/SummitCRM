@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Activity, Clock, Phone, X, ExternalLink, ChevronDown, CheckCircle2 } from 'lucide-react'
+import { Activity, Clock, Phone, X, ExternalLink, ChevronDown, CheckCircle2, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,6 +15,8 @@ import { ActivityTimeline } from '@/components/leads/detail/activity-timeline'
 import { NoteEditor }       from '@/components/leads/detail/note-editor'
 import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
 import { CallHistory }      from '@/components/leads/detail/call-history'
+import { Questionnaire }   from '@/components/leads/detail/questionnaire'
+import type { QuestionnaireData } from '@/components/leads/detail/questionnaire'
 import type {
   LeadDetail, ActivityEntry,
   FollowUp, NewFollowUp, TeamMember, LeadStatus,
@@ -24,9 +26,10 @@ import type { InterestStatus } from '@/types/database'
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'activity',  label: 'Activity',   Icon: Activity },
-  { id: 'followups', label: 'Follow-ups', Icon: Clock    },
-  { id: 'calls',     label: 'Calls',      Icon: Phone    },
+  { id: 'activity',      label: 'Activity',      Icon: Activity      },
+  { id: 'followups',     label: 'Follow-ups',    Icon: Clock         },
+  { id: 'calls',         label: 'Calls',         Icon: Phone         },
+  { id: 'questionnaire', label: 'Questionnaire', Icon: ClipboardList },
 ] as const
 
 type TabId = typeof TABS[number]['id']
@@ -72,25 +75,41 @@ export function LeadFullPanel({
   activityDone,
   onMarkActivityDone,
 }: LeadFullPanelProps) {
-  const [data,      setData]      = React.useState<PanelData | null>(null)
-  const [loading,   setLoading]   = React.useState(true)
-  const [activeTab, setActiveTab] = React.useState<TabId>('activity')
-  const [followUpPrompt, setFollowUpPrompt] = React.useState<{ title: string; notes: string | null; due_at: string } | null>(null)
+  const [data,             setData]             = React.useState<PanelData | null>(null)
+  const [loading,          setLoading]          = React.useState(true)
+  const [activeTab,        setActiveTab]        = React.useState<TabId>('activity')
+  const [followUpPrompt,   setFollowUpPrompt]   = React.useState<{ title: string; notes: string | null; due_at: string } | null>(null)
+  const [questionnaireData, setQuestionnaireData] = React.useState<QuestionnaireData | null>(null)
 
   React.useEffect(() => {
     let cancelled = false
     setLoading(true)
     setData(null)
-    fetch(`/api/leads/${leadId}/full`)
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setData(d) })
-      .catch(console.error)
-      .finally(() => { if (!cancelled) setLoading(false) })
+    Promise.all([
+      fetch(`/api/leads/${leadId}/full`).then((r) => r.json()),
+      fetch(`/api/leads/${leadId}/questionnaire`).then((r) => r.json()).catch(() => ({ questionnaire: null })),
+    ]).then(([leadData, qData]) => {
+      if (!cancelled) {
+        setData(leadData)
+        setQuestionnaireData(qData.questionnaire ?? null)
+      }
+    }).catch(console.error)
+    .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [leadId])
 
   // Use team members from API (includes names), fall back to parent list
   const teamMembers = data ? (data as unknown as { teamMembers?: TeamMember[] }).teamMembers ?? parentTeamMembers : parentTeamMembers
+
+  // ── Questionnaire save ────────────────────────────────────────────────
+  async function handleSaveQuestionnaire(qData: QuestionnaireData) {
+    await fetch(`/api/leads/${leadId}/questionnaire`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(qData),
+    })
+    setQuestionnaireData(qData)
+  }
 
   // ── Profile mutations ─────────────────────────────────────────────────
   async function handleSaveProfile(patch: Partial<LeadDetail>) {
@@ -474,6 +493,13 @@ export function LeadFullPanel({
                   calls={data.calls}
                   onLogCall={handleLogCall}
                   currentUserId={currentUserId}
+                />
+              )}
+              {activeTab === 'questionnaire' && (
+                <Questionnaire
+                  leadId={leadId}
+                  data={questionnaireData}
+                  onSave={handleSaveQuestionnaire}
                 />
               )}
             </div>
