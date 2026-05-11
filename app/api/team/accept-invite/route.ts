@@ -38,12 +38,21 @@ export async function POST(req: NextRequest) {
   let userId: string
 
   if (existingUser) {
-    // Always update password and name — this handles re-invited users whose
-    // auth account wasn't fully deleted (e.g. silent delete failure)
-    await admin.auth.admin.updateUserById(existingUser.id, {
-      password,
-      user_metadata: { full_name },
-    })
+    // Only update password if the account was never confirmed (incomplete signup).
+    // If they already have a confirmed account, just update their name and re-add
+    // them to the workspace — never reset the password of an active user.
+    const isConfirmed = !!(existingUser as any).email_confirmed_at
+    if (!isConfirmed) {
+      await admin.auth.admin.updateUserById(existingUser.id, {
+        password,
+        email_confirm: true,
+        user_metadata: { full_name },
+      })
+    } else {
+      await admin.auth.admin.updateUserById(existingUser.id, {
+        user_metadata: { full_name },
+      })
+    }
     userId = existingUser.id
   } else {
     // Create new user account

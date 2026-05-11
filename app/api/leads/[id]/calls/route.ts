@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
-function tomorrowAt(hour: number, minute: number) {
+const DEFAULT_FOLLOWUP_HOUR = 11 // 11 AM — change this to adjust follow-up time
+
+function tomorrowAt(hour: number) {
   const d = new Date()
   d.setDate(d.getDate() + 1)
-  d.setHours(hour, minute, 0, 0)
+  d.setHours(hour, 0, 0, 0)
   return d.toISOString()
 }
 
 // GET /api/leads/[id]/calls — list call logs for a lead
+// Reps only see calls for leads assigned to them; admins see all
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -18,7 +22,33 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
+  const admin = createAdminClient() as any
+  const { data: member } = await admin
+    .from('workspace_members')
+    .select('workspace_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+
+  // Verify the lead belongs to this workspace
+  const leadQuery = admin
+    .from('leads')
+    .select('id, assigned_to, workspace_id')
+    .eq('id', leadId)
+    .eq('workspace_id', member.workspace_id)
+    .single()
+
+  const { data: lead, error: leadErr } = await leadQuery
+  if (leadErr || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+
+  // Reps can only see calls for leads assigned to them
+  if (member.role === 'rep' && lead.assigned_to !== user.id) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+  }
+
+  const { data, error } = await admin
     .from('call_logs')
     .select('*')
     .eq('lead_id', leadId)
@@ -43,16 +73,31 @@ export async function POST(
 
   if (!outcome) return NextResponse.json({ error: 'outcome is required' }, { status: 400 })
 
-  // Get workspace_id from lead
-  const { data: lead, error: leadErr } = await supabase
+  const admin = createAdminClient() as any
+  const { data: member } = await admin
+    .from('workspace_members')
+    .select('workspace_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .single()
+
+  if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+
+  // Verify lead belongs to workspace; reps can only log calls for their own leads
+  const { data: lead, error: leadErr } = await admin
     .from('leads')
-    .select('workspace_id')
+    .select('id, workspace_id, assigned_to')
     .eq('id', leadId)
+    .eq('workspace_id', member.workspace_id)
     .single()
 
   if (leadErr || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
-  const { data: call, error } = await supabase
+  if (member.role === 'rep' && lead.assigned_to !== user.id) {
+    return NextResponse.json({ error: 'You can only log calls for your own leads' }, { status: 403 })
+  }
+
+  const { data: call, error } = await admin
     .from('call_logs')
     .insert({
       lead_id:      leadId,
@@ -61,6 +106,7 @@ export async function POST(
       outcome,
       duration_sec: duration_sec ?? null,
       notes:        notes ?? null,
+      called_at:    new Date().toISOString(),
     })
     .select()
     .single()
@@ -68,7 +114,7 @@ export async function POST(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Log activity
-  await supabase.from('activity_logs').insert({
+  await admin.from('activity_logs').insert({
     workspace_id: lead.workspace_id,
     lead_id:      leadId,
     user_id:      user.id,
@@ -81,11 +127,11 @@ export async function POST(
 
   const followUpSuggestion = (outcome === 'voicemail' || outcome === 'no_answer')
     ? {
-        title: outcome === 'voicemail' ? 'Follow up after voicemail' : 'Follow up after no answer',
-        notes: outcome === 'voicemail'
+        title:  outcome === 'voicemail' ? 'Follow up after voicemail' : 'Follow up after no answer',
+        notes:  outcome === 'voicemail'
           ? 'Left voicemail. Try again tomorrow morning.'
           : 'No answer. Retry tomorrow morning.',
-        due_at: tomorrowAt(11, 0),
+        due_at: tomorrowAt(DEFAULT_FOLLOWUP_HOUR),
       }
     : null
 

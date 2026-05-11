@@ -14,26 +14,29 @@ const STATUS_TO_CALL_OUTCOME: Partial<Record<LeadStatus, CallOutcome>> = {
   sold_already: 'answered',
 }
 
+// Default follow-up time for auto-suggestions — change this number to adjust (24-hour format)
+const DEFAULT_FOLLOWUP_HOUR = 11 // 11 AM
+
 function followUpSuggestionForStatus(status: LeadStatus) {
   if (status === 'voicemail') {
     const d = new Date()
     d.setDate(d.getDate() + 1)
-    d.setHours(10, 0, 0, 0)
-      return {
-        title: 'Follow up after voicemail',
-        notes: 'Left voicemail. Try again tomorrow morning.',
-        due_at: (() => { d.setHours(11, 0, 0, 0); return d.toISOString() })(),
-      }
+    d.setHours(DEFAULT_FOLLOWUP_HOUR, 0, 0, 0)
+    return {
+      title:  'Follow up after voicemail',
+      notes:  'Left voicemail. Try again tomorrow morning.',
+      due_at: d.toISOString(),
+    }
   }
   if (status === 'no_answer') {
     const d = new Date()
     d.setDate(d.getDate() + 1)
-    d.setHours(10, 0, 0, 0)
-      return {
-        title: 'Follow up after no answer',
-        notes: 'No answer. Retry tomorrow morning.',
-        due_at: (() => { d.setHours(11, 0, 0, 0); return d.toISOString() })(),
-      }
+    d.setHours(DEFAULT_FOLLOWUP_HOUR, 0, 0, 0)
+    return {
+      title:  'Follow up after no answer',
+      notes:  'No answer. Retry tomorrow morning.',
+      due_at: d.toISOString(),
+    }
   }
   return null
 }
