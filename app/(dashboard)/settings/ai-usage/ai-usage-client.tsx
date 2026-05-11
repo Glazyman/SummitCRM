@@ -65,7 +65,7 @@ export function AiUsageClient() {
       {/* Stat cards */}
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Month to date"    value={loading ? '…' : fmtUsd(data?.month_total_usd ?? 0)} sub="USD" />
-        <Stat label="Calls this month" value={loading ? '…' : fmtInt(data?.month_total_calls ?? 0)} sub="snapshot emails" />
+        <Stat label="Total emails sent" value={loading ? '…' : fmtInt(data?.month_total_calls ?? 0)} sub="this month" />
         <Stat label="Avg per email"    value={loading ? '…' : fmtUsd(avgCost)} sub="USD" />
       </div>
 
