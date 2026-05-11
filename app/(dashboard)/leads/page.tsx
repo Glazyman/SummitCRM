@@ -100,7 +100,7 @@ export default async function LeadsPage() {
         custom_fields: Record<string, string> | null
         created_at: string
         updated_at: string
-      }>
+      }>)
 
       const leadIds = rawLeads.map((l) => l.id)
       const { data: callLogsRaw } = leadIds.length > 0
