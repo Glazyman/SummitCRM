@@ -52,12 +52,16 @@ export default async function PipelinePage() {
     .rpc('get_workspace_leads_json', { p_workspace_id: member.workspace_id })
 
   const excluded = new Set(['do_not_contact', 'unsubscribed'])
+  const isAdminRole = ['admin', 'super_admin'].includes(member.role)
   const rawLeads = ((allLeadsJson ?? []) as Array<{
     id: string; first_name: string | null; last_name: string | null;
     email: string; company: string | null; title: string | null; phone: string | null;
     status: string; interest_status: string; pipeline_stage_id: string | null;
     assigned_to: string | null; batch_id: string | null; created_at: string; updated_at: string
-  }>).filter((l) => !excluded.has(l.status))
+  }>)
+    .filter((l) => !excluded.has(l.status))
+    // Non-admins only see deals assigned to them. Admins see all.
+    .filter((l) => isAdminRole || l.assigned_to === user.id)
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 
   const leadIds = rawLeads.map((l) => l.id)
@@ -99,7 +103,7 @@ export default async function PipelinePage() {
     pipeline_value:    revenueMap.get(lead.id) ?? 0,
   }))
 
-  const isAdmin = ['admin', 'super_admin'].includes(member.role)
+  const isAdmin = isAdminRole
 
   const defaultStages = stages.length === 0 ? [
     { id: 'new-lead',    workspace_id: member.workspace_id, name: 'New Lead',      color: '#6366f1', position: 0, is_won: false, is_lost: false, created_at: '', updated_at: '' },
