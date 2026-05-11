@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { getUsersById } from '@/lib/users-cache'
 
 function periodRange(period: string) {
   const now   = new Date()
@@ -52,9 +53,8 @@ export async function GET(req: NextRequest) {
     const wsId   = member.workspace_id
 
     // Fetch everything in parallel
-    const [membersRes, usersRes, callsRes, followUpsRes, leadsRes, statusActivitiesRes] = await Promise.all([
+    const [membersRes, callsRes, followUpsRes, leadsRes, statusActivitiesRes] = await Promise.all([
       admin.from('workspace_members').select('user_id, role').eq('workspace_id', wsId).eq('is_active', true),
-      admin.auth.admin.listUsers(),
       admin.from('call_logs')
         .select('logged_by, outcome, called_at')
         .eq('workspace_id', wsId)
@@ -73,7 +73,8 @@ export async function GET(req: NextRequest) {
     ])
 
     const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
-    const allUsers  = usersRes.data?.users ?? []
+    const memberIds = members.map((m) => m.user_id)
+    const nameById  = await getUsersById(admin, memberIds)
     const calls     = (callsRes.data ?? []) as Array<{ logged_by: string; outcome: string; called_at: string }>
     const statusActivities = (statusActivitiesRes.data ?? []) as Array<{ user_id: string; metadata: Record<string, unknown> | null }>
     const followUps = (followUpsRes.data ?? []) as Array<{ assigned_to: string | null; completed_at: string | null; due_at: string }>
@@ -82,11 +83,6 @@ export async function GET(req: NextRequest) {
     const leads = leadCounts.flatMap(r => Array.from({ length: Number(r.cnt) }, () => ({ assigned_to: r.assigned_to, status: r.status })))
 
     const now = new Date()
-
-    // Build user name map
-    const nameById = new Map(
-      allUsers.map(u => [u.id, (u.user_metadata?.full_name as string | undefined) ?? u.email ?? u.id])
-    )
 
     const statusToOutcome = new Map<string, string>([
       ['called', 'answered'],

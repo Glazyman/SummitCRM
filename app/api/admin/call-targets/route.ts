@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { getUsersByIdsFull } from '@/lib/users-cache'
 
 const DEFAULT_DAILY_TARGET = 100
 const OVERRIDES_KEY = 'rep_daily_call_targets'
@@ -69,9 +70,10 @@ export async function GET() {
       if (Number.isFinite(parsed) && parsed > 0) overrideByUser.set(userId, Math.floor(parsed))
     }
 
-    const { data: usersData } = await admin.auth.admin.listUsers()
+    const memberIds = members.map((m) => m.user_id)
+    const users = await getUsersByIdsFull(admin, memberIds)
     const usersById = new Map(
-      (usersData.users ?? []).map((u) => [
+      users.map((u) => [
         u.id,
         {
           email: u.email ?? null,

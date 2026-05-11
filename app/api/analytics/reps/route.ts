@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { cookies }      from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { getUsersByIdsFull } from '@/lib/users-cache'
 
 export async function GET(req: Request) {
   try {
@@ -29,9 +30,8 @@ export async function GET(req: Request) {
     const end   = searchParams.get('end')   ?? now.toISOString()
     const wsId  = member.workspace_id
 
-    const [membersRes, usersRes, callsRes, followUpsRes, leadsRes] = await Promise.all([
+    const [membersRes, callsRes, followUpsRes, leadsRes] = await Promise.all([
       admin.from('workspace_members').select('user_id, role').eq('workspace_id', wsId).eq('is_active', true),
-      admin.auth.admin.listUsers(),
       admin.from('call_logs').select('logged_by, outcome').eq('workspace_id', wsId).gte('called_at', start).lte('called_at', end),
       admin.from('follow_ups').select('assigned_to, completed_at, due_at').eq('workspace_id', wsId),
       // RPC aggregate — bypasses PostgREST row limit
@@ -39,7 +39,8 @@ export async function GET(req: Request) {
     ])
 
     const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
-    const allUsers  = usersRes.data?.users ?? []
+    const memberIds = members.map((m) => m.user_id)
+    const memberUsers = await getUsersByIdsFull(admin, memberIds)
     const calls     = (callsRes.data ?? []) as Array<{ logged_by: string; outcome: string }>
     const followUps = (followUpsRes.data ?? []) as Array<{ assigned_to: string | null; completed_at: string | null; due_at: string }>
     // RPC returns [{assigned_to, status, cnt}] — expand into flat rows for existing logic
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
     const leads = leadCounts.flatMap(r => Array.from({ length: Number(r.cnt) }, () => ({ assigned_to: r.assigned_to, status: r.status })))
 
     const nameById = new Map(
-      allUsers.map(u => [u.id, { name: (u.user_metadata?.full_name as string | undefined) ?? null, email: u.email ?? '' }])
+      memberUsers.map(u => [u.id, { name: (u.user_metadata?.full_name as string | undefined) ?? null, email: u.email ?? '' }])
     )
 
     const nowDate    = new Date()

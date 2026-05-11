@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { getUsersById } from '@/lib/users-cache'
 import type { UsageRow, UsageSummary, AiModel } from '@/lib/ai'
 
 export async function GET(_req: Request) {
@@ -16,9 +17,9 @@ export async function GET(_req: Request) {
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const admin = createAdminClient() as unknown as {
+    const adminRaw = createAdminClient()
+    const admin = adminRaw as unknown as {
       from: (t: string) => any  // eslint-disable-line @typescript-eslint/no-explicit-any
-      auth: { admin: { listUsers: () => Promise<{ data: { users: Array<{ id: string; email?: string | null; user_metadata?: { full_name?: string } }> } }> } }
     }
 
     const { data: member } = await admin
@@ -37,7 +38,7 @@ export async function GET(_req: Request) {
     monthStart.setUTCHours(0, 0, 0, 0)
 
     // Month aggregate + recent rows in parallel.
-    const [aggRes, recentRes, usersRes] = await Promise.all([
+    const [aggRes, recentRes] = await Promise.all([
       admin
         .from('ai_usage_logs')
         .select('total_tokens, cost_usd')
@@ -49,7 +50,6 @@ export async function GET(_req: Request) {
         .eq('workspace_id', member.workspace_id)
         .order('created_at', { ascending: false })
         .limit(50),
-      admin.auth.admin.listUsers(),
     ])
 
     const aggRows = (aggRes.data ?? []) as Array<{ total_tokens: number; cost_usd: number }>
@@ -62,19 +62,16 @@ export async function GET(_req: Request) {
       { tokens: 0, usd: 0 },
     )
 
-    const usersById = new Map(
-      (usersRes.data?.users ?? []).map((u) => [
-        u.id,
-        (u.user_metadata?.full_name ?? u.email ?? u.id) as string,
-      ]),
-    )
-
     type RawRow = {
       id: string; created_at: string; user_id: string; lead_id: string | null
       model: AiModel; prompt_tokens: number; completion_tokens: number
       total_tokens: number; cost_usd: number
     }
     const recentRaw = (recentRes.data ?? []) as RawRow[]
+
+    // Resolve only the user IDs that appear in the recent rows (cached, no full scan).
+    const userIds   = Array.from(new Set(recentRaw.map((r) => r.user_id).filter(Boolean)))
+    const usersById = await getUsersById(adminRaw, userIds)
 
     // Resolve lead company names in one query.
     const leadIds = Array.from(new Set(recentRaw.map((r) => r.lead_id).filter((id): id is string => Boolean(id))))

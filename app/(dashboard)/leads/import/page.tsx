@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getUsersById } from '@/lib/users-cache'
 import { ImportPageClient } from './import-page-client'
 
 export const metadata: Metadata = { title: 'Import Leads' }
@@ -45,12 +46,7 @@ export default async function ImportPage() {
   ])
 
   const memberIds = (membersResult.data ?? []).map((m: { user_id: string }) => m.user_id)
-  const { data: usersData } = await adminClient.auth.admin.listUsers()
-  const usersById = new Map(
-    (usersData?.users ?? [])
-      .filter(u => memberIds.includes(u.id))
-      .map(u => [u.id, (u.user_metadata?.full_name as string | undefined) ?? u.email ?? u.id])
-  )
+  const usersById = await getUsersById(adminClient, memberIds)
 
   const teamMembers = memberIds.map(id => ({ id, name: usersById.get(id) ?? id }))
 

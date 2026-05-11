@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { findUserByEmail } from '@/lib/users-cache'
 import type { WorkspaceRole } from '@/types/database'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -65,10 +66,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Check if already an active member
-  const { data: existingUsers } = await admin.auth.admin.listUsers()
-  const existingUser = (existingUsers?.users as Array<{ id: string; email?: string }>)?.find(
-    (u) => u.email?.toLowerCase() === email.toLowerCase()
-  )
+  const existingUser = await findUserByEmail(admin, email)
 
   if (existingUser) {
     const { data: existingMember } = await admin

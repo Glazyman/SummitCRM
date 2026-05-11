@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { findUserByEmail, invalidateUsersCache } from '@/lib/users-cache'
 
 // POST /api/team/accept-invite — accept invite, create account, join workspace
 export async function POST(req: NextRequest) {
@@ -30,10 +31,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Check if user with this email already exists
-  const { data: usersData } = await admin.auth.admin.listUsers()
-  const existingUser = (usersData?.users as Array<{ id: string; email?: string; user_metadata?: Record<string, unknown> }> | undefined)?.find(
-    (u) => u.email?.toLowerCase() === invitation.email.toLowerCase()
-  )
+  const existingUser = await findUserByEmail(admin, invitation.email) as
+    | { id: string; email?: string; user_metadata?: Record<string, unknown>; email_confirmed_at?: string }
+    | null
 
   let userId: string
 
@@ -66,6 +66,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: createErr?.message ?? 'Failed to create account' }, { status: 500 })
     }
     userId = newUser.user.id
+    // New user → bust the cache so subsequent /leads etc. see them.
+    invalidateUsersCache()
   }
 
   // Upsert workspace membership

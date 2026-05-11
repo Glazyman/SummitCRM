@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getUsersById } from '@/lib/users-cache'
 import { ActivitiesClient } from './activities-client'
 
 export const metadata: Metadata = { title: 'Activities' }
@@ -43,11 +44,8 @@ export default async function ActivitiesPage() {
       activities = activitiesResult.data ?? []
 
       const memberIds = ((membersResult.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
-      const { data: usersData } = await admin.auth.admin.listUsers()
-      teamMembers = memberIds.map((id) => {
-        const u = usersData.users.find((u) => u.id === id)
-        return { id, name: (u?.user_metadata?.full_name as string | undefined) ?? u?.email ?? id }
-      })
+      const usersById = await getUsersById(admin, memberIds)
+      teamMembers = memberIds.map((id) => ({ id, name: usersById.get(id) ?? id }))
     }
   }
 
