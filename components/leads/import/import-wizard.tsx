@@ -96,8 +96,18 @@ export function ImportWizard({ batches: initialBatches, teamMembers, onImport }:
   function canProceed(): boolean {
     if (step === 'upload') return !!file
     if (step === 'mapping') return true
-    if (step === 'options') return true
+    if (step === 'options') {
+      // Must either type a new batch name OR select an existing batch
+      const hasBatch = (options.batchId !== null) || (options.newBatchName.trim().length > 0)
+      return hasBatch
+    }
     return false
+  }
+
+  function batchMissing(): boolean {
+    return step === 'options' &&
+      options.batchId === null &&
+      options.newBatchName.trim().length === 0
   }
 
   // ── Render step content ──────────────────────────────────────────────────
@@ -191,7 +201,12 @@ export function ImportWizard({ batches: initialBatches, teamMembers, onImport }:
             </Button>
 
             <div className="flex items-center gap-3">
-                <Button
+              {batchMissing() && (
+                <p className="text-sm text-destructive">
+                  A batch name is required before importing.
+                </p>
+              )}
+              <Button
                 type="button"
                 onClick={goNext}
                 disabled={!canProceed()}

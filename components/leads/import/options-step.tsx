@@ -88,7 +88,6 @@ export function OptionsStep({ file, mapping, options, batches, teamMembers, onCh
               />
               <p className="text-xs text-muted-foreground">
                 A new batch with this name will be created when the import runs.
-                Leave blank to auto-name by date.
               </p>
             </div>
           ) : (
