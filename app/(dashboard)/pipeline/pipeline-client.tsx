@@ -8,8 +8,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { STATUS_CONFIG } from '@/components/leads/status-config'
+import { STATUS_CONFIG, INTEREST_CONFIG } from '@/components/leads/status-config'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
+import type { InterestStatus } from '@/types/database'
 import type { LeadStatus } from '@/components/leads/types'
 
 interface PipelineStage {
@@ -182,76 +183,67 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
 
       {/* ── Views ── */}
       {pipelineView === 'kanban' ? (
-      <div className="flex-1 overflow-x-auto">
-        <div className="flex gap-3 px-6 py-5 min-h-full items-start"
-          style={{ minWidth: `${stages.length * 268 + 96}px` }}>
+      <div className="flex-1 overflow-x-auto bg-secondary/40">
+        <div className="flex gap-4 px-6 py-6 min-h-full items-start"
+          style={{ minWidth: `${stages.length * 304 + 96}px` }}>
 
           {stages.map(stage => {
             const stageLeads = leadsByStage.get(stage.id) ?? []
             const isOver     = dragOverStage === stage.id
 
             return (
-              <div
-                key={stage.id}
-                className={cn(
-                  'flex flex-col w-64 shrink-0 rounded-xl border border-border bg-card overflow-hidden transition-colors',
-                  isOver && 'ring-2 ring-primary/30 ring-offset-1',
-                )}
-                onDragOver={e => handleDragOver(e, stage.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={e => handleDrop(e, stage.id)}
-              >
-                {/* Top color strip */}
-                <div className="h-[3px] w-full shrink-0" style={{ backgroundColor: stage.color }} />
+              <div key={stage.id} className="flex flex-col w-72 shrink-0">
 
-                {/* Header */}
-                <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-border">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-semibold truncate">{stage.name}</span>
-                    {stage.is_won  && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-emerald-500 text-white shrink-0">WON</span>}
-                    {stage.is_lost && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-red-500 text-white shrink-0">LOST</span>}
-                  </div>
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-muted px-1 text-[11px] font-bold text-muted-foreground tabular-nums shrink-0">
+                {/* ── Column header ── */}
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+                  <span className="text-sm font-semibold truncate">{stage.name}</span>
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-secondary border border-border px-1.5 text-[11px] font-bold text-muted-foreground tabular-nums">
                     {stageLeads.length}
                   </span>
+                  {stage.is_won  && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500 text-white shrink-0">WON</span>}
+                  {stage.is_lost && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-red-500 text-white shrink-0">LOST</span>}
                 </div>
 
-                {/* Lead rows */}
-                <div className={cn(
-                  'flex-1 overflow-y-auto max-h-[calc(100vh-220px)]',
-                  isOver && 'bg-primary/5',
-                )}>
+                {/* ── Cards area ── */}
+                <div
+                  className={cn(
+                    'flex-1 rounded-2xl p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-218px)] transition-colors',
+                    isOver
+                      ? 'bg-primary/8 ring-2 ring-primary/25 ring-inset'
+                      : 'bg-secondary/60',
+                  )}
+                  onDragOver={e => handleDragOver(e, stage.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={e => handleDrop(e, stage.id)}
+                >
                   {stageLeads.length === 0 ? (
                     <div className={cn(
-                      'flex items-center justify-center h-14 mx-3 my-2 rounded-lg border border-dashed text-xs text-muted-foreground transition-colors',
-                      isOver ? 'border-primary/50 text-primary' : 'border-border',
+                      'flex items-center justify-center h-16 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition-colors',
+                      isOver ? 'border-primary/40 text-primary' : 'border-border/60',
                     )}>
                       {isOver ? 'Drop here' : 'No leads'}
                     </div>
                   ) : (
-                    <div className="divide-y divide-border">
-                      {stageLeads.map(lead => (
-                        <CompactLeadRow
-                          key={lead.id}
-                          lead={lead}
-                          stageColor={stage.color}
-                          isDragging={draggingId === lead.id}
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          onOpen={() => { if (!didDragRef.current) setSelectedLeadId(lead.id) }}
-                        />
-                      ))}
-                    </div>
+                    stageLeads.map(lead => (
+                      <KanbanCard
+                        key={lead.id}
+                        lead={lead}
+                        stageColor={stage.color}
+                        isDragging={draggingId === lead.id}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        onOpen={() => { if (!didDragRef.current) setSelectedLeadId(lead.id) }}
+                      />
+                    ))
                   )}
-                </div>
 
-                {/* Add lead */}
-                <div className="border-t border-border">
+                  {/* Add lead */}
                   <Link
-                    href={`/leads?pipeline_stage=${stage.id}`}
-                    className="flex items-center gap-1.5 w-full px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    href={`/leads`}
+                    className="flex items-center gap-1.5 w-full px-3 py-2 rounded-xl border border-dashed border-border/70 text-xs font-medium text-muted-foreground hover:bg-card hover:border-border hover:text-foreground transition-all"
                   >
-                    <Plus className="h-3 w-3" /> Add lead
+                    <Plus className="h-3.5 w-3.5" /> Add lead
                   </Link>
                 </div>
               </div>
@@ -332,19 +324,21 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
   )
 }
 
-// ── Compact lead row (kanban) ─────────────────────────────────────────────
-function CompactLeadRow({
+// ── Kanban card ───────────────────────────────────────────────────────────
+function KanbanCard({
   lead, stageColor, isDragging, onDragStart, onDragEnd, onOpen,
 }: {
   lead: PipelineLead; stageColor: string; isDragging: boolean
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void; onOpen: () => void
 }) {
-  const name       = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
-  const statusMeta = STATUS_CONFIG[lead.status as LeadStatus]
-  const timeLabel  = lead.last_contacted_at
-    ? timeAgo(lead.last_contacted_at)
-    : timeAgo(lead.created_at)
+  const name         = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
+  const initials     = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  const statusMeta   = STATUS_CONFIG[lead.status as LeadStatus]
+  const interestMeta = INTEREST_CONFIG[lead.interest_status as InterestStatus]
+  const timeLabel    = lead.last_contacted_at
+    ? `Contacted ${timeAgo(lead.last_contacted_at)}`
+    : `Added ${timeAgo(lead.created_at)}`
 
   return (
     <div
@@ -353,35 +347,75 @@ function CompactLeadRow({
       onDragEnd={onDragEnd}
       onClick={onOpen}
       className={cn(
-        'group relative flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none transition-colors',
-        isDragging ? 'opacity-40 bg-muted' : 'hover:bg-muted/50',
+        'group relative bg-card rounded-xl border border-border/60 shadow-sm',
+        'cursor-pointer select-none transition-all duration-150',
+        isDragging
+          ? 'opacity-40 scale-[0.97] shadow-none cursor-grabbing'
+          : 'hover:shadow-md hover:border-border',
       )}
     >
-      {/* Left stage color strip */}
-      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: stageColor }} />
+      {/* Stage color top bar */}
+      <div className="h-[3px] rounded-t-xl w-full" style={{ backgroundColor: stageColor }} />
 
-      {/* Drag handle */}
-      <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground/20 group-hover:text-muted-foreground/50 transition-colors cursor-grab ml-1" />
+      <div className="p-3.5">
+        {/* Company + drag handle */}
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <p className="text-[11px] font-medium text-muted-foreground truncate">
+            {lead.company ?? <span className="italic">No company</span>}
+          </p>
+          <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground/20 group-hover:text-muted-foreground/60 transition-colors cursor-grab" />
+        </div>
 
-      {/* Name + company */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate leading-snug">{name}</p>
-        {lead.company && (
-          <p className="text-xs text-muted-foreground truncate">{lead.company}</p>
+        {/* Contact name */}
+        <p className="text-sm font-semibold text-foreground truncate leading-snug mb-0.5">
+          {name}
+        </p>
+
+        {/* Title / role if available */}
+        {lead.title && (
+          <p className="text-[11px] text-muted-foreground truncate mb-2">{lead.title}</p>
         )}
-      </div>
 
-      {/* Status badge + time */}
-      <div className="flex flex-col items-end gap-0.5 shrink-0">
-        {statusMeta && (
-          <span className={cn(
-            'inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold border leading-none',
-            statusMeta.badge,
-          )}>
-            {statusMeta.label}
-          </span>
-        )}
-        <span className="text-[10px] text-muted-foreground tabular-nums">{timeLabel}</span>
+        {/* Status + time row */}
+        <div className="flex items-center gap-1.5 mt-2 mb-3">
+          {statusMeta && (
+            <span className={cn(
+              'inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold border leading-none',
+              statusMeta.badge,
+            )}>
+              {statusMeta.label}
+            </span>
+          )}
+          <span className="text-[11px] text-muted-foreground">·</span>
+          <span className="text-[11px] text-muted-foreground truncate">{timeLabel}</span>
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-border/60 mb-2.5" />
+
+        {/* Footer: initials + interest badge */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Initials avatar */}
+            <div
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+              style={{ backgroundColor: stageColor }}
+            >
+              {initials}
+            </div>
+            <span className="text-xs font-medium truncate text-foreground/80">
+              {lead.first_name ?? lead.email.split('@')[0]}
+            </span>
+          </div>
+          {interestMeta && (
+            <span className={cn(
+              'inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold border leading-none shrink-0',
+              interestMeta.badge,
+            )}>
+              {interestMeta.label}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )
