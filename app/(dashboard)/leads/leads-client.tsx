@@ -162,13 +162,17 @@ export function LeadsClient({
     try {
       const saved = localStorage.getItem(colConfigKey)
       if (saved) {
-        const { visible } = JSON.parse(saved) as { visible: ColumnId[] }
-        if (Array.isArray(visible)) {
-          const validIds = new Set(COLUMNS.map(c => c.id))
-          const filtered = visible.filter(id => validIds.has(id as ColumnId)) as ColumnId[]
-          // Also include any new columns added since the user last saved (use their defaults)
-          const savedSet = new Set(filtered)
-          COLUMNS.forEach(c => { if (!savedSet.has(c.id) && c.defaultOn) filtered.push(c.id) })
+        const parsed = JSON.parse(saved) as { visible: ColumnId[]; order?: ColumnId[] }
+        if (Array.isArray(parsed.visible)) {
+          const validIds  = new Set(COLUMNS.map(c => c.id))
+          const filtered  = parsed.visible.filter(id => validIds.has(id as ColumnId)) as ColumnId[]
+          // Only add brand-new columns (ones that didn't exist when the user saved).
+          // We detect "new" by checking if they're absent from the saved ORDER list.
+          // This avoids re-adding columns the user deliberately turned off.
+          const savedOrderSet = new Set(parsed.order ?? filtered)
+          COLUMNS.forEach(c => {
+            if (!savedOrderSet.has(c.id) && c.defaultOn) filtered.push(c.id)
+          })
           return new Set(filtered)
         }
       }
@@ -184,7 +188,7 @@ export function LeadsClient({
         const { order } = JSON.parse(saved) as { order: ColumnId[] }
         if (Array.isArray(order)) {
           const validIds = new Set(DEFAULT_COLUMN_ORDER)
-          // Keep saved order for known columns; append any new columns at the end
+          // Keep saved order for known columns; append genuinely new columns at the end
           const savedValid = order.filter(id => validIds.has(id as ColumnId)) as ColumnId[]
           const savedSet   = new Set(savedValid)
           const newCols    = DEFAULT_COLUMN_ORDER.filter(id => !savedSet.has(id))
