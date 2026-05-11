@@ -42,8 +42,6 @@ export async function PATCH(req: NextRequest) {
 
   if (!Array.isArray(ids) || ids.length === 0)
     return NextResponse.json({ error: 'ids array is required' }, { status: 400 })
-  if (ids.length > 500)
-    return NextResponse.json({ error: 'Maximum 500 leads per bulk operation' }, { status: 400 })
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (status !== undefined)      patch.status      = status as LeadStatus
@@ -53,14 +51,19 @@ export async function PATCH(req: NextRequest) {
   if (Object.keys(patch).length === 1)
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
-  const { error } = await admin
-    .from('leads')
-    .update(patch as never)
-    .in('id', ids)
-    .eq('workspace_id', member.workspace_id)
-    .is('deleted_at', null)
+  // Process in chunks of 1,000 to stay within Supabase's safe IN-clause limits
+  const CHUNK = 1000
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK)
+    const { error } = await admin
+      .from('leads')
+      .update(patch as never)
+      .in('id', chunk)
+      .eq('workspace_id', member.workspace_id)
+      .is('deleted_at', null)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   if (status) {
     const activityRows = ids.map((id: string) => ({
@@ -111,15 +114,18 @@ export async function DELETE(req: NextRequest) {
   const { ids } = body
   if (!Array.isArray(ids) || ids.length === 0)
     return NextResponse.json({ error: 'ids array is required' }, { status: 400 })
-  if (ids.length > 200)
-    return NextResponse.json({ error: 'Maximum 200 leads per bulk delete' }, { status: 400 })
 
-  const { error } = await admin
-    .from('leads')
-    .delete()
-    .in('id', ids)
-    .eq('workspace_id', member.workspace_id)
+  const CHUNK = 1000
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK)
+    const { error } = await admin
+      .from('leads')
+      .delete()
+      .in('id', chunk)
+      .eq('workspace_id', member.workspace_id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
   return NextResponse.json({ deleted: ids.length })
 }

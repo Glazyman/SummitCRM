@@ -414,21 +414,33 @@ export function LeadsClient({
     }).catch(console.error)
   }
 
-  function handleBulkAssign(userId: string) {
+  async function handleBulkAssign(userId: string) {
     const ids    = [...selectedIds]
     const member = teamMembers.find((m) => m.id === userId)
-    setLeads((prev) =>
-      prev.map((l) => ids.includes(l.id)
-        ? { ...l, assigned_to: userId || null, assigned_name: member?.name ?? null, updated_at: new Date().toISOString() }
-        : l
+    // Optimistic update
+    const prev = leads
+    setLeads((l) =>
+      l.map((lead) => ids.includes(lead.id)
+        ? { ...lead, assigned_to: userId || null, assigned_name: member?.name ?? null, updated_at: new Date().toISOString() }
+        : lead
       )
     )
     setSelectedIds(new Set())
-    fetch('/api/leads/bulk', {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ids, assigned_to: userId || null }),
-    }).catch(console.error)
+    try {
+      const res = await fetch('/api/leads/bulk', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ ids, assigned_to: userId || null }),
+      })
+      if (!res.ok) {
+        // Revert on failure
+        setLeads(prev)
+        console.error('[bulk assign] failed:', await res.json().catch(() => ({})))
+      }
+    } catch (err) {
+      setLeads(prev)
+      console.error('[bulk assign]', err)
+    }
   }
 
   function handleBulkBatch(batchId: string) {
