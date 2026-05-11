@@ -296,7 +296,7 @@ function AddFollowUpModal({ open, teamMembers, currentUserId, isAdmin, onClose, 
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5 px-6">
+        <div className="space-y-5 px-6 pb-2">
           {/* Type */}
           <div className="space-y-2">
             <Label>Type</Label>
@@ -440,7 +440,7 @@ function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onCl
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5 px-6">
+        <div className="space-y-5 px-6 pb-2">
           <div className="space-y-1.5">
             <Label>Description</Label>
             <Input
