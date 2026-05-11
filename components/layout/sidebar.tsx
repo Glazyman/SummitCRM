@@ -127,7 +127,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
         type="button"
         onClick={toggleCollapsed}
         className={cn(
-          'absolute -right-2.5 top-1/2 -translate-y-1/2 z-30',
+          'absolute -right-2.5 top-6 z-30',
           'flex h-5 w-5 items-center justify-center',
           'text-muted-foreground transition-colors hover:text-foreground'
         )}
