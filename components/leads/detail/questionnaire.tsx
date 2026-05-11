@@ -66,7 +66,7 @@ function stripAdornment(value: string, format: FieldFormat | undefined): string 
 // ── Default Summit Mergers questionnaire fields ───────────────────────────────
 export const DEFAULT_QUESTIONS: QuestionDef[] = [
   { id: 'employees',           label: 'Employees',               type: 'text',     placeholder: '45',                    col: 1 },
-  { id: 'union',               label: 'Union',                   type: 'text',     placeholder: 'Yes / No',              col: 1 },
+  { id: 'union',               label: 'Union',                   type: 'yesno',                                          col: 1 },
   { id: 'years_in_business',   label: 'Years in business',       type: 'text',     placeholder: '23',                    col: 1 },
   { id: 'service_area',        label: 'Service area',            type: 'text',     placeholder: 'e.g. Las Vegas, Utah',  col: 1 },
   { id: 'residential_pct',     label: 'Residential',             type: 'text',     placeholder: '90',                    col: 1 },
@@ -87,7 +87,7 @@ export const DEFAULT_QUESTIONS: QuestionDef[] = [
 export interface QuestionDef {
   id:          string
   label:       string
-  type:        'text' | 'textarea'
+  type:        'text' | 'textarea' | 'yesno'
   placeholder?: string
   custom?:     boolean
   col?:        number
@@ -103,6 +103,45 @@ interface QuestionnaireProps {
   data:      QuestionnaireData | null
   onSave:    (data: QuestionnaireData) => Promise<void>
   readOnly?: boolean
+}
+
+// ── Yes / No toggle ──────────────────────────────────────────────────────────
+function YesNoToggle({
+  value,
+  readOnly,
+  onChange,
+}: {
+  value:     string
+  readOnly?: boolean
+  onChange:  (v: string) => void
+}) {
+  const current = value.toLowerCase()
+  return (
+    <div className="flex h-11 gap-2">
+      {(['Yes', 'No'] as const).map((opt) => {
+        const active = current === opt.toLowerCase()
+        return (
+          <button
+            key={opt}
+            type="button"
+            disabled={readOnly}
+            onClick={() => onChange(active ? '' : opt)}
+            className={cn(
+              'flex-1 rounded-xl border text-[14px] font-semibold transition-all',
+              active
+                ? opt === 'Yes'
+                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                  : 'bg-red-500 border-red-500 text-white shadow-sm'
+                : 'border-border bg-background text-muted-foreground hover:shadow-sm',
+              readOnly && 'pointer-events-none opacity-60',
+            )}
+          >
+            {opt}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 // ── Adorned input ($ prefix / % suffix) ──────────────────────────────────────
@@ -260,8 +299,8 @@ export function Questionnaire({ leadId, data, onSave, readOnly }: QuestionnaireP
     }
   }
 
-  // Split questions: inline (text, col-able) vs full-width (textarea)
-  const gridQuestions = questions.filter(q => q.type === 'text')
+  // Split questions: inline (text/yesno) vs full-width (textarea)
+  const gridQuestions = questions.filter(q => q.type === 'text' || q.type === 'yesno')
   const fullQuestions = questions.filter(q => q.type === 'textarea')
 
   return (
@@ -304,7 +343,13 @@ export function Questionnaire({ leadId, data, onSave, readOnly }: QuestionnaireP
                     </button>
                   )}
                 </div>
-                {format ? (
+                {q.type === 'yesno' ? (
+                  <YesNoToggle
+                    value={value}
+                    readOnly={readOnly}
+                    onChange={(v) => setAnswer(q.id, v)}
+                  />
+                ) : format ? (
                   <AdornedInput
                     value={value}
                     format={format}
