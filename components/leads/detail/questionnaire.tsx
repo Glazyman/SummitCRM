@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Plus, Save, Trash2, ClipboardList, Check } from 'lucide-react'
+import { Plus, Save, Trash2, ClipboardList, Check, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SelectMenu } from '@/components/ui/select-menu'
@@ -103,6 +103,12 @@ interface QuestionnaireProps {
   data:      QuestionnaireData | null
   onSave:    (data: QuestionnaireData) => Promise<void>
   readOnly?: boolean
+  /**
+   * When provided, an "Email Snapshot" button is shown next to Save.
+   * Parent receives the live edit-state (answers + questions) so it can
+   * build the snapshot using the surrounding lead profile.
+   */
+  onEmailSnapshot?: (live: QuestionnaireData) => void
 }
 
 // ── Yes / No toggle ──────────────────────────────────────────────────────────
@@ -250,7 +256,7 @@ function StyledTextarea({
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function Questionnaire({ leadId, data, onSave, readOnly }: QuestionnaireProps) {
+export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot }: QuestionnaireProps) {
   const [answers,   setAnswers]   = React.useState<Record<string, string>>(data?.answers   ?? {})
   const [questions, setQuestions] = React.useState<QuestionDef[]>(
     data?.questions ?? DEFAULT_QUESTIONS
@@ -311,16 +317,30 @@ export function Questionnaire({ leadId, data, onSave, readOnly }: QuestionnaireP
           <ClipboardList className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold">Summit Mergers Questionnaire</h3>
         </div>
-        {!readOnly && (
-          <Button
-            size="sm"
-            className={cn('gap-1.5', saved && 'bg-emerald-600 hover:bg-emerald-700')}
-            onClick={handleSave}
-            disabled={saving || !dirty}
-          >
-            {saved ? <><Check className="h-3.5 w-3.5" /> Saved</> : saving ? 'Saving…' : <><Save className="h-3.5 w-3.5" /> Save</>}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {onEmailSnapshot && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => onEmailSnapshot({ answers, questions })}
+              title="Open a Gmail draft with the snapshot"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Email Snapshot
+            </Button>
+          )}
+          {!readOnly && (
+            <Button
+              size="sm"
+              className={cn('gap-1.5', saved && 'bg-emerald-600 hover:bg-emerald-700')}
+              onClick={handleSave}
+              disabled={saving || !dirty}
+            >
+              {saved ? <><Check className="h-3.5 w-3.5" /> Saved</> : saving ? 'Saving…' : <><Save className="h-3.5 w-3.5" /> Save</>}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* 2-column grid for short fields */}

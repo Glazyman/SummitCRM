@@ -17,6 +17,7 @@ import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
 import { CallHistory }      from '@/components/leads/detail/call-history'
 import { Questionnaire }   from '@/components/leads/detail/questionnaire'
 import type { QuestionnaireData } from '@/components/leads/detail/questionnaire'
+import { openSnapshotEmail } from '@/lib/intake-snapshot'
 import type {
   LeadDetail, ActivityEntry,
   FollowUp, NewFollowUp, TeamMember, LeadStatus,
@@ -476,6 +477,18 @@ export function LeadFullPanel({
                   leadId={leadId}
                   data={questionnaireData}
                   onSave={handleSaveQuestionnaire}
+                  onEmailSnapshot={isAdmin ? (live) => openSnapshotEmail({
+                    lead: {
+                      first_name: data.lead.first_name,
+                      last_name:  data.lead.last_name,
+                      email:      data.lead.email,
+                      phone:      data.lead.phone,
+                      company:    data.lead.company,
+                      website:    data.lead.website,
+                    },
+                    answers:   live.answers,
+                    questions: live.questions,
+                  }) : undefined}
                 />
               )}
             </div>

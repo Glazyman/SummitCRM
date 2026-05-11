@@ -12,6 +12,7 @@ import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
 import { CallHistory }      from '@/components/leads/detail/call-history'
 import { Questionnaire }   from '@/components/leads/detail/questionnaire'
 import type { QuestionnaireData } from '@/components/leads/detail/questionnaire'
+import { openSnapshotEmail } from '@/lib/intake-snapshot'
 import type {
   LeadDetail, ActivityEntry,
   FollowUp, NewFollowUp, TeamMember, LeadStatus,
@@ -548,6 +549,18 @@ export default function LeadDetailClient({
                 leadId={lead.id}
                 data={questionnaireData}
                 onSave={handleSaveQuestionnaire}
+                onEmailSnapshot={isAdmin ? (live) => openSnapshotEmail({
+                  lead: {
+                    first_name: lead.first_name,
+                    last_name:  lead.last_name,
+                    email:      lead.email,
+                    phone:      lead.phone,
+                    company:    lead.company,
+                    website:    lead.website,
+                  },
+                  answers:   live.answers,
+                  questions: live.questions,
+                }) : undefined}
               />
             </Section>
           </div>
