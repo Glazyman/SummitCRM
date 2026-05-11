@@ -149,37 +149,6 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
       <div className="px-6 pt-6 pb-4 space-y-5">
         <h1 className="text-2xl font-bold tracking-[-0.025em]">Sales Pipeline</h1>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard
-            icon={<TrendingUp className="h-4 w-4" />}
-            label="Total Deals"
-            value={totalLeads.toLocaleString()}
-            sub={{ bold: `${stages.length} stages`, rest: `· ${unassigned} unassigned` }}
-          />
-          <StatCard
-            icon={<DollarSign className="h-4 w-4" />}
-            label="Pipeline Value"
-            value={pipelineValueHasData ? fmtMoney(pipelineValue) : '—'}
-            sub={{ bold: pipelineValueHasData ? '' : 'Fill questionnaire', rest: pipelineValueHasData ? 'from questionnaire' : 'to track value' }}
-            accent={pipelineValueHasData}
-          />
-          <StatCard
-            icon={<Trophy className="h-4 w-4" />}
-            label="Deals Won"
-            value={dealsWon.toLocaleString()}
-            sub={{ bold: wonStageIds.size > 0 ? stages.find(s => s.is_won)?.name ?? 'Won stage' : 'No won stage', rest: '' }}
-            deltaUp={dealsWon > 0}
-          />
-          <StatCard
-            icon={<BarChart3 className="h-4 w-4" />}
-            label="Deals in Progress"
-            value={dealsInProgress.toLocaleString()}
-            sub={{ bold: `${totalLeads > 0 ? Math.round((dealsInProgress / Math.max(totalLeads,1)) * 100) : 0}%`, rest: 'of pipeline' }}
-            deltaUp={dealsInProgress > 0}
-          />
-        </div>
-
         {/* Toolbar */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Search */}
@@ -227,6 +196,37 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
               <Plus className="h-3.5 w-3.5" /> Add Lead
             </Link>
           </Button>
+        </div>
+
+        {/* Stat cards — below toolbar */}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard
+            icon={<TrendingUp className="h-4 w-4" />}
+            label="Total Deals"
+            value={totalLeads.toLocaleString()}
+            sub={{ bold: `${stages.length} stages`, rest: `· ${unassigned} unassigned` }}
+          />
+          <StatCard
+            icon={<DollarSign className="h-4 w-4" />}
+            label="Pipeline Value"
+            value={pipelineValueHasData ? fmtMoney(pipelineValue) : '—'}
+            sub={{ bold: pipelineValueHasData ? '' : 'Fill questionnaire', rest: pipelineValueHasData ? 'from questionnaire' : 'to track value' }}
+            accent={pipelineValueHasData}
+          />
+          <StatCard
+            icon={<Trophy className="h-4 w-4" />}
+            label="Deals Won"
+            value={dealsWon.toLocaleString()}
+            sub={{ bold: wonStageIds.size > 0 ? stages.find(s => s.is_won)?.name ?? 'Won stage' : 'No won stage', rest: '' }}
+            deltaUp={dealsWon > 0}
+          />
+          <StatCard
+            icon={<BarChart3 className="h-4 w-4" />}
+            label="Deals in Progress"
+            value={dealsInProgress.toLocaleString()}
+            sub={{ bold: `${totalLeads > 0 ? Math.round((dealsInProgress / Math.max(totalLeads,1)) * 100) : 0}%`, rest: 'of pipeline' }}
+            deltaUp={dealsInProgress > 0}
+          />
         </div>
       </div>
 
