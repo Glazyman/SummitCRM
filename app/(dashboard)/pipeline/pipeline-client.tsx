@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Search, Columns3, List,
-  MoreHorizontal, TrendingUp, DollarSign, Calendar, Phone,
-  BarChart3, Trophy, Loader2,
+  MoreHorizontal, TrendingUp, Calendar, Phone,
+  BarChart3, Trophy,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -135,10 +135,7 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
   const dealsWon        = leads.filter(l => l.pipeline_stage_id && wonStageIds.has(l.pipeline_stage_id)).length
   const dealsInProgress = leads.filter(l => l.pipeline_stage_id && !wonStageIds.has(l.pipeline_stage_id) && !lostStageIds.has(l.pipeline_stage_id)).length
 
-  // Pipeline value = revenue total of leads currently in a pipeline stage
-  const inPipelineLeads = leads.filter(l => l.pipeline_stage_id !== null)
-  const pipelineValue = inPipelineLeads.reduce((sum, l) => sum + (l.pipeline_value ?? 0), 0)
-  const pipelineLeadsWithValue = inPipelineLeads.filter(l => (l.pipeline_value ?? 0) > 0).length
+  const hotLeads = leads.filter(l => l.interest_status === 'interested' && l.pipeline_stage_id !== null).length
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
@@ -205,11 +202,12 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
             sub={{ bold: `${stages.length} stages`, rest: `· ${unassigned} unassigned` }}
           />
           <StatCard
-            icon={<DollarSign className="h-4 w-4" />}
-            label="Pipeline Value"
-            value={pipelineValue > 0 ? fmtMoney(pipelineValue) : '—'}
-            sub={{ bold: pipelineLeadsWithValue > 0 ? `${pipelineLeadsWithValue}` : '', rest: pipelineLeadsWithValue > 0 ? `lead${pipelineLeadsWithValue !== 1 ? 's' : ''} with revenue` : 'No revenue on file yet' }}
-            accent={pipelineValue > 0}
+            icon={<Trophy className="h-4 w-4" />}
+            label="Hot Leads"
+            value={hotLeads.toLocaleString()}
+            sub={{ bold: `${totalLeads > 0 ? Math.round((hotLeads / Math.max(totalLeads, 1)) * 100) : 0}%`, rest: 'marked interested' }}
+            deltaUp={hotLeads > 0}
+            accent={hotLeads > 0}
           />
           <StatCard
             icon={<Trophy className="h-4 w-4" />}
