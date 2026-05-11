@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { Metadata } from 'next'
 import PipelineClient from './pipeline-client'
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Pipeline — Summits CRM' }
 
 /** Parse questionnaire revenue strings like "$10.7M", "$2.5M", "$50K" → number */

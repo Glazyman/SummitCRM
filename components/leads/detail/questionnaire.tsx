@@ -20,21 +20,46 @@ const FIELD_FORMATS: Record<string, FieldFormat> = {
   ebitda:            'dollar',
 }
 
-// Auto-format: strip and re-add prefix/suffix on blur
+// Parse M/K/B suffixes and reformat dollar values on blur
+// e.g. "2.5M" → "$2.5M", "2500000" → "$2.5M", "50k" → "$50K"
+function autoFormatDollar(raw: string): string {
+  const s = raw.replace(/^\$/, '').replace(/,/g, '').trim()
+  if (!s) return ''
+  const numStr = s.replace(/[^0-9.]/g, '')
+  const num = parseFloat(numStr)
+  if (isNaN(num) || num === 0) return s ? `$${s}` : ''
+
+  let val = num
+  if      (/[Bb]/i.test(s)) val = num * 1_000_000_000
+  else if (/[Mm]/i.test(s)) val = num * 1_000_000
+  else if (/[Kk]/i.test(s)) val = num * 1_000
+
+  if (val >= 1_000_000_000) return `$${(val / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`
+  if (val >= 1_000_000)     return `$${(val / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (val >= 10_000)        return `$${(val / 1_000).toFixed(0)}K`
+  return `$${val.toLocaleString()}`
+}
+
+// Normalize percent on blur: "90" → "90%", "90.5" → "90.5%"
+function autoFormatPercent(raw: string): string {
+  const s = raw.replace(/%$/, '').trim()
+  if (!s) return ''
+  const num = parseFloat(s)
+  return isNaN(num) ? `${s}%` : `${num}%`
+}
+
 function autoFormat(value: string, format: FieldFormat | undefined): string {
   if (!value.trim() || !format) return value
-  const stripped = value.replace(/^\$/, '').replace(/%$/, '').trim()
-  if (!stripped) return value
-  if (format === 'dollar' && !value.startsWith('$')) return `$${stripped}`
-  if (format === 'percent' && !value.endsWith('%')) return `${stripped}%`
+  if (format === 'dollar')  return autoFormatDollar(value)
+  if (format === 'percent') return autoFormatPercent(value)
   return value
 }
 
 // Strip prefix/suffix for the raw input display while typing
 function stripAdornment(value: string, format: FieldFormat | undefined): string {
   if (!format) return value
-  if (format === 'dollar') return value.startsWith('$') ? value.slice(1) : value
-  if (format === 'percent') return value.endsWith('%') ? value.slice(0, -1) : value
+  if (format === 'dollar')  return value.startsWith('$') ? value.slice(1) : value
+  if (format === 'percent') return value.endsWith('%')   ? value.slice(0, -1) : value
   return value
 }
 
@@ -113,10 +138,11 @@ function AdornedInput({
         readOnly={readOnly}
         placeholder={placeholder}
         onChange={(e) => {
+          // Store raw while typing; adornment is visual-only
           const v = e.target.value
           onChange(format === 'dollar' ? `$${v}` : format === 'percent' ? `${v}%` : v)
         }}
-        onBlur={(e) => onBlur(autoFormat(value, format))}
+        onBlur={() => onBlur(autoFormat(value, format))}
         className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none min-w-0"
       />
       {format === 'percent' && (
