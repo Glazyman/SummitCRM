@@ -23,7 +23,6 @@ export function ColumnVisibilityMenu({
   onSave,
 }: ColumnVisibilityMenuProps) {
   const [open, setOpen] = React.useState(false)
-  const [saved, setSaved] = React.useState(false)
   const panelRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -69,8 +68,7 @@ export function ColumnVisibilityMenu({
 
   function handleSave() {
     onSave(columnOrder, visibleColumns)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setOpen(false)
   }
 
   const colMap = new Map(COLUMNS.map(c => [c.id, c]))
@@ -180,7 +178,7 @@ export function ColumnVisibilityMenu({
               className="ml-auto h-7 gap-1.5 text-xs"
               onClick={handleSave}
             >
-              {saved ? <><Check className="h-3 w-3" /> Saved</> : 'Save'}
+              Save
             </Button>
           </div>
         </div>
