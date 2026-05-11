@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
   Phone, ArrowUpRight, CheckCircle2, Circle, Clock,
-  Plus, X, User,
+  Plus, X, User, List, CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { CalendarPicker, TimePicker, splitDateTime, joinDateTime, toLocalDatetimeInput } from '@/components/ui/calendar-picker'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
+import { ActivitiesCalendar } from './activities-calendar'
 import type { TeamMember } from '@/components/leads/detail/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -88,6 +89,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
   const [filterDone,      setFilterDone]      = useState('false')
   const [showNew,         setShowNew]         = useState(false)
   const [saving,          setSaving]          = useState(false)
+  const [pageView,        setPageView]        = useState<'list' | 'calendar'>('list')
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   useEffect(() => {
@@ -207,12 +209,43 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
             {openCount} open{overdueCount > 0 && <span className="text-red-500 font-medium"> · {overdueCount} overdue</span>}
           </p>
         </div>
-        <Button onClick={() => setShowNew(true)} className="gap-1.5">
-          <Plus className="h-4 w-4" /> New Activity
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* List / Calendar toggle */}
+          <div className="flex items-center rounded-full border border-border bg-background p-0.5 text-[13px] font-medium">
+            <button
+              onClick={() => setPageView('list')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-all',
+                pageView === 'list' ? 'bg-foreground text-background font-semibold' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <List className="h-3.5 w-3.5" /> List
+            </button>
+            <button
+              onClick={() => setPageView('calendar')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-all',
+                pageView === 'calendar' ? 'bg-foreground text-background font-semibold' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <CalendarDays className="h-3.5 w-3.5" /> Calendar
+            </button>
+          </div>
+          <Button onClick={() => setShowNew(true)} className="gap-1.5">
+            <Plus className="h-4 w-4" /> New Activity
+          </Button>
+        </div>
       </div>
 
-      <>
+      {/* Calendar view */}
+      {pageView === 'calendar' && (
+        <ActivitiesCalendar
+          activities={activities}
+          onActivityClick={(a) => setSelectedActivity(a)}
+        />
+      )}
+
+      <>{pageView === 'list' && <>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
@@ -503,7 +536,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
         </DialogContent>
       </Dialog>
 
-      </>
+      </>}</>
     </div>
   )
 }
