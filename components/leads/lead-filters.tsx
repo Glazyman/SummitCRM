@@ -4,6 +4,8 @@ import * as React from 'react'
 import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { SelectMenu } from '@/components/ui/select-menu'
+import { CalendarPicker } from '@/components/ui/calendar-picker'
 import { STATUS_CONFIG, ALL_STATUSES } from './status-config'
 import type { LeadFilters, LeadStatus } from './types'
 
@@ -94,20 +96,17 @@ export function LeadFiltersPanel({
 
         {/* Batch — upfront for reps (their primary organizer by industry) */}
         {isRep && batches.length > 0 && (
-          <select
-            value={filters.batchId ?? ''}
-            onChange={(e) => onChange({ batchId: e.target.value || null, page: 1 })}
-            className={cn(
-              'h-9 rounded-lg border border-input bg-background px-3 text-sm sm:w-44',
-              'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0',
-              filters.batchId && 'border-primary/50 bg-primary/5 text-primary'
-            )}
-          >
-            <option value="">All batches</option>
-            {batches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
+          <div className="sm:w-44">
+            <SelectMenu
+              value={filters.batchId ?? ''}
+              onChange={(v) => onChange({ batchId: v || null, page: 1 })}
+              nullable
+              nullLabel="All batches"
+              size="sm"
+              options={batches.map((b) => ({ value: b.id, label: b.name }))}
+              className={cn(filters.batchId && 'border-primary/50 bg-primary/5 text-primary')}
+            />
+          </div>
         )}
 
         <div className="flex items-center gap-2">
@@ -199,19 +198,14 @@ export function LeadFiltersPanel({
             {!isRep && (
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Batch</label>
-                <select
+                <SelectMenu
                   value={filters.batchId ?? ''}
-                  onChange={(e) => onChange({ batchId: e.target.value || null, page: 1 })}
-                  className={cn(
-                    'h-9 w-full rounded-lg border border-input bg-background px-3 text-sm',
-                    'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0'
-                  )}
-                >
-                  <option value="">All batches</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
+                  onChange={(v) => onChange({ batchId: v || null, page: 1 })}
+                  nullable
+                  nullLabel="All batches"
+                  size="sm"
+                  options={batches.map((b) => ({ value: b.id, label: b.name }))}
+                />
               </div>
             )}
 
@@ -219,46 +213,36 @@ export function LeadFiltersPanel({
             {isAdmin && (
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Assigned To</label>
-                <select
+                <SelectMenu
                   value={filters.assignedTo ?? ''}
-                  onChange={(e) => onChange({ assignedTo: e.target.value || null, page: 1 })}
-                  className={cn(
-                    'h-9 w-full rounded-lg border border-input bg-background px-3 text-sm',
-                    'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0'
-                  )}
-                >
-                  <option value="">All reps</option>
-                  <option value="unassigned">Unassigned</option>
-                  {teamMembers.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                </select>
+                  onChange={(v) => onChange({ assignedTo: v || null, page: 1 })}
+                  nullable
+                  nullLabel="All reps"
+                  size="sm"
+                  searchable={teamMembers.length > 5}
+                  options={[
+                    { value: 'unassigned', label: 'Unassigned' },
+                    ...teamMembers.map((m) => ({ value: m.id, label: m.name })),
+                  ]}
+                />
               </div>
             )}
 
             {/* Date range */}
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Created From</label>
-              <input
-                type="date"
+              <CalendarPicker
                 value={filters.dateFrom}
-                onChange={(e) => onChange({ dateFrom: e.target.value, page: 1 })}
-                className={cn(
-                  'h-9 w-full rounded-lg border border-input bg-background px-3 text-sm',
-                  'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0'
-                )}
+                onChange={(v) => onChange({ dateFrom: v, page: 1 })}
+                className="h-9"
               />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Created To</label>
-              <input
-                type="date"
+              <CalendarPicker
                 value={filters.dateTo}
-                onChange={(e) => onChange({ dateTo: e.target.value, page: 1 })}
-                className={cn(
-                  'h-9 w-full rounded-lg border border-input bg-background px-3 text-sm',
-                  'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0'
-                )}
+                onChange={(v) => onChange({ dateTo: v, page: 1 })}
+                className="h-9"
               />
             </div>
           </div>

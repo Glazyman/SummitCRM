@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { SelectMenu } from '@/components/ui/select-menu'
+import { CalendarPicker, TimePicker, splitDateTime, joinDateTime, toLocalDatetimeInput } from '@/components/ui/calendar-picker'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
 import type { TeamMember } from '@/components/leads/detail/types'
 
@@ -60,15 +62,12 @@ function fmtDate(iso: string) {
   return { label: `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${timeStr}`, overdue: false }
 }
 
-const selectCls = 'h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
-
-/** Tomorrow at 9 AM in local time, formatted for datetime-local inputs. */
+/** Tomorrow at 9 AM in local time. */
 function defaultActivityDueAt(): string {
   const d = new Date()
   d.setDate(d.getDate() + 1)
   d.setHours(9, 0, 0, 0)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return toLocalDatetimeInput(d)
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -97,13 +96,15 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
   }, [initialActivities])
 
   // ── New form ──────────────────────────────────────────────────────────────
+  const defaultDue = splitDateTime(defaultActivityDueAt())
   const [newForm, setNewForm] = useState(() => ({
     leadId:     '',
     type:       'follow_up' as ActivityType,
     priority:   'medium'   as Priority,
     title:      '',
     notes:      '',
-    dueAt:      defaultActivityDueAt(),
+    dueDate:    defaultDue.date,
+    dueTime:    defaultDue.time,
     assignedTo: currentUserId,
   }))
 
@@ -175,7 +176,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
           priority:   newForm.priority,
           title:      newForm.title,
           notes:      newForm.notes || undefined,
-          dueAt:      new Date(newForm.dueAt).toISOString(),
+          dueAt:      new Date(joinDateTime(newForm.dueDate, newForm.dueTime || '09:00')).toISOString(),
           assignedTo: newForm.assignedTo || null,
         }),
       })
@@ -184,8 +185,9 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
         const json = await listRes.json() as { data?: { activities: Activity[] } }
         if (json.data?.activities) setActivities(json.data.activities)
         setShowNew(false)
+        const resetDue = splitDateTime(defaultActivityDueAt())
         setNewForm({ leadId: '', type: 'follow_up', priority: 'medium', title: '', notes: '',
-          dueAt: defaultActivityDueAt(), assignedTo: currentUserId })
+          dueDate: resetDue.date, dueTime: resetDue.time, assignedTo: currentUserId })
       }
     } finally { setSaving(false) }
   }
@@ -228,26 +230,43 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
           )}
         </div>
 
-        <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={selectCls}>
-          <option value="">All types</option>
-          <option value="follow_up">Follow-up</option>
-          <option value="callback">Callback</option>
-        </select>
+        <SelectMenu
+          value={filterType}
+          onChange={setFilterType}
+          nullable
+          nullLabel="All types"
+          size="sm"
+          options={[
+            { value: 'follow_up', label: 'Follow-up' },
+            { value: 'callback',  label: 'Call Back'  },
+          ]}
+          className="w-36"
+        />
 
         {isAdmin && (
-          <select value={filterAssigned} onChange={(e) => setFilterAssigned(e.target.value)} className={selectCls}>
-            <option value="">All reps</option>
-            {teamMembers.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
+          <SelectMenu
+            value={filterAssigned}
+            onChange={setFilterAssigned}
+            nullable
+            nullLabel="All reps"
+            size="sm"
+            searchable={teamMembers.length > 5}
+            options={teamMembers.map((m) => ({ value: m.id, label: m.name }))}
+            className="w-40"
+          />
         )}
 
-        <select value={filterDone} onChange={(e) => setFilterDone(e.target.value)} className={selectCls}>
-          <option value="false">Open</option>
-          <option value="true">Past / Completed</option>
-          <option value="">All</option>
-        </select>
+        <SelectMenu
+          value={filterDone}
+          onChange={setFilterDone}
+          size="sm"
+          options={[
+            { value: 'false', label: 'Open'            },
+            { value: 'true',  label: 'Past / Completed' },
+            { value: '',      label: 'All'              },
+          ]}
+          className="w-40"
+        />
       </div>
 
       {/* Table */}
@@ -407,18 +426,26 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Type</Label>
-                <select value={newForm.type} onChange={(e) => setNewForm((f) => ({ ...f, type: e.target.value as ActivityType }))} className={cn(selectCls, 'w-full')}>
-                  <option value="follow_up">Follow-up</option>
-                  <option value="callback">Call Back</option>
-                </select>
+                <SelectMenu
+                  value={newForm.type}
+                  onChange={(v) => setNewForm((f) => ({ ...f, type: v as ActivityType }))}
+                  options={[
+                    { value: 'follow_up', label: 'Follow-up' },
+                    { value: 'callback',  label: 'Call Back'  },
+                  ]}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Priority</Label>
-                <select value={newForm.priority} onChange={(e) => setNewForm((f) => ({ ...f, priority: e.target.value as Priority }))} className={cn(selectCls, 'w-full')}>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
+                <SelectMenu
+                  value={newForm.priority}
+                  onChange={(v) => setNewForm((f) => ({ ...f, priority: v as Priority }))}
+                  options={[
+                    { value: 'high',   label: 'High'   },
+                    { value: 'medium', label: 'Medium' },
+                    { value: 'low',    label: 'Low'    },
+                  ]}
+                />
               </div>
               <div className="col-span-2 space-y-1.5">
                 <Label>Title <span className="text-destructive">*</span></Label>
@@ -431,14 +458,28 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
               </div>
               <div className="space-y-1.5">
                 <Label>Due Date <span className="text-destructive">*</span></Label>
-                <Input type="datetime-local" value={newForm.dueAt} onChange={(e) => setNewForm((f) => ({ ...f, dueAt: e.target.value }))} />
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <CalendarPicker
+                      value={newForm.dueDate}
+                      onChange={(v) => setNewForm((f) => ({ ...f, dueDate: v }))}
+                    />
+                  </div>
+                  <TimePicker
+                    value={newForm.dueTime}
+                    onChange={(v) => setNewForm((f) => ({ ...f, dueTime: v }))}
+                  />
+                </div>
               </div>
               {isAdmin && (
                 <div className="space-y-1.5">
                   <Label>Assign to</Label>
-                  <select value={newForm.assignedTo} onChange={(e) => setNewForm((f) => ({ ...f, assignedTo: e.target.value }))} className={cn(selectCls, 'w-full')}>
-                    {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
+                  <SelectMenu
+                    value={newForm.assignedTo}
+                    onChange={(v) => setNewForm((f) => ({ ...f, assignedTo: v }))}
+                    searchable={teamMembers.length > 5}
+                    options={teamMembers.map((m) => ({ value: m.id, label: m.name }))}
+                  />
                 </div>
               )}
               <div className={cn('space-y-1.5', isAdmin ? '' : 'col-span-2')}>

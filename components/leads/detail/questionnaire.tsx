@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { SelectMenu } from '@/components/ui/select-menu'
 import { cn } from '@/lib/utils'
 
 // ── Default Summit Mergers questionnaire fields ───────────────────────────
@@ -182,14 +183,16 @@ export function Questionnaire({ leadId, data, onSave, readOnly }: QuestionnaireP
                 className="h-8 text-sm"
               />
               <div className="flex items-center gap-2">
-                <select
+                <SelectMenu
                   value={newQType}
-                  onChange={(e) => setNewQType(e.target.value as 'text' | 'textarea')}
-                  className="h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="text">Short answer</option>
-                  <option value="textarea">Long answer</option>
-                </select>
+                  onChange={(v) => setNewQType(v as 'text' | 'textarea')}
+                  size="sm"
+                  options={[
+                    { value: 'text',     label: 'Short answer' },
+                    { value: 'textarea', label: 'Long answer'  },
+                  ]}
+                  className="h-8 text-xs"
+                />
                 <Button size="sm" className="h-8 text-xs" onClick={addCustomQuestion} disabled={!newQLabel.trim()}>
                   Add
                 </Button>

@@ -1,11 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import { createPortal } from 'react-dom'
 import {
   Calendar as CalendarIcon, Plus, CheckCircle2, Clock,
-  Trash2, Pencil, User, Phone, Mail, FileText,
-  ChevronLeft, ChevronRight, AlertCircle,
+  Trash2, Pencil, User, Phone, Mail, FileText, AlertCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -13,6 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { SelectMenu } from '@/components/ui/select-menu'
+import { CalendarPicker, TimePicker, splitDateTime, joinDateTime, toLocalDatetimeInput, p2 } from '@/components/ui/calendar-picker'
 import type { FollowUp, NewFollowUp, TeamMember } from './types'
 
 interface EditFollowUpData {
@@ -364,16 +364,14 @@ function AddFollowUpModal({ open, teamMembers, currentUserId, isAdmin, onClose, 
           {isAdmin && (
             <div className="space-y-1.5">
               <Label>Assign to</Label>
-              <select
+              <SelectMenu
                 value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Unassigned</option>
-                {teamMembers.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
+                onChange={setAssignedTo}
+                nullable
+                nullLabel="Unassigned"
+                searchable={teamMembers.length > 5}
+                options={teamMembers.map((m) => ({ value: m.id, label: m.name }))}
+              />
             </div>
           )}
 
@@ -480,16 +478,14 @@ function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onCl
           {isAdmin && (
             <div className="space-y-1.5">
               <Label>Assign to</Label>
-              <select
+              <SelectMenu
                 value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Unassigned</option>
-                {teamMembers.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
+                onChange={setAssignedTo}
+                nullable
+                nullLabel="Unassigned"
+                searchable={teamMembers.length > 5}
+                options={teamMembers.map((m) => ({ value: m.id, label: m.name }))}
+              />
             </div>
           )}
 
@@ -511,13 +507,11 @@ function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onCl
   )
 }
 
-// ── DateTimePicker ─────────────────────────────────────────────────────────
+// ── DateTimePicker (uses shared pickers) ───────────────────────────────────
 function DateTimePicker({
-  date, time,
-  onDateChange, onTimeChange,
+  date, time, onDateChange, onTimeChange,
 }: {
-  date:         string
-  time:         string
+  date: string; time: string
   onDateChange: (v: string) => void
   onTimeChange: (v: string) => void
 }) {
@@ -531,364 +525,7 @@ function DateTimePicker({
   )
 }
 
-// ── Calendar picker ────────────────────────────────────────────────────────
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
-const DAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-
-function CalendarPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [open,      setOpen]      = React.useState(false)
-  const [mounted,   setMounted]   = React.useState(false)
-  const btnRef  = React.useRef<HTMLButtonElement>(null)
-  const menuRef = React.useRef<HTMLDivElement>(null)
-
-  const today = React.useMemo(() => {
-    const d = new Date()
-    return { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() }
-  }, [])
-
-  const [viewYear,  setViewYear]  = React.useState(() => value ? new Date(value + 'T12:00').getFullYear()  : today.year)
-  const [viewMonth, setViewMonth] = React.useState(() => value ? new Date(value + 'T12:00').getMonth()     : today.month)
-
-  React.useEffect(() => { setMounted(true) }, [])
-
-  // Sync view to value on open
-  React.useEffect(() => {
-    if (open && value) {
-      const d = new Date(value + 'T12:00')
-      setViewYear(d.getFullYear())
-      setViewMonth(d.getMonth())
-    }
-  }, [open, value])
-
-  // Position popover
-  React.useLayoutEffect(() => {
-    if (!open || !btnRef.current || !menuRef.current) return
-    const a = btnRef.current.getBoundingClientRect()
-    const m = menuRef.current
-    const mw = m.offsetWidth  || 280
-    const mh = m.offsetHeight || 320
-    const pad = 8
-
-    let top  = a.bottom + 4
-    if (top + mh > window.innerHeight - pad) top = a.top - mh - 4
-    if (top < pad) top = a.bottom + 4
-
-    let left = a.left
-    if (left + mw > window.innerWidth - pad) left = a.right - mw
-    left = Math.max(pad, left)
-
-    m.style.top  = `${Math.round(top)}px`
-    m.style.left = `${Math.round(left)}px`
-  }, [open])
-
-  // Outside click + Escape
-  React.useEffect(() => {
-    if (!open) return
-    function handler(e: MouseEvent) {
-      if (btnRef.current?.contains(e.target as Node)) return
-      if (menuRef.current?.contains(e.target as Node)) return
-      setOpen(false)
-    }
-    function keyHandler(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    document.addEventListener('keydown', keyHandler)
-    return () => {
-      document.removeEventListener('mousedown', handler)
-      document.removeEventListener('keydown', keyHandler)
-    }
-  }, [open])
-
-  // Build calendar grid (always 42 cells = 6 weeks)
-  const firstWeekday   = new Date(viewYear, viewMonth, 1).getDay()
-  const daysInMonth    = new Date(viewYear, viewMonth + 1, 0).getDate()
-  const daysInPrevMon  = new Date(viewYear, viewMonth, 0).getDate()
-
-  interface Cell { day: number; dateStr: string; currentMonth: boolean }
-  const cells: Cell[] = []
-
-  // Prev-month tail
-  for (let i = firstWeekday - 1; i >= 0; i--) {
-    const d = daysInPrevMon - i
-    const pm = viewMonth === 0 ? 12 : viewMonth
-    const py = viewMonth === 0 ? viewYear - 1 : viewYear
-    cells.push({ day: d, dateStr: `${py}-${p2(pm)}-${p2(d)}`, currentMonth: false })
-  }
-  // Current month
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ day: d, dateStr: `${viewYear}-${p2(viewMonth + 1)}-${p2(d)}`, currentMonth: true })
-  }
-  // Next-month head
-  const nm = viewMonth === 11 ? 1 : viewMonth + 2
-  const ny = viewMonth === 11 ? viewYear + 1 : viewYear
-  for (let d = 1; cells.length < 42; d++) {
-    cells.push({ day: d, dateStr: `${ny}-${p2(nm)}-${p2(d)}`, currentMonth: false })
-  }
-
-  const todayStr = `${today.year}-${p2(today.month + 1)}-${p2(today.day)}`
-
-  function prevMonth() {
-    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
-    else setViewMonth(m => m - 1)
-  }
-  function nextMonth() {
-    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
-    else setViewMonth(m => m + 1)
-  }
-
-  const displayValue = value
-    ? new Date(value + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-    : undefined
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          'flex h-10 w-full items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm transition-colors',
-          'hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring',
-          open && 'ring-2 ring-ring border-ring',
-          !value ? 'text-muted-foreground' : 'text-foreground',
-        )}
-      >
-        <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="truncate">{displayValue ?? 'Pick a date'}</span>
-      </button>
-
-      {open && mounted && createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, width: 276 }}
-          className="rounded-2xl border border-border bg-popover shadow-card p-3"
-        >
-          {/* Month navigation */}
-          <div className="flex items-center justify-between mb-2">
-            <button
-              type="button"
-              onClick={prevMonth}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-sm font-semibold">
-              {MONTH_NAMES[viewMonth]} {viewYear}
-            </span>
-            <button
-              type="button"
-              onClick={nextMonth}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Day-of-week headers */}
-          <div className="grid grid-cols-7 mb-1">
-            {DAY_NAMES.map((d) => (
-              <div key={d} className="text-center text-[10px] font-medium text-muted-foreground py-1">
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Day cells */}
-          <div className="grid grid-cols-7 gap-0.5">
-            {cells.map((cell, i) => {
-              const isSelected = cell.dateStr === value
-              const isToday    = cell.dateStr === todayStr
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => { onChange(cell.dateStr); setOpen(false) }}
-                  className={cn(
-                    'flex h-8 w-full items-center justify-center rounded-lg text-xs font-medium transition-colors',
-                    // Selected
-                    isSelected && 'bg-primary text-primary-foreground shadow-sm',
-                    // Today (not selected)
-                    !isSelected && isToday && 'ring-1 ring-inset ring-primary text-primary font-semibold',
-                    // Normal current-month
-                    !isSelected && !isToday && cell.currentMonth && 'text-foreground hover:bg-muted',
-                    // Other-month days
-                    !isSelected && !cell.currentMonth && 'text-muted-foreground/40 hover:bg-muted/50',
-                  )}
-                >
-                  {cell.day}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Today shortcut */}
-          <div className="mt-2 border-t border-border pt-2">
-            <button
-              type="button"
-              onClick={() => { onChange(todayStr); setOpen(false) }}
-              className="w-full rounded-lg py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              Today
-            </button>
-          </div>
-        </div>,
-        document.body,
-      )}
-    </>
-  )
-}
-
-// ── Time picker ────────────────────────────────────────────────────────────
-function TimePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [open,    setOpen]    = React.useState(false)
-  const [mounted, setMounted] = React.useState(false)
-  const btnRef      = React.useRef<HTMLButtonElement>(null)
-  const menuRef     = React.useRef<HTMLDivElement>(null)
-  const selectedRef = React.useRef<HTMLButtonElement>(null)
-
-  React.useEffect(() => { setMounted(true) }, [])
-
-  // Scroll selected into view when the menu opens
-  React.useEffect(() => {
-    if (open && selectedRef.current) {
-      // Small delay lets the portal render first
-      const t = setTimeout(() => selectedRef.current?.scrollIntoView({ block: 'center' }), 30)
-      return () => clearTimeout(t)
-    }
-  }, [open])
-
-  // Position
-  React.useLayoutEffect(() => {
-    if (!open || !btnRef.current || !menuRef.current) return
-    const a = btnRef.current.getBoundingClientRect()
-    const m = menuRef.current
-    const mw  = m.offsetWidth  || 160
-    const mh  = m.offsetHeight || 260
-    const pad = 8
-
-    let top  = a.bottom + 4
-    if (top + mh > window.innerHeight - pad) top = a.top - mh - 4
-    if (top < pad) top = a.bottom + 4
-
-    let left = a.left
-    if (left + mw > window.innerWidth - pad) left = a.right - mw
-    left = Math.max(pad, left)
-
-    m.style.top  = `${Math.round(top)}px`
-    m.style.left = `${Math.round(left)}px`
-  }, [open])
-
-  // Outside click + Escape
-  React.useEffect(() => {
-    if (!open) return
-    function handler(e: MouseEvent) {
-      if (btnRef.current?.contains(e.target as Node)) return
-      if (menuRef.current?.contains(e.target as Node)) return
-      setOpen(false)
-    }
-    function keyHandler(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    document.addEventListener('keydown', keyHandler)
-    return () => {
-      document.removeEventListener('mousedown', handler)
-      document.removeEventListener('keydown', keyHandler)
-    }
-  }, [open])
-
-  // Generate 30-min slots from 6 AM to 9:30 PM
-  const slots = React.useMemo(() => {
-    const out: string[] = []
-    for (let h = 6; h <= 21; h++) {
-      out.push(`${p2(h)}:00`)
-      if (h < 21) out.push(`${p2(h)}:30`)
-    }
-    out.push('21:30')
-    return out
-  }, [])
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          'flex h-10 w-32 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm transition-colors shrink-0',
-          'hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring',
-          open && 'ring-2 ring-ring border-ring',
-          !value ? 'text-muted-foreground' : 'text-foreground',
-        )}
-      >
-        <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="truncate">{value ? fmt12(value) : 'Time'}</span>
-      </button>
-
-      {open && mounted && createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, width: 152 }}
-          className="rounded-2xl border border-border bg-popover shadow-card overflow-hidden"
-        >
-          <div className="max-h-60 overflow-y-auto py-1.5 overscroll-contain">
-            {slots.map((slot) => {
-              const isSelected = slot === value
-              return (
-                <button
-                  key={slot}
-                  ref={isSelected ? selectedRef : undefined}
-                  type="button"
-                  onClick={() => { onChange(slot); setOpen(false) }}
-                  className={cn(
-                    'flex w-full items-center px-4 py-1.5 text-sm transition-colors',
-                    isSelected
-                      ? 'bg-primary text-primary-foreground font-semibold'
-                      : 'text-foreground hover:bg-muted',
-                  )}
-                >
-                  {fmt12(slot)}
-                </button>
-              )
-            })}
-          </div>
-        </div>,
-        document.body,
-      )}
-    </>
-  )
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-function p2(n: number) { return String(n).padStart(2, '0') }
-
-/** Convert "HH:MM" (24h) → "H:MM AM/PM" */
-function fmt12(t: string): string {
-  if (!t) return ''
-  const [hStr, mStr] = t.split(':')
-  const h = parseInt(hStr, 10)
-  const ampm = h < 12 ? 'AM' : 'PM'
-  const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h
-  return `${h12}:${mStr} ${ampm}`
-}
-
-function splitDateTime(dt: string): { date: string; time: string } {
-  const [date, time] = dt.split('T')
-  return { date: date ?? '', time: time?.slice(0, 5) ?? '09:00' }
-}
-
-function joinDateTime(date: string, time: string): string {
-  return `${date}T${time}`
-}
-
-function toLocalDatetimeInput(d: Date): string {
-  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`
-}
 
 function defaultDueAt(): string {
   const d = new Date()

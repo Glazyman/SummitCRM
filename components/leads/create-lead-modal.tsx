@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
+import { SelectMenu } from '@/components/ui/select-menu'
 import type { LeadRow } from './types'
 
 interface BatchOption { id: string; name: string }
@@ -172,19 +173,13 @@ export function CreateLeadModal({ open, batches, onClose, onCreate }: CreateLead
             {/* Batch selector */}
             {batches.length > 0 && (
               <FormField label="Add to Batch" icon={<Tag className="h-3.5 w-3.5" />}>
-                <select
+                <SelectMenu
                   value={form.batch_id}
-                  onChange={(e) => patch('batch_id', e.target.value)}
-                  className={cn(
-                    'h-10 w-full rounded-lg border border-input bg-background px-3 text-sm',
-                    'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0'
-                  )}
-                >
-                  <option value="">No batch</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
+                  onChange={(v) => patch('batch_id', v)}
+                  nullable
+                  nullLabel="No batch"
+                  options={batches.map((b) => ({ value: b.id, label: b.name }))}
+                />
               </FormField>
             )}
 
