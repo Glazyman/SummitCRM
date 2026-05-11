@@ -4,17 +4,12 @@ import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  Plus, GripVertical, Building2, Phone,
-  Clock, Search, Columns3, List,
+  Plus, GripVertical, Search, Columns3, List,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import {
-  INTEREST_CONFIG,
-  STATUS_CONFIG,
-} from '@/components/leads/status-config'
+import { STATUS_CONFIG } from '@/components/leads/status-config'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
-import type { InterestStatus } from '@/types/database'
 import type { LeadStatus } from '@/components/leads/types'
 
 interface PipelineStage {
@@ -25,7 +20,7 @@ interface PipelineStage {
 interface PipelineLead {
   id: string; first_name: string | null; last_name: string | null
   email: string; company: string | null; title: string | null
-  phone: string | null; status: string; interest_status: InterestStatus
+  phone: string | null; status: string; interest_status: string
   pipeline_stage_id: string | null; assigned_to: string | null
   batch_id: string | null; created_at: string; updated_at: string
   last_contacted_at: string | null
@@ -44,13 +39,6 @@ function timeAgo(iso: string) {
   return `${Math.floor(d / 30)}mo ago`
 }
 
-// Lighten a hex color for the column header background
-function hexToRgba(hex: string, alpha: number) {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return `rgba(${r},${g},${b},${alpha})`
-}
 
 export default function PipelineClient({ stages, initialLeads, isAdmin, currentUserId }: Props) {
   const router = useRouter()
@@ -195,81 +183,75 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
       {/* ── Views ── */}
       {pipelineView === 'kanban' ? (
       <div className="flex-1 overflow-x-auto">
-        <div className="flex gap-4 px-6 py-6 min-h-full items-start"
-          style={{ minWidth: `${stages.length * 300 + 96}px` }}>
+        <div className="flex gap-3 px-6 py-5 min-h-full items-start"
+          style={{ minWidth: `${stages.length * 268 + 96}px` }}>
 
           {stages.map(stage => {
             const stageLeads = leadsByStage.get(stage.id) ?? []
             const isOver     = dragOverStage === stage.id
-            const headerBg   = stage.color.startsWith('#') ? hexToRgba(stage.color, 0.1) : stage.color
 
             return (
-              <div key={stage.id}
+              <div
+                key={stage.id}
                 className={cn(
-                  'flex flex-col w-[288px] shrink-0 rounded-[20px] transition-all duration-150',
-                  'glass-panel shadow-card',
-                  isOver ? 'shadow-xl ring-2 ring-primary/25' : 'hover:shadow-lg'
+                  'flex flex-col w-64 shrink-0 rounded-xl border border-border bg-card overflow-hidden transition-colors',
+                  isOver && 'ring-2 ring-primary/30 ring-offset-1',
                 )}
                 onDragOver={e => handleDragOver(e, stage.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={e => handleDrop(e, stage.id)}
               >
-                {/* ── Stage header ── */}
-                <div className="rounded-t-[20px] px-4 pt-4 pb-3"
-                  style={{ background: headerBg }}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <div className="h-2.5 w-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: stage.color }} />
-                        <span className="text-[13px] font-semibold truncate leading-tight">
-                          {stage.name}
-                        </span>
-                        {stage.is_won  && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-500/90 text-white shrink-0">WON</span>}
-                        {stage.is_lost && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-red-500/90 text-white shrink-0">LOST</span>}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground pl-4">
-                        {stageLeads.length} {stageLeads.length === 1 ? 'lead' : 'leads'}
-                      </p>
-                    </div>
+                {/* Top color strip */}
+                <div className="h-[3px] w-full shrink-0" style={{ backgroundColor: stage.color }} />
+
+                {/* Header */}
+                <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-border">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-semibold truncate">{stage.name}</span>
+                    {stage.is_won  && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-emerald-500 text-white shrink-0">WON</span>}
+                    {stage.is_lost && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-red-500 text-white shrink-0">LOST</span>}
                   </div>
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-muted px-1 text-[11px] font-bold text-muted-foreground tabular-nums shrink-0">
+                    {stageLeads.length}
+                  </span>
                 </div>
 
-                {/* Thin color divider */}
-                <div className="h-0.5 w-full" style={{ backgroundColor: stage.color }} />
-
-                {/* ── Cards ── */}
+                {/* Lead rows */}
                 <div className={cn(
-                  'flex-1 overflow-y-auto p-3 space-y-2.5 max-h-[calc(100vh-210px)]',
-                  isOver && 'bg-primary/5 rounded-b-[20px]'
+                  'flex-1 overflow-y-auto max-h-[calc(100vh-220px)]',
+                  isOver && 'bg-primary/5',
                 )}>
                   {stageLeads.length === 0 ? (
                     <div className={cn(
-                      'flex items-center justify-center h-24 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition-colors',
-                      isOver ? 'border-primary/55 text-primary bg-primary/5' : 'border-border/80 bg-white/40'
+                      'flex items-center justify-center h-14 mx-3 my-2 rounded-lg border border-dashed text-xs text-muted-foreground transition-colors',
+                      isOver ? 'border-primary/50 text-primary' : 'border-border',
                     )}>
-                      {isOver ? 'Drop to add here' : 'No leads yet'}
+                      {isOver ? 'Drop here' : 'No leads'}
                     </div>
                   ) : (
-                    stageLeads.map(lead => (
-                      <LeadCard
-                        key={lead.id}
-                        lead={lead}
-                        stageColor={stage.color}
-                        isDragging={draggingId === lead.id}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                        onOpen={() => { if (!didDragRef.current) setSelectedLeadId(lead.id) }}
-                      />
-                    ))
+                    <div className="divide-y divide-border">
+                      {stageLeads.map(lead => (
+                        <CompactLeadRow
+                          key={lead.id}
+                          lead={lead}
+                          stageColor={stage.color}
+                          isDragging={draggingId === lead.id}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          onOpen={() => { if (!didDragRef.current) setSelectedLeadId(lead.id) }}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
 
-                {/* ── Add lead ── */}
-                <div className="p-3 pt-0">
-                  <Link href={`/leads?pipeline_stage=${stage.id}`}
-                    className="flex items-center justify-center gap-1.5 w-full h-9 rounded-xl border-2 border-dashed border-border/80 text-[12px] font-medium text-muted-foreground hover:border-primary/45 hover:text-foreground hover:bg-white/55 transition-all">
-                    <Plus className="h-3.5 w-3.5" /> Add lead
+                {/* Add lead */}
+                <div className="border-t border-border">
+                  <Link
+                    href={`/leads?pipeline_stage=${stage.id}`}
+                    className="flex items-center gap-1.5 w-full px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    <Plus className="h-3 w-3" /> Add lead
                   </Link>
                 </div>
               </div>
@@ -350,17 +332,19 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
   )
 }
 
-// ── Lead card ─────────────────────────────────────────────────────────────
-function LeadCard({
+// ── Compact lead row (kanban) ─────────────────────────────────────────────
+function CompactLeadRow({
   lead, stageColor, isDragging, onDragStart, onDragEnd, onOpen,
 }: {
   lead: PipelineLead; stageColor: string; isDragging: boolean
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void; onOpen: () => void
 }) {
-  const name         = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
-  const interestMeta = INTEREST_CONFIG[lead.interest_status as InterestStatus]
-  const statusMeta   = STATUS_CONFIG[lead.status as LeadStatus]
+  const name       = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
+  const statusMeta = STATUS_CONFIG[lead.status as LeadStatus]
+  const timeLabel  = lead.last_contacted_at
+    ? timeAgo(lead.last_contacted_at)
+    : timeAgo(lead.created_at)
 
   return (
     <div
@@ -369,73 +353,35 @@ function LeadCard({
       onDragEnd={onDragEnd}
       onClick={onOpen}
       className={cn(
-        'group relative rounded-2xl cursor-pointer select-none',
-        'glass-panel shadow-card border border-white/70',
-        'transition-all duration-100',
-        isDragging
-          ? 'opacity-40 scale-95 shadow-none cursor-grabbing rotate-1'
-          : 'hover:shadow-lg hover:border-white hover:-translate-y-0.5'
+        'group relative flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none transition-colors',
+        isDragging ? 'opacity-40 bg-muted' : 'hover:bg-muted/50',
       )}
     >
-      {/* Left color accent */}
-      <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full"
-        style={{ backgroundColor: stageColor }} />
+      {/* Left stage color strip */}
+      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: stageColor }} />
 
       {/* Drag handle */}
-      <div className="absolute right-2.5 top-3 opacity-0 group-hover:opacity-30 transition-opacity">
-        <GripVertical className="h-3.5 w-3.5 text-gray-400" />
+      <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground/20 group-hover:text-muted-foreground/50 transition-colors cursor-grab ml-1" />
+
+      {/* Name + company */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate leading-snug">{name}</p>
+        {lead.company && (
+          <p className="text-xs text-muted-foreground truncate">{lead.company}</p>
+        )}
       </div>
 
-      <div className="pl-4 pr-8 pt-3.5 pb-3">
-        {/* Name */}
-        <p className="font-semibold text-[13.5px] leading-snug truncate mb-1 text-foreground">
-          {name}
-        </p>
-
-        {/* Company */}
-        {lead.company && (
-          <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground mb-2 truncate">
-            <Building2 className="h-3 w-3 shrink-0" />
-            {lead.company}
-          </div>
-        )}
-
-        {/* Phone — click to call */}
-        {lead.phone && (
-          <a href={`tel:${lead.phone}`}
-            onClick={e => e.stopPropagation()}
-            className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-primary transition-colors mb-2.5 w-fit">
-            <Phone className="h-3 w-3 shrink-0" />
-            {lead.phone}
-          </a>
-        )}
-
-        {/* Separator */}
-        <div className="border-t border-border/60 mb-2.5" />
-
-        {/* Footer row */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1 flex-wrap min-w-0">
-            {statusMeta && (
-              <span className={cn(
-                'inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border',
-                statusMeta.badge
-              )}>
-                {statusMeta.label}
-              </span>
-            )}
-            <span className={cn(
-              'inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border',
-              interestMeta.badge
-            )}>
-              {interestMeta.label}
-            </span>
-          </div>
-          <span className="text-[10px] text-muted-foreground/80 shrink-0 flex items-center gap-0.5 whitespace-nowrap">
-            <Clock className="h-2.5 w-2.5" />
-            {lead.last_contacted_at ? `Contacted ${timeAgo(lead.last_contacted_at)}` : `Added ${timeAgo(lead.created_at)}`}
+      {/* Status badge + time */}
+      <div className="flex flex-col items-end gap-0.5 shrink-0">
+        {statusMeta && (
+          <span className={cn(
+            'inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold border leading-none',
+            statusMeta.badge,
+          )}>
+            {statusMeta.label}
           </span>
-        </div>
+        )}
+        <span className="text-[10px] text-muted-foreground tabular-nums">{timeLabel}</span>
       </div>
     </div>
   )
