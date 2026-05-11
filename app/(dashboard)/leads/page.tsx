@@ -43,7 +43,9 @@ export default async function LeadsPage() {
       const adminForLeads = createAdminClient()
 
       const [leadsResult, batchesResult, membersResult] = await Promise.all([
-        adminForLeads.rpc('get_workspace_leads', {
+        // Returns a single JSON array — PostgREST cannot cap a single-row response,
+        // so this definitively bypasses the db-max-rows 1,000 row limit.
+        adminForLeads.rpc('get_workspace_leads_json', {
           p_workspace_id: workspaceId,
           p_assigned_to:  isRep ? user.id : null,
           p_max_rows:     20000,
@@ -77,7 +79,9 @@ export default async function LeadsPage() {
 
       teamMembers = memberIds.map((id) => ({ id, name: usersById.get(id) ?? id }))
 
-      const rawLeads = (leadsResult.data ?? []) as Array<{
+      // get_workspace_leads_json returns a single JSON value (the array),
+      // so leadsResult.data is the array itself, not an array of rows.
+      const rawLeads = ((leadsResult.data ?? []) as unknown as Array<{
         id: string
         workspace_id: string
         first_name: string | null
