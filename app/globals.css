@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 /*
- * Tailwind v4 theme — define all design tokens here.
- * `@theme inline` uses CSS variables so dark mode can override them.
+ * Tailwind v4 theme — Relay-style warm-neutral palette.
+ * Tokens live as CSS variables so every shadcn-style class
+ * inherits the new palette without per-component refactoring.
  */
 @theme inline {
   --color-background: hsl(var(--background));
@@ -35,77 +36,79 @@
 
   --radius: var(--border-radius);
 
-  --font-sans: var(--font-sans, -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", ui-sans-serif, system-ui, sans-serif);
+  --font-sans: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", ui-sans-serif, system-ui, sans-serif);
 }
 
 /* ── Light-only CSS variables ──────────────────────────────────────────────── */
 :root {
-  /* Apple-inspired neutrals */
-  --background: 220 20% 97%;
-  --foreground: 220 16% 12%;
+  /* Cool-neutral light gray background, white cards */
+  --background: 220 14% 95%;    /* #EEEEF2 — neutral light gray */
+  --foreground: 222 15% 12%;    /* #191C23 — near-black */
 
-  --card: 0 0% 100%;
-  --card-foreground: 220 16% 12%;
+  --card: 0 0% 100%;            /* #FFFFFF — pure white cards */
+  --card-foreground: 222 15% 12%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 220 16% 12%;
+  --popover-foreground: 222 15% 12%;
 
-  /* Monochrome primary — black actions, no saturated brand color */
-  --primary: 214 89% 52%;
+  /* Charcoal primary */
+  --primary: 222 15% 12%;        /* #191C23 */
   --primary-foreground: 0 0% 100%;
 
-  /* Subtle surface for hover states / secondary elements */
-  --secondary: 220 14% 90%;
-  --secondary-foreground: 220 16% 18%;
+  /* Subtle surface for hover / chips */
+  --secondary: 220 14% 91%;      /* #E5E6EA */
+  --secondary-foreground: 222 15% 18%;
 
-  --muted: 220 14% 90%;
-  --muted-foreground: 220 10% 45%;
+  --muted: 220 14% 91%;
+  --muted-foreground: 220 9% 50%;   /* #797E8A */
 
-  --accent: 220 14% 88%;
-  --accent-foreground: 220 16% 18%;
+  --accent: 220 14% 91%;
+  --accent-foreground: 222 15% 18%;
 
-  --destructive: 0 72% 52%;
+  /* Reds reserved for negatives / destructive */
+  --destructive: 8 60% 49%;          /* #C24A36 */
   --destructive-foreground: 0 0% 100%;
 
   /* Hairline borders */
-  --border: 220 16% 87%;
-  --input: 220 16% 86%;
-  --ring: 214 89% 52%;
+  --border: 220 13% 88%;             /* #DDDEE4 */
+  --input: 220 13% 85%;
+  --ring: 222 15% 12%;
 
-  --border-radius: 1rem;            /* 16px */
-  --sidebar-width: 236px;
-  --header-height: 54px;
+  --border-radius: 1rem;             /* 16px */
+  --sidebar-width: 248px;
+  --header-height: 64px;
+
+  /* Brand accents (used directly, not through Tailwind tokens) */
+  --pos: 150 64% 33%;                /* #1F8A5B emerald */
+  --pos-soft: 145 38% 92%;           /* #E3F3EB */
+  --neg: 8 60% 49%;                  /* #C24A36 */
+  --neg-soft: 12 80% 93%;            /* #FBE6E0 */
+  --hot: 14 100% 62%;                /* #FF6A3D */
+  --chip: 220 14% 91%;               /* #E5E6EA — matches secondary on cool palette */
+  --line-2: 220 13% 86%;             /* #DADCE2 */
 }
 
-/* Light-only app: dark class intentionally maps back to the same neutral theme. */
+/* The dark class maps back to the same light neutral theme (light-only app). */
 .dark {
-  --background: 220 20% 97%;
-  --foreground: 220 16% 12%;
-
+  --background: 220 14% 95%;
+  --foreground: 222 15% 12%;
   --card: 0 0% 100%;
-  --card-foreground: 220 16% 12%;
-
+  --card-foreground: 222 15% 12%;
   --popover: 0 0% 100%;
-  --popover-foreground: 220 16% 12%;
-
-  --primary: 214 89% 52%;
+  --popover-foreground: 222 15% 12%;
+  --primary: 222 15% 12%;
   --primary-foreground: 0 0% 100%;
-
-  --secondary: 220 14% 90%;
-  --secondary-foreground: 220 16% 18%;
-
-  --muted: 220 14% 90%;
-  --muted-foreground: 220 10% 45%;
-
-  --accent: 220 14% 88%;
-  --accent-foreground: 220 16% 18%;
-
-  --destructive: 0 72% 52%;
+  --secondary: 220 14% 91%;
+  --secondary-foreground: 222 15% 18%;
+  --muted: 220 14% 91%;
+  --muted-foreground: 220 9% 50%;
+  --accent: 220 14% 91%;
+  --accent-foreground: 222 15% 18%;
+  --destructive: 8 60% 49%;
   --destructive-foreground: 0 0% 100%;
-
-  --border: 220 16% 87%;
-  --input: 220 16% 86%;
-  --ring: 214 89% 52%;
+  --border: 220 13% 88%;
+  --input: 220 13% 85%;
+  --ring: 222 15% 12%;
 }
 
 /* ── Base styles ───────────────────────────────────────────────────────────── */
@@ -116,10 +119,7 @@
   }
 
   body {
-    background:
-      radial-gradient(1200px 500px at 10% -10%, rgba(115, 173, 255, 0.15), transparent 60%),
-      radial-gradient(900px 420px at 95% 0%, rgba(153, 199, 255, 0.14), transparent 62%),
-      hsl(var(--background));
+    background: hsl(var(--background));
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -131,10 +131,10 @@
     scroll-behavior: smooth;
   }
 
-  h1 { font-size: 1.875rem; font-weight: 700; letter-spacing: -0.025em; line-height: 1.2; }
-  h2 { font-size: 1.5rem;   font-weight: 600; letter-spacing: -0.02em;  line-height: 1.3; }
-  h3 { font-size: 1.25rem;  font-weight: 600; letter-spacing: -0.015em; line-height: 1.4; }
-  h4 { font-size: 1.125rem; font-weight: 500; line-height: 1.5; }
+  h1 { font-size: 2.25rem; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05; }
+  h2 { font-size: 1.5rem;  font-weight: 700; letter-spacing: -0.025em; line-height: 1.25; }
+  h3 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em;  line-height: 1.35; }
+  h4 { font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.45; }
 }
 
 /* ── Dropdown pop-in animation ─────────────────────────────────────────────── */
@@ -172,20 +172,24 @@
   .scrollbar-thin::-webkit-scrollbar-track  { background: transparent; }
   .scrollbar-thin::-webkit-scrollbar-thumb  { background-color: hsl(var(--border)); border-radius: 3px; }
 
-  /* Card-style shadow used in sidebar active items */
+  /* Soft, very subtle card shadow + hairline ring */
   .shadow-card {
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 14px 38px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 1px 2px rgba(20, 20, 30, 0.04), 0 0 0 1px hsl(var(--border));
   }
 
-  /* Primary button lift */
+  /* Primary button "lift" — soft, no saturated glow */
   .shadow-primary-glow {
-    box-shadow: 0 8px 20px rgba(10, 132, 255, 0.26), 0 1px 2px rgba(10, 132, 255, 0.2);
+    box-shadow: 0 1px 2px rgba(20, 20, 30, 0.06), 0 6px 18px rgba(20, 20, 30, 0.10);
   }
 
   .glass-panel {
-    background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.52));
+    background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.65));
     backdrop-filter: blur(16px) saturate(120%);
     -webkit-backdrop-filter: blur(16px) saturate(120%);
-    border: 1px solid rgba(255,255,255,0.75);
+    border: 1px solid hsl(var(--border));
   }
+
+  /* Positive/negative chip helpers (used by status pills) */
+  .chip-pos { background: hsl(var(--pos-soft)); color: hsl(var(--pos)); }
+  .chip-neg { background: hsl(var(--neg-soft)); color: hsl(var(--neg)); }
 }

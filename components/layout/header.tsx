@@ -46,7 +46,7 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
 function RoleBadge({ role }: { role: WorkspaceRole }) {
   return (
     <span className={cn(
-      'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
+      'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
       ROLE_STYLES[role]
     )}>
       {ROLE_LABELS[role]}
@@ -186,40 +186,40 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex h-[var(--header-height)] shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur lg:px-5">
+      <header className="sticky top-0 z-20 flex h-[var(--header-height)] shrink-0 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur lg:px-6">
         {/* Mobile menu */}
         <button
           type="button"
           onClick={handleMobileMenu}
-          className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground lg:hidden"
+          className="rounded-full p-2 text-muted-foreground hover:bg-secondary hover:text-foreground lg:hidden"
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
         </button>
 
-        {/* Page title */}
-        <h1 className="text-[15px] font-semibold leading-none tracking-[-0.01em] min-w-0 truncate">
+        {/* Page title — display size */}
+        <h1 className="text-[26px] font-bold leading-none tracking-[-0.035em] min-w-0 truncate">
           {pageTitle}
         </h1>
 
-        {/* Search bar — pushes right with ml-auto but doesn't crowd buttons */}
-        <div ref={searchBoxRef} className="relative ml-auto hidden md:block w-56 lg:w-72">
+        {/* Search pill */}
+        <div ref={searchBoxRef} className="relative ml-auto hidden md:block w-64 lg:w-80">
           <form
             onSubmit={handleSearch}
-            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-muted-foreground shadow-card"
+            className="flex h-11 items-center gap-2 rounded-full border border-border bg-card px-4 text-muted-foreground"
           >
-            <Search className="h-3.5 w-3.5 shrink-0" />
+            <Search className="h-4 w-4 shrink-0" />
             <input
               ref={searchRef}
               value={searchQuery}
               onFocus={() => { if (searchResults.length > 0) setResultsOpen(true) }}
               onChange={e => setSearchQuery(e.target.value)}
-              className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground min-w-0"
-              placeholder="Search leads…"
+              className="flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground min-w-0"
+              placeholder="Search leads, deals, people…"
             />
             {searchQuery ? (
               <button type="button" onClick={() => { setSearchQuery(''); setResultsOpen(false) }} className="shrink-0 text-muted-foreground hover:text-foreground">
-                <X className="h-3 w-3" />
+                <X className="h-3.5 w-3.5" />
               </button>
             ) : (
               <kbd className="hidden rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground sm:block shrink-0">
@@ -229,7 +229,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
           </form>
 
           {resultsOpen && (searchLoading || searchResults.length > 0) && (
-            <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-border bg-popover shadow-card">
+            <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-border bg-popover shadow-card">
               {searchLoading ? (
                 <div className="px-3 py-2 text-xs text-muted-foreground">Searching…</div>
               ) : (
@@ -243,13 +243,13 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
                         setResultsOpen(false)
                         setSearchQuery('')
                       }}
-                      className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left hover:bg-muted"
+                      className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left hover:bg-secondary"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">{lead.name}</p>
+                        <p className="truncate text-sm font-semibold text-foreground">{lead.name}</p>
                         <p className="truncate text-xs text-muted-foreground">{lead.company ?? 'No company'} · {lead.email}</p>
                       </div>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase text-muted-foreground">{lead.status}</span>
+                      <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] uppercase text-muted-foreground">{lead.status}</span>
                     </button>
                   ))}
                 </div>
@@ -258,29 +258,29 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
           )}
         </div>
 
-        {/* Right actions — always visible, shrink-0 prevents squishing */}
-        <div className="flex shrink-0 items-center gap-1 ml-2">
+        {/* Right actions */}
+        <div className="flex shrink-0 items-center gap-2 ml-2">
           {/* Mobile search button */}
           <button
             type="button"
             onClick={() => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 50) }}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors md:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-secondary transition-colors md:hidden"
           >
             <Search className="h-4 w-4" />
           </button>
 
-          {/* Notifications */}
-          <div className="flex h-9 w-9 items-center justify-center relative z-30">
+          {/* Notifications — wrapped in a round white pill */}
+          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-secondary transition-colors relative z-30">
             {role === 'rep' ? <FollowUpBell /> : <NotificationBell />}
           </div>
 
-          {/* User dropdown */}
-          <div className="relative ml-1 z-30" ref={dropdownRef}>
+          {/* User dropdown — round avatar pill */}
+          <div className="relative ml-0.5 z-30" ref={dropdownRef}>
             <button
               type="button"
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className={cn(
-                'flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm transition-colors',
+                'flex items-center gap-2 rounded-full border border-border bg-card pl-1 pr-3 py-1 text-sm transition-colors',
                 'hover:bg-secondary',
                 dropdownOpen && 'bg-secondary'
               )}
@@ -288,7 +288,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
               aria-haspopup="menu"
             >
               <Avatar name={displayName} size="sm" />
-              <span className="hidden max-w-[100px] truncate text-[13.5px] font-semibold md:block">
+              <span className="hidden max-w-[100px] truncate text-[13px] font-semibold md:block">
                 {fullName ?? email.split('@')[0]}
               </span>
               <ChevronDown className={cn(
@@ -300,7 +300,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
             {dropdownOpen && (
               <div
                 role="menu"
-                className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-popover shadow-card"
+                className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-border bg-popover shadow-card"
               >
                 <div className="px-3.5 py-3">
                   <div className="flex items-center gap-2.5">
@@ -343,7 +343,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
       {/* Mobile full-screen search overlay */}
       {searchOpen && (
         <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col p-4 md:hidden">
-          <form onSubmit={handleSearch} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-card">
+          <form onSubmit={handleSearch} className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 shadow-card">
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <input
               ref={searchRef}
@@ -359,7 +359,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
           </form>
           {searchQuery.trim() && (
             <button type="button" onClick={runSearch}
-              className="mt-3 rounded-xl bg-primary text-primary-foreground py-3 text-sm font-medium">
+              className="mt-3 rounded-full bg-primary text-primary-foreground py-3 text-sm font-semibold">
               Search for &quot;{searchQuery}&quot;
             </button>
           )}
@@ -376,34 +376,34 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lead Contact</p>
                   <h3 className="text-base font-semibold">{selectedLead.name}</h3>
                 </div>
-                <button type="button" onClick={() => setSelectedLead(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label="Close">
+                <button type="button" onClick={() => setSelectedLead(null)} className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary" aria-label="Close">
                   <X className="h-4 w-4" />
                 </button>
               </div>
               <div className="space-y-3 p-4 text-sm">
-                <div className="rounded-lg border border-border px-3 py-2">
+                <div className="rounded-2xl border border-border px-3 py-2">
                   <p className="text-xs text-muted-foreground">Email</p>
                   <p className="font-medium">{selectedLead.email}</p>
                 </div>
-                <div className="rounded-lg border border-border px-3 py-2">
+                <div className="rounded-2xl border border-border px-3 py-2">
                   <p className="text-xs text-muted-foreground">Phone</p>
                   <p className="font-medium">{selectedLead.phone ?? '—'}</p>
                 </div>
-                <div className="rounded-lg border border-border px-3 py-2">
+                <div className="rounded-2xl border border-border px-3 py-2">
                   <p className="text-xs text-muted-foreground">Company</p>
                   <p className="font-medium">{selectedLead.company ?? '—'}</p>
                 </div>
-                <div className="rounded-lg border border-border px-3 py-2">
+                <div className="rounded-2xl border border-border px-3 py-2">
                   <p className="text-xs text-muted-foreground">Title</p>
                   <p className="font-medium">{selectedLead.title ?? '—'}</p>
                 </div>
-                <div className="rounded-lg border border-border px-3 py-2">
+                <div className="rounded-2xl border border-border px-3 py-2">
                   <p className="text-xs text-muted-foreground">Status</p>
                   <p className="font-medium capitalize">{selectedLead.status.replace('_', ' ')}</p>
                 </div>
                 <Link
                   href={`/leads/${selectedLead.id}`}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-secondary"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                   Open Full Lead

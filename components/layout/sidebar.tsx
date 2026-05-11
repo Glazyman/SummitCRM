@@ -8,7 +8,6 @@ import {
   Users,
   Settings,
   PlusCircle,
-  Building2,
   MoreHorizontal,
   Kanban,
   ListChecks,
@@ -115,56 +114,57 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
   }).filter((item) => canAccess(role ?? null, item.minRole))
 
   const isAdmin = role === 'admin' || role === 'super_admin'
-  const isRep   = role === 'rep'
   const initials = getInitials(userName, userEmail)
   const displayName = userName ?? userEmail?.split('@')[0] ?? 'You'
 
   return (
     <aside className={cn(
-      'flex h-full flex-col border-r border-border bg-background transition-all duration-200',
-      'relative',
-      collapsed ? 'w-[60px]' : 'w-[var(--sidebar-width)]'
+      'flex h-full flex-col bg-background transition-all duration-200',
+      'relative border-r border-border',
+      collapsed ? 'w-[64px]' : 'w-[var(--sidebar-width)]'
     )}>
       <button
         type="button"
         onClick={toggleCollapsed}
         className={cn(
-          'absolute -right-4 top-4 z-30',
+          'absolute -right-4 top-6 z-30',
           'flex h-8 w-8 items-center justify-center rounded-full',
-          'border border-white/80 bg-white/95 backdrop-blur-md',
-          'text-foreground shadow-card ring-1 ring-black/5',
-          'transition-all hover:scale-105 hover:bg-white'
+          'border border-border bg-card text-foreground shadow-card',
+          'transition-all hover:scale-105 hover:bg-secondary'
         )}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
       </button>
+
       {/* Brand */}
       {collapsed ? (
-        <div className="flex flex-col items-center gap-3 px-2 pb-3 pt-4">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold text-foreground shadow-card">
+        <div className="flex flex-col items-center gap-3 px-2 pb-4 pt-5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-foreground text-[13px] font-bold text-background">
             {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
           </div>
         </div>
       ) : (
-        /* Expanded: workspace name */
-        <div className="flex items-center gap-2.5 px-3 pb-3 pt-4">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold text-foreground shadow-card">
+        <div className="flex items-center gap-2.5 px-4 pb-5 pt-5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-foreground text-[13px] font-bold text-background">
             {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
           </div>
-          <p className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-none tracking-[-0.02em]">
+          <p className="min-w-0 flex-1 truncate text-[15px] font-bold leading-none tracking-[-0.02em]">
             {workspaceName ?? 'Summit Mergers'}
           </p>
         </div>
       )}
 
       {/* Main nav */}
-      <nav className="flex flex-1 flex-col overflow-y-auto px-2 scrollbar-thin">
+      <nav className={cn(
+        'flex flex-1 flex-col overflow-y-auto scrollbar-thin',
+        collapsed ? 'px-2' : 'px-3'
+      )}>
         {isAdmin && !collapsed && (
           <Link
             href="/leads/import"
-            className="mb-3 flex items-center gap-2 rounded-lg bg-primary px-2.5 py-2 text-[13px] font-medium text-primary-foreground shadow-primary-glow transition-colors hover:bg-primary/90"
+            className="mb-3 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground px-3 text-[13px] font-semibold text-background shadow-primary-glow transition-colors hover:bg-foreground/90"
           >
             <PlusCircle className="h-4 w-4" />
             Import
@@ -173,7 +173,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
         {isAdmin && collapsed && (
           <Link
             href="/leads/import"
-            className="mb-3 flex items-center justify-center rounded-lg bg-primary p-2 text-primary-foreground shadow-primary-glow transition-colors hover:bg-primary/90"
+            className="mb-3 flex items-center justify-center rounded-full bg-foreground p-2.5 text-background shadow-primary-glow transition-colors hover:bg-foreground/90"
             title="Import"
           >
             <PlusCircle className="h-4 w-4" />
@@ -186,27 +186,49 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
           ))}
         </div>
 
-        {/* Settings section for admins */}
         {isAdmin && !collapsed && (
-          <div className="mt-6">
-            <p className="mb-2 px-2 text-[11px] font-medium text-muted-foreground">Admin</p>
-            <NavLink item={{ label: 'Import',       href: '/leads/import',  icon: PlusCircle }} active={isActive('/leads/import')} />
-            <NavLink item={{ label: 'Analytics',    href: '/analytics',     icon: BarChart2 }}  active={isActive('/analytics')} />
-            <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }}      active={isActive('/settings/team')} />
+          <div className="mt-7">
+            <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Admin</p>
+            <div className="flex flex-col gap-1">
+              <NavLink item={{ label: 'Import',       href: '/leads/import',  icon: PlusCircle }} active={isActive('/leads/import')} />
+              <NavLink item={{ label: 'Analytics',    href: '/analytics',     icon: BarChart2 }}  active={isActive('/analytics')} />
+              <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }}      active={isActive('/settings/team')} />
+            </div>
           </div>
         )}
         {isAdmin && collapsed && (
-          <div className="mt-4">
+          <div className="mt-4 flex flex-col gap-1">
             <NavLink item={{ label: 'Import',       href: '/leads/import',  icon: PlusCircle }} active={isActive('/leads/import')} collapsed />
             <NavLink item={{ label: 'Analytics',    href: '/analytics',     icon: BarChart2 }}  active={isActive('/analytics')} collapsed />
             <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }}      active={isActive('/settings/team')} collapsed />
           </div>
         )}
 
+        {/* Quota / activities widget — fills bottom space */}
+        {!collapsed && activitiesDue !== undefined && (
+          <div className="mt-auto mb-3 rounded-2xl border border-border bg-card p-3.5 shadow-card">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(var(--pos))' }} />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Today</span>
+            </div>
+            <div className="mt-2 text-[22px] font-bold leading-none tracking-[-0.04em]">
+              {activitiesDue} <span className="text-[12px] font-medium text-muted-foreground">due</span>
+            </div>
+            <Link
+              href="/activities"
+              className="mt-3 inline-flex items-center text-[11px] font-semibold text-foreground hover:underline"
+            >
+              View activities →
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Bottom nav */}
-      <div className="flex flex-col gap-1 px-2 pb-3 pt-2">
+      <div className={cn(
+        'flex flex-col gap-1 pb-3 pt-2',
+        collapsed ? 'px-2' : 'px-3'
+      )}>
         {bottomNav.map((item) => (
           <NavLink key={item.href} item={item} active={isActive(item.href)} collapsed={collapsed} />
         ))}
@@ -214,16 +236,16 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
 
       {/* Footer — user info */}
       <div className={cn(
-        'flex items-center border-t border-border px-2 py-3',
-        collapsed ? 'justify-center' : 'gap-2.5'
+        'flex items-center border-t border-border',
+        collapsed ? 'justify-center px-2 py-3' : 'gap-2.5 px-3 py-3'
       )}>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-[11px] font-semibold text-foreground">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-card text-[11px] font-bold text-foreground">
           {initials}
         </div>
         {!collapsed && (
           <>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium leading-tight">{displayName}</p>
+              <p className="truncate text-[13px] font-semibold leading-tight">{displayName}</p>
               {userEmail && (
                 <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">{userEmail}</p>
               )}
@@ -232,7 +254,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-all hover:shadow-sm hover:text-foreground"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-secondary hover:text-foreground"
                   aria-label="More options"
                 >
                   <MoreHorizontal className="h-4 w-4" />
@@ -278,17 +300,20 @@ function NavLink({
       href={item.href}
       title={collapsed ? item.label : undefined}
       className={cn(
-        'flex items-center rounded-lg py-2 text-[13px] font-medium transition-colors duration-100',
-        collapsed ? 'justify-center px-2' : 'gap-2.5 px-2.5',
+        'flex items-center rounded-xl text-[13.5px] font-medium transition-all duration-150',
+        collapsed ? 'h-10 w-10 justify-center mx-auto' : 'gap-3 px-3 py-2.5',
         active
-          ? 'bg-primary text-primary-foreground shadow-primary-glow'
-          : 'text-foreground/75 hover:bg-secondary hover:text-foreground'
+          ? 'bg-card text-foreground shadow-card font-semibold'
+          : 'text-foreground/65 hover:bg-secondary hover:text-foreground'
       )}
     >
       <span className="relative shrink-0">
-        <Icon className={cn('h-4 w-4', active ? 'text-primary-foreground' : 'text-muted-foreground')} />
+        <Icon className={cn('h-[18px] w-[18px]', active ? 'text-foreground' : 'text-foreground/60')} />
         {collapsed && item.badge != null && item.badge > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground">
+          <span
+            className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
+            style={{ background: 'hsl(var(--hot))' }}
+          >
             {item.badge > 9 ? '9+' : item.badge}
           </span>
         )}
@@ -296,12 +321,8 @@ function NavLink({
       {!collapsed && <span className="flex-1">{item.label}</span>}
       {!collapsed && item.badge != null && item.badge > 0 && (
         <span
-          className={cn(
-            'rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none',
-            active
-              ? 'bg-primary-foreground/15 text-primary-foreground'
-              : 'bg-secondary text-muted-foreground'
-          )}
+          className="rounded-full px-2 py-0.5 text-[10px] font-bold leading-none text-white"
+          style={{ background: 'hsl(var(--foreground))' }}
         >
           {item.badge > 99 ? '99+' : item.badge}
         </span>

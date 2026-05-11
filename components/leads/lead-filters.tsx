@@ -176,7 +176,7 @@ export function LeadFiltersPanel({
                 'flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-all',
                 filters.myLeads
                   ? 'border-primary/50 bg-primary/5 text-primary shadow-sm'
-                  : 'border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground',
+                  : 'border-border bg-background text-muted-foreground hover:shadow-sm',
               )}
             >
               <User className="h-3.5 w-3.5" />
@@ -192,7 +192,7 @@ export function LeadFiltersPanel({
               'flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-all',
               expanded || hasActiveFilters
                 ? 'border-primary/50 bg-primary/5 text-primary shadow-sm'
-                : 'border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground',
+                : 'border-border bg-background text-muted-foreground hover:shadow-sm',
             )}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -213,7 +213,7 @@ export function LeadFiltersPanel({
             <button
               type="button"
               onClick={() => { setLocalSearch(''); onClear() }}
-              className="flex h-9 items-center gap-1 rounded-lg border border-border bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:border-muted-foreground hover:text-foreground"
+              className="flex h-9 items-center gap-1 rounded-lg border border-border bg-background px-2.5 text-sm text-muted-foreground transition-all hover:shadow-sm"
             >
               <X className="h-3.5 w-3.5" />
               Clear
@@ -263,7 +263,7 @@ export function LeadFiltersPanel({
                       'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium transition-all duration-150',
                       active
                         ? cn(meta.pill, 'border-current shadow-sm ring-1 ring-current/30')
-                        : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
+                        : 'border-border bg-muted/50 text-muted-foreground hover:shadow-sm',
                     )}
                   >
                     <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', active ? meta.dot : 'bg-current opacity-40')} />
@@ -290,7 +290,7 @@ export function LeadFiltersPanel({
                       'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium transition-all duration-150',
                       active
                         ? cn(meta.badge, 'shadow-sm scale-[1.02]')
-                        : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
+                        : 'border-border bg-muted/50 text-muted-foreground hover:shadow-sm',
                     )}
                   >
                     <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', active ? meta.dot : 'bg-current opacity-40')} />

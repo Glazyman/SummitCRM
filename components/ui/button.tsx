@@ -4,22 +4,22 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium tracking-[-0.01em] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold tracking-[-0.01em] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-primary-glow hover:shadow-[0_4px_16px_rgba(10,132,255,0.35)] hover:bg-primary/95',
+          'bg-primary text-primary-foreground shadow-primary-glow hover:bg-primary/90',
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/95 hover:shadow-md',
         outline:
-          'border border-border bg-card text-foreground shadow-card hover:shadow-md',
+          'border border-border bg-card text-foreground shadow-card hover:bg-secondary',
         secondary:
-          'bg-card text-foreground border border-border shadow-card hover:shadow-md',
+          'bg-card text-foreground border border-border shadow-card hover:bg-secondary',
         ghost:
-          'text-muted-foreground hover:text-foreground hover:shadow-sm',
+          'text-muted-foreground hover:bg-secondary hover:text-foreground',
         link:
-          'text-foreground underline-offset-4 hover:underline',
+          'text-foreground underline-offset-4 hover:underline rounded-none',
       },
       size: {
         default: 'h-10 px-5',

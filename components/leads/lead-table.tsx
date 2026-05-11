@@ -340,7 +340,7 @@ function StatusDropdown({
         <Button
           size="sm"
           variant="outline"
-          className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', meta.badge)}
+          className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap hover:bg-transparent hover:shadow-sm', meta.badge)}
         >
           {meta.label}
           <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
@@ -383,9 +383,9 @@ function InterestDropdown({
         <Button
           size="sm"
           variant="outline"
-          className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', meta.badge)}
+          className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap hover:bg-transparent hover:shadow-sm', meta.badge)}
         >
-          {meta.icon} {meta.label}
+          {meta.label}
           <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
@@ -400,7 +400,7 @@ function InterestDropdown({
               className={cn(current && 'opacity-50 cursor-default')}
             >
               <span className={cn('h-2 w-2 rounded-full', m.dot)} />
-              {m.icon} {m.label}
+              {m.label}
               {current && <span className="ml-auto text-xs text-muted-foreground">current</span>}
             </DropdownMenuItem>
           )
