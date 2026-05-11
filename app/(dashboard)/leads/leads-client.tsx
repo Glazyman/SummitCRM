@@ -154,12 +154,23 @@ export function LeadsClient({
   const [leads, setLeads]               = React.useState<LeadRow[]>(initialLeads)
   const [selectedIds, setSelectedIds]   = React.useState<Set<string>>(new Set())
   const [createOpen, setCreateOpen]     = React.useState(false)
+  // Per-user localStorage key — each user's column preferences are saved separately
+  const colConfigKey = `leads_column_config_${currentUserId}`
+  const viewModeKey  = `leads_view_mode_${currentUserId}`
+
   const [visibleColumns, setVisibleCols] = React.useState<Set<ColumnId>>(() => {
     try {
-      const saved = localStorage.getItem('leads_column_config')
+      const saved = localStorage.getItem(colConfigKey)
       if (saved) {
         const { visible } = JSON.parse(saved) as { visible: ColumnId[] }
-        if (Array.isArray(visible)) return new Set(visible as ColumnId[])
+        if (Array.isArray(visible)) {
+          const validIds = new Set(COLUMNS.map(c => c.id))
+          const filtered = visible.filter(id => validIds.has(id as ColumnId)) as ColumnId[]
+          // Also include any new columns added since the user last saved (use their defaults)
+          const savedSet = new Set(filtered)
+          COLUMNS.forEach(c => { if (!savedSet.has(c.id) && c.defaultOn) filtered.push(c.id) })
+          return new Set(filtered)
+        }
       }
     } catch { /* ignore */ }
     const defaults = new Set(COLUMNS.filter((c) => c.defaultOn).map((c) => c.id))
@@ -168,15 +179,16 @@ export function LeadsClient({
   })
   const [columnOrder, setColumnOrder] = React.useState<ColumnId[]>(() => {
     try {
-      const saved = localStorage.getItem('leads_column_config')
+      const saved = localStorage.getItem(colConfigKey)
       if (saved) {
         const { order } = JSON.parse(saved) as { order: ColumnId[] }
         if (Array.isArray(order)) {
-          const allIds = new Set(DEFAULT_COLUMN_ORDER)
-          const savedIds = new Set(order)
-          if (DEFAULT_COLUMN_ORDER.every(id => savedIds.has(id)) && order.every(id => allIds.has(id))) {
-            return order
-          }
+          const validIds = new Set(DEFAULT_COLUMN_ORDER)
+          // Keep saved order for known columns; append any new columns at the end
+          const savedValid = order.filter(id => validIds.has(id as ColumnId)) as ColumnId[]
+          const savedSet   = new Set(savedValid)
+          const newCols    = DEFAULT_COLUMN_ORDER.filter(id => !savedSet.has(id))
+          return [...savedValid, ...newCols]
         }
       }
     } catch { /* ignore */ }
@@ -192,7 +204,7 @@ export function LeadsClient({
   } | null>(null)
   const [leadView, setLeadView] = React.useState<'table' | 'cards'>(() => {
     try {
-      const saved = localStorage.getItem('leads_view_mode')
+      const saved = localStorage.getItem(viewModeKey)
       return saved === 'cards' ? 'cards' : 'table'
     } catch {
       return 'table'
@@ -518,7 +530,7 @@ export function LeadsClient({
     setColumnOrder(order)
     setVisibleCols(new Set(visible))
     try {
-      localStorage.setItem('leads_column_config', JSON.stringify({
+      localStorage.setItem(colConfigKey, JSON.stringify({
         order,
         visible: [...visible],
       }))
@@ -545,7 +557,7 @@ export function LeadsClient({
 
   function setViewMode(mode: 'table' | 'cards') {
     setLeadView(mode)
-    try { localStorage.setItem('leads_view_mode', mode) } catch {}
+    try { localStorage.setItem(viewModeKey, mode) } catch {}
   }
 
   // ── Render ─────────────────────────────────────────────────────────────
