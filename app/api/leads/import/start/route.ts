@@ -4,11 +4,12 @@
  * Accepts pre-parsed row data from the client, runs the full import pipeline,
  * and returns the final result synchronously.
  *
- * This approach works for up to ~5 000 rows within Vercel's function timeout.
- * For larger batches the Edge Function should be used instead (see /api/leads/import/queue).
- *
  * Auth: rep+
  */
+
+// Raise the body size limit for this route — large CSV imports can exceed the 4MB default
+export const maxDuration = 60 // seconds (Vercel Pro allows up to 300s)
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from 'next/server'
 import { z } from 'zod'

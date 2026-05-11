@@ -34,11 +34,25 @@ export function ImportPageClient({ batches, teamMembers }: ImportPageClientProps
     customFieldNames: CustomFieldNames
     options:          ImportOptions
   }): Promise<ImportResult> {
+    // Only send the columns that are actually mapped (not ignored).
+    // This strips all unmapped/ignored CSV columns before sending,
+    // which can reduce the payload by 80%+ for files with many columns.
+    const mappedColumns = Object.entries(mapping)
+      .filter(([, field]) => field !== 'ignore')
+      .map(([col]) => col)
+    const strippedRows = file.rawData.map((row) => {
+      const lean: Record<string, string> = {}
+      for (const col of mappedColumns) {
+        if (col in row) lean[col] = row[col]
+      }
+      return lean
+    })
+
     const res = await fetch('/api/leads/import/start', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        rows:             file.rawData,
+        rows:             strippedRows,
         mapping,
         customFieldNames,
         batchId:          options.batchId ?? null,
