@@ -21,7 +21,7 @@ import type {
   LeadDetail, ActivityEntry,
   FollowUp, NewFollowUp, TeamMember, LeadStatus,
 } from '@/components/leads/detail/types'
-import type { CallLogItem, NewCall } from '@/components/leads/detail/call-history'
+import type { CallLogItem } from '@/components/leads/detail/call-history'
 import type { InterestStatus } from '@/types/database'
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
@@ -240,30 +240,6 @@ export function LeadFullPanel({
     await fetch(`/api/leads/${leadId}/follow-ups/${id}`, { method: 'DELETE' }).catch(console.error)
   }
 
-  // ── Call mutations — auto-syncs lead status to call outcome ──────────
-  async function handleLogCall(call: NewCall) {
-    const res  = await fetch(`/api/leads/${leadId}/calls`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(call) })
-    const json = await res.json()
-    setData((d) => d ? { ...d, calls: [{ ...json.call, logger_name: 'You' }, ...d.calls] } : d)
-    if (json.follow_up_suggestion) {
-      setFollowUpPrompt({
-        ...(json.follow_up_suggestion as { title: string; notes: string | null; due_at: string }),
-        due_at: tomorrowAt11LocalIso(),
-      })
-    } else {
-      setFollowUpPrompt(null)
-    }
-
-    const outcomeToStatus: Partial<Record<typeof call.outcome, LeadStatus>> = {
-      answered:           'called',
-      voicemail:          'voicemail',
-      no_answer:          'no_answer',
-      wrong_number:       'wrong_number',
-      callback_requested: 'called',
-    }
-    const newStatus = outcomeToStatus[call.outcome]
-    if (newStatus) await handleStatusChange(newStatus)
-  }
 
   async function scheduleSuggestedFollowUp() {
     if (!followUpPrompt) return
@@ -491,8 +467,7 @@ export function LeadFullPanel({
               {activeTab === 'calls' && (
                 <CallHistory
                   calls={data.calls}
-                  onLogCall={handleLogCall}
-                  currentUserId={currentUserId}
+                  
                 />
               )}
               {activeTab === 'questionnaire' && (

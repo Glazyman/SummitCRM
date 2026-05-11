@@ -16,7 +16,7 @@ import type {
   LeadDetail, ActivityEntry,
   FollowUp, NewFollowUp, TeamMember, LeadStatus,
 } from '@/components/leads/detail/types'
-import type { CallLogItem, NewCall } from '@/components/leads/detail/call-history'
+import type { CallLogItem } from '@/components/leads/detail/call-history'
 
 // ── Tab config ────────────────────────────────────────────────────────────
 const TABS = [
@@ -404,30 +404,6 @@ export default function LeadDetailClient({
     setActivity((prev) => [entry, ...prev])
   }
 
-  // ── Call log handler — auto-syncs lead status to call outcome ────────
-  async function handleLogCall(data: NewCall) {
-    const res = await fetch(`/api/leads/${lead.id}/calls`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(data),
-    })
-    const json = await res.json()
-    if (!res.ok) throw new Error(json.error ?? 'Failed to log call')
-
-    setCalls((prev) => [{ ...json.call, logger_name: 'You' }, ...prev])
-    addActivity({ type: 'call_logged', metadata: { call_outcome: data.outcome } })
-
-    // Sync lead status to match the call outcome
-    const outcomeToStatus: Partial<Record<typeof data.outcome, LeadStatus>> = {
-      answered:           'called',
-      voicemail:          'voicemail',
-      no_answer:          'no_answer',
-      wrong_number:       'wrong_number',
-      callback_requested: 'called',
-    }
-    const newStatus = outcomeToStatus[data.outcome]
-    if (newStatus) await handleStatusChange(newStatus)
-  }
 
   // ── Pending count badges ──────────────────────────────────────────────
   const pendingFollowUps = followUps.filter((f) => !f.is_completed).length
@@ -558,8 +534,7 @@ export default function LeadDetailClient({
             >
               <CallHistory
                 calls={calls}
-                onLogCall={handleLogCall}
-                currentUserId={currentUserId}
+                
               />
             </Section>
 
