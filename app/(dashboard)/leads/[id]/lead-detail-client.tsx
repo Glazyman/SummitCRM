@@ -533,8 +533,8 @@ export default function LeadDetailClient({
               alwaysVisible
             >
               <CallHistory
+                leadId={lead.id}
                 calls={calls}
-                
               />
             </Section>
 

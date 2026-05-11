@@ -466,8 +466,8 @@ export function LeadFullPanel({
               )}
               {activeTab === 'calls' && (
                 <CallHistory
+                  leadId={leadId}
                   calls={data.calls}
-                  
                 />
               )}
               {activeTab === 'questionnaire' && (
