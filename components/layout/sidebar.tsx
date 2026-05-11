@@ -127,10 +127,9 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
         type="button"
         onClick={toggleCollapsed}
         className={cn(
-          'absolute -right-4 top-6 z-30',
-          'flex h-8 w-8 items-center justify-center rounded-full',
-          'border border-border bg-card text-foreground shadow-card',
-          'transition-all hover:scale-105 hover:bg-secondary'
+          'absolute -right-2.5 top-1/2 -translate-y-1/2 z-30',
+          'flex h-5 w-5 items-center justify-center',
+          'text-muted-foreground transition-colors hover:text-foreground'
         )}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -204,24 +203,6 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
           </div>
         )}
 
-        {/* Quota / activities widget — fills bottom space */}
-        {!collapsed && activitiesDue !== undefined && (
-          <div className="mt-auto mb-3 rounded-2xl border border-border bg-card p-3.5 shadow-card">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(var(--pos))' }} />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Today</span>
-            </div>
-            <div className="mt-2 text-[22px] font-bold leading-none tracking-[-0.04em]">
-              {activitiesDue} <span className="text-[12px] font-medium text-muted-foreground">due</span>
-            </div>
-            <Link
-              href="/activities"
-              className="mt-3 inline-flex items-center text-[11px] font-semibold text-foreground hover:underline"
-            >
-              View activities →
-            </Link>
-          </div>
-        )}
       </nav>
 
       {/* Bottom nav */}
