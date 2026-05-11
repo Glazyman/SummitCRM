@@ -15,7 +15,6 @@ async function parseCSV(file: File): Promise<ParsedFile> {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      preview: 1001, // parse first 1001 rows for preview (1 header + 1000 data rows)
       complete: (results) => {
         const data = results.data as Record<string, string>[]
         const headers = results.meta.fields ?? []
