@@ -90,8 +90,10 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
   const [showNew,         setShowNew]         = useState(false)
   const [saving,          setSaving]          = useState(false)
   const [pageView,        setPageView]        = useState<'list' | 'calendar'>('list')
-  const [calendarDay,     setCalendarDay]     = useState<Date | null>(null)
-  const [calendarLeadId,  setCalendarLeadId]  = useState<string | null>(null)
+  const [calendarDay,            setCalendarDay]            = useState<Date | null>(null)
+  const [calendarLeadId,         setCalendarLeadId]         = useState<string | null>(null)
+  const [calendarFilterAssigned, setCalendarFilterAssigned] = useState('')
+  const [calendarFilterStatus,   setCalendarFilterStatus]   = useState('open')
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   useEffect(() => {
@@ -129,6 +131,18 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
       return true
     })
   }, [activities, search, filterType, filterAssigned, filterDone, justCompleted])
+
+  // ── Calendar-specific filtered activities ────────────────────────────────
+  const calendarFiltered = useMemo(() => {
+    const now = new Date()
+    return activities.filter((a) => {
+      if (calendarFilterAssigned && a.assigned_to !== calendarFilterAssigned) return false
+      if (calendarFilterStatus === 'open')     return !a.completed_at
+      if (calendarFilterStatus === 'past_due') return !a.completed_at && new Date(a.due_at) < now
+      if (calendarFilterStatus === 'completed') return !!a.completed_at
+      return true // 'all'
+    })
+  }, [activities, calendarFilterAssigned, calendarFilterStatus])
 
   // ── Toggle done (with brief visual linger) ────────────────────────────────
   async function toggleDone(activity: Activity) {
@@ -241,15 +255,60 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
 
       {/* Calendar view */}
       {pageView === 'calendar' && (
-        <ActivitiesCalendar
-          activities={activities}
-          selectedDay={calendarDay}
-          onDayOpen={(d) => { setCalendarDay(d); setCalendarLeadId(null) }}
-          onActivityClick={(a) => {
-            // Day-tab direct click → open lead panel
-            if (a.lead) { setCalendarLeadId(a.lead.id); setCalendarDay(new Date(a.due_at)) }
-          }}
-        />
+        <div className="space-y-3">
+          {/* Calendar filter bar */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Status filter pills */}
+            <div className="flex items-center gap-1.5">
+              {[
+                { value: 'open',      label: 'Open'      },
+                { value: 'past_due',  label: 'Past Due'  },
+                { value: 'completed', label: 'Completed' },
+                { value: 'all',       label: 'All'       },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setCalendarFilterStatus(value)}
+                  className={cn(
+                    'rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all',
+                    calendarFilterStatus === value
+                      ? 'bg-foreground text-background border-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:shadow-sm'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Rep filter — admins only */}
+            {isAdmin && teamMembers.length > 0 && (
+              <SelectMenu
+                value={calendarFilterAssigned}
+                onChange={setCalendarFilterAssigned}
+                nullable
+                nullLabel="All reps"
+                size="sm"
+                searchable={teamMembers.length > 5}
+                options={teamMembers.map((m) => ({ value: m.id, label: m.name }))}
+                className="w-40"
+              />
+            )}
+
+            <span className="ml-auto text-[12px] text-muted-foreground">
+              {calendarFiltered.length} {calendarFiltered.length === 1 ? 'activity' : 'activities'}
+            </span>
+          </div>
+
+          <ActivitiesCalendar
+            activities={calendarFiltered}
+            selectedDay={calendarDay}
+            onDayOpen={(d) => { setCalendarDay(d); setCalendarLeadId(null) }}
+            onActivityClick={(a) => {
+              if (a.lead) { setCalendarLeadId(a.lead.id); setCalendarDay(new Date(a.due_at)) }
+            }}
+          />
+        </div>
       )}
 
       <>{pageView === 'list' && <>
@@ -548,7 +607,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
       {/* ── Calendar day detail panel ── */}
       {pageView === 'calendar' && calendarDay && (() => {
         const dayKey  = toLocalDateKey(calendarDay)
-        const dayActs = activities.filter(a => toLocalDateKey(new Date(a.due_at)) === dayKey)
+        const dayActs = calendarFiltered.filter(a => toLocalDateKey(new Date(a.due_at)) === dayKey)
         const dateLabel = calendarDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
         const panelW = 380
         return (
@@ -598,13 +657,29 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
                         done && 'opacity-60',
                       )}
                     >
+                      {/* Header row: time + type + mark done */}
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-[11px] font-semibold text-muted-foreground">{fmtTime(a.due_at)}</span>
                         <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', typeColor)}>
                           {a.type === 'callback' ? 'Call Back' : 'Follow-up'}
                         </span>
-                        {done && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 ml-auto" />}
+                        <button
+                          onClick={() => toggleDone(a)}
+                          title={done ? 'Mark open' : 'Mark done'}
+                          className={cn(
+                            'ml-auto flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold border transition-all',
+                            done
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              : 'border-border bg-background text-muted-foreground hover:border-emerald-300 hover:text-emerald-700'
+                          )}
+                        >
+                          {done
+                            ? <><CheckCircle2 className="h-3 w-3" /> Done</>
+                            : <><Circle className="h-3 w-3" /> Mark done</>
+                          }
+                        </button>
                       </div>
+
                       <p className={cn('text-[13px] font-semibold leading-snug', done && 'line-through text-muted-foreground')}>
                         {a.title}
                       </p>
