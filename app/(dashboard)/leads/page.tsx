@@ -37,9 +37,9 @@ export default async function LeadsPage() {
       workspaceId = member?.workspace_id ?? ''
       const isRep = role === 'rep'
 
-      // Use admin client for the leads query — regular client is capped at 1,000
-      // rows by Supabase's default PostgREST max_rows config regardless of .limit().
-      // Admin client bypasses this cap. We enforce rep scoping manually.
+      // Use admin client + .range() instead of .limit() to bypass Supabase's
+      // default db-max-rows cap (1,000). The range header is honored even when
+      // db-max-rows would otherwise truncate the response.
       const adminForLeads = createAdminClient()
       let leadsQuery = adminForLeads
         .from('leads')
@@ -47,7 +47,7 @@ export default async function LeadsPage() {
         .eq('workspace_id', workspaceId)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
-        .limit(20000)
+        .range(0, 19999)
 
       // Reps only see leads assigned to them
       if (isRep) leadsQuery = leadsQuery.eq('assigned_to', user.id)
@@ -111,7 +111,7 @@ export default async function LeadsPage() {
             .select('lead_id, called_at, outcome')
             .in('lead_id', leadIds)
             .order('called_at', { ascending: false })
-            .limit(20000)
+            .range(0, 49999)
         : { data: [] as Array<{ lead_id: string; called_at: string; outcome: string | null }> }
 
       const lastContactedMap = new Map<string, string>()
