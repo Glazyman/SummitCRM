@@ -37,23 +37,17 @@ export default async function LeadsPage() {
       workspaceId = member?.workspace_id ?? ''
       const isRep = role === 'rep'
 
-      // Use admin client + .range() instead of .limit() to bypass Supabase's
-      // default db-max-rows cap (1,000). The range header is honored even when
-      // db-max-rows would otherwise truncate the response.
+      // Use a PostgreSQL function via RPC — this bypasses PostgREST's db-max-rows
+      // cap entirely, which was silently truncating results at 1,000 regardless
+      // of .limit() or .range() calls.
       const adminForLeads = createAdminClient()
-      let leadsQuery = adminForLeads
-        .from('leads')
-        .select('id, workspace_id, first_name, last_name, email, phone, company, title, website, linkedin_url, status, interest_status, pipeline_stage_id, batch_id, assigned_to, custom_fields, created_at, updated_at')
-        .eq('workspace_id', workspaceId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .range(0, 19999)
-
-      // Reps only see leads assigned to them
-      if (isRep) leadsQuery = leadsQuery.eq('assigned_to', user.id)
 
       const [leadsResult, batchesResult, membersResult] = await Promise.all([
-        leadsQuery,
+        adminForLeads.rpc('get_workspace_leads', {
+          p_workspace_id: workspaceId,
+          p_assigned_to:  isRep ? user.id : null,
+          p_max_rows:     20000,
+        }),
         supabase
           .from('lead_batches')
           .select('id, name')
