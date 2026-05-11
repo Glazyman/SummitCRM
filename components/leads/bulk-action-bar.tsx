@@ -54,8 +54,8 @@ export function BulkActionBar({
       )}>
         {/* Selection count */}
         <div className="flex items-center gap-2 pr-3 border-r border-border">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-            {selectedCount}
+          <div className="flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-bold text-primary-foreground tabular-nums">
+            {selectedCount.toLocaleString()}
           </div>
           <span className="text-sm font-medium whitespace-nowrap">
             {selectedCount === 1 ? 'lead' : 'leads'} selected
