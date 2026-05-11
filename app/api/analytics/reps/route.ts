@@ -34,14 +34,17 @@ export async function GET(req: Request) {
       admin.auth.admin.listUsers(),
       admin.from('call_logs').select('logged_by, outcome').eq('workspace_id', wsId).gte('called_at', start).lte('called_at', end),
       admin.from('follow_ups').select('assigned_to, completed_at, due_at').eq('workspace_id', wsId),
-      admin.from('leads').select('assigned_to, status').eq('workspace_id', wsId).is('deleted_at', null),
+      // RPC aggregate — bypasses PostgREST row limit
+      admin.rpc('get_leads_assigned_status_counts', { p_workspace_id: wsId }),
     ])
 
     const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
     const allUsers  = usersRes.data?.users ?? []
     const calls     = (callsRes.data ?? []) as Array<{ logged_by: string; outcome: string }>
     const followUps = (followUpsRes.data ?? []) as Array<{ assigned_to: string | null; completed_at: string | null; due_at: string }>
-    const leads     = (leadsRes.data ?? []) as Array<{ assigned_to: string | null; status: string }>
+    // RPC returns [{assigned_to, status, cnt}] — expand into flat rows for existing logic
+    const leadCounts = (leadsRes.data ?? []) as Array<{ assigned_to: string | null; status: string; cnt: number }>
+    const leads = leadCounts.flatMap(r => Array.from({ length: Number(r.cnt) }, () => ({ assigned_to: r.assigned_to, status: r.status })))
 
     const nameById = new Map(
       allUsers.map(u => [u.id, { name: (u.user_metadata?.full_name as string | undefined) ?? null, email: u.email ?? '' }])

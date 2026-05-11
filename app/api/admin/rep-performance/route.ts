@@ -62,10 +62,8 @@ export async function GET(req: NextRequest) {
       admin.from('follow_ups')
         .select('assigned_to, completed_at, due_at')
         .eq('workspace_id', wsId),
-      admin.from('leads')
-        .select('assigned_to, status')
-        .eq('workspace_id', wsId)
-        .is('deleted_at', null),
+      // RPC aggregate — bypasses PostgREST row limit
+      admin.rpc('get_leads_assigned_status_counts', { p_workspace_id: wsId }),
       admin.from('activity_logs')
         .select('user_id, metadata')
         .eq('workspace_id', wsId)
@@ -79,7 +77,9 @@ export async function GET(req: NextRequest) {
     const calls     = (callsRes.data ?? []) as Array<{ logged_by: string; outcome: string; called_at: string }>
     const statusActivities = (statusActivitiesRes.data ?? []) as Array<{ user_id: string; metadata: Record<string, unknown> | null }>
     const followUps = (followUpsRes.data ?? []) as Array<{ assigned_to: string | null; completed_at: string | null; due_at: string }>
-    const leads     = (leadsRes.data ?? []) as Array<{ assigned_to: string | null; status: string }>
+    // RPC returns [{assigned_to, status, cnt}] — expand into flat rows so filter logic works unchanged
+    const leadCounts = (leadsRes.data ?? []) as Array<{ assigned_to: string | null; status: string; cnt: number }>
+    const leads = leadCounts.flatMap(r => Array.from({ length: Number(r.cnt) }, () => ({ assigned_to: r.assigned_to, status: r.status })))
 
     const now = new Date()
 

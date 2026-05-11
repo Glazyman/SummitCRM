@@ -71,13 +71,8 @@ export async function GET(req: Request) {
         .gte('created_at', range.start)
         .lte('created_at', range.end),
 
-      // leads assigned per user
-      adminClient
-        .from('leads')
-        .select('assigned_to')
-        .eq('workspace_id', wsId)
-        .not('assigned_to', 'is', null)
-        .is('deleted_at', null),
+      // RPC aggregate — bypasses PostgREST row limit
+      adminClient.rpc('get_leads_assigned_status_counts', { p_workspace_id: wsId }),
     ]) as [
       { data: Array<{ user_id: string; role: string; users: { email: string; raw_user_meta_data: Record<string, unknown> } | null }> | null },
       { data: Array<{ sent_by: string | null; status: string; created_at: string }> | null },
@@ -117,15 +112,16 @@ export async function GET(req: Request) {
       callRows = [...callRows, ...syntheticRows]
     } catch {}
 
-    const members      = membersRes.data       ?? []
-    const emails       = emailsRes.data        ?? []
-    const leadsRows    = leadsAssignedRes.data  ?? []
+    const members   = membersRes.data ?? []
+    const emails    = emailsRes.data  ?? []
+    // RPC returns [{assigned_to, status, cnt}] — sum counts per user
+    const leadCounts = (leadsAssignedRes.data ?? []) as Array<{ assigned_to: string | null; status: string; cnt: number }>
 
-    // Count leads assigned per user
+    // Count leads assigned per user (sum across all statuses)
     const leadsByUser = new Map<string, number>()
-    for (const row of leadsRows) {
+    for (const row of leadCounts) {
       if (row.assigned_to) {
-        leadsByUser.set(row.assigned_to, (leadsByUser.get(row.assigned_to) ?? 0) + 1)
+        leadsByUser.set(row.assigned_to, (leadsByUser.get(row.assigned_to) ?? 0) + Number(row.cnt))
       }
     }
 

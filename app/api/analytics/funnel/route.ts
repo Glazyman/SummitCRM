@@ -25,19 +25,30 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const isRep = member.role === 'rep'
 
-    let query = adminClient.from('leads').select('status')
-      .eq('workspace_id', member.workspace_id)
-      .is('deleted_at', null)
+    // Use RPC aggregate for admins (bypasses PostgREST row limit).
+    // Reps get per-rep counts via a direct filtered query (their data is small).
+    let counts = new Map<string, number>()
+    let total = 0
 
-    if (isRep) query = query.eq('assigned_to', user.id) as typeof query
-
-    const { data: rows } = await query as { data: Array<{ status: string }> | null }
-    const all = rows ?? []
-    const total = all.length
-
-    const counts = new Map<string, number>()
-    for (const row of all) {
-      counts.set(row.status, (counts.get(row.status) ?? 0) + 1)
+    if (isRep) {
+      const { data: rows } = await adminClient
+        .from('leads')
+        .select('status')
+        .eq('workspace_id', member.workspace_id)
+        .eq('assigned_to', user.id)
+        .is('deleted_at', null) as { data: Array<{ status: string }> | null }
+      for (const row of rows ?? []) {
+        counts.set(row.status, (counts.get(row.status) ?? 0) + 1)
+      }
+      total = (rows ?? []).length
+    } else {
+      const { data: rows } = await adminClient
+        .rpc('get_leads_status_counts', { p_workspace_id: member.workspace_id }) as
+        { data: Array<{ status: string; cnt: number }> | null }
+      for (const row of rows ?? []) {
+        counts.set(row.status, Number(row.cnt))
+        total += Number(row.cnt)
+      }
     }
 
     // Only the conversion funnel stages (exclude DNC/unsub from drop-off calculation)

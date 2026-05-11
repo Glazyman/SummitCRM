@@ -109,12 +109,8 @@ export async function GET(req: Request) {
           .in('status', ['called', 'voicemail', 'no_answer', 'emailed', 'contacted', 'replied'])
           .is('deleted_at', null),
 
-        // all lead statuses for breakdown
-        adminClient
-          .from('leads')
-          .select('status')
-          .eq('workspace_id', wsId)
-          .is('deleted_at', null),
+        // all lead status counts for breakdown — RPC bypasses PostgREST row limit
+        adminClient.rpc('get_leads_status_counts', { p_workspace_id: wsId }),
 
         // unassigned leads
         adminClient
@@ -132,7 +128,7 @@ export async function GET(req: Request) {
         { data: Array<{ id: string; name: string; from_email: string; type: string; emails_sent_today: number; daily_limit: number; is_active: boolean }> | null },
         { count: number | null },
         { count: number | null },
-        { data: Array<{ status: string }> | null },
+        { data: Array<{ status: string; cnt: number }> | null },
         { count: number | null },
       ]
 
@@ -178,11 +174,11 @@ export async function GET(req: Request) {
     const aiTokens    = aiRows.reduce((s, r) => s + r.total_tokens, 0)
     const aiCost      = aiRows.reduce((s, r) => s + r.cost_usd, 0)
 
-    // Build lead status breakdown
+    // Build lead status breakdown (RPC returns pre-aggregated rows)
     const statusRows = statusesRes.data ?? []
     const lead_status_counts: Record<string, number> = {}
     for (const row of statusRows) {
-      lead_status_counts[row.status] = (lead_status_counts[row.status] ?? 0) + 1
+      lead_status_counts[row.status] = Number(row.cnt)
     }
 
     const accounts    = accountsRes.data ?? []

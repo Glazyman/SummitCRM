@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { Metadata } from 'next'
 import PipelineClient from './pipeline-client'
 
@@ -31,26 +32,19 @@ export default async function PipelinePage() {
     position: number; is_won: boolean; is_lost: boolean; created_at: string; updated_at: string
   }>
 
-  // Load leads with their pipeline stage (excluding deleted and unsubscribed/do_not_contact)
-  const { data: rawLeadsData } = await supabase
-    .from('leads')
-    .select(`
-      id, first_name, last_name, email, company, title, phone,
-      status, interest_status, pipeline_stage_id,
-      assigned_to, batch_id, created_at, updated_at
-    `)
-    .eq('workspace_id', member.workspace_id)
-    .is('deleted_at', null)
-    .not('status', 'in', '("do_not_contact","unsubscribed")')
-    .order('updated_at', { ascending: false })
-    .limit(500)
+  // Load leads via RPC to bypass PostgREST row limit, then filter in JS
+  const admin = createAdminClient() as any
+  const { data: allLeadsJson } = await admin
+    .rpc('get_workspace_leads_json', { p_workspace_id: member.workspace_id })
 
-  const rawLeads = (rawLeadsData ?? []) as Array<{
+  const excluded = new Set(['do_not_contact', 'unsubscribed'])
+  const rawLeads = ((allLeadsJson ?? []) as Array<{
     id: string; first_name: string | null; last_name: string | null;
     email: string; company: string | null; title: string | null; phone: string | null;
     status: string; interest_status: string; pipeline_stage_id: string | null;
     assigned_to: string | null; batch_id: string | null; created_at: string; updated_at: string
-  }>
+  }>).filter((l) => !excluded.has(l.status))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 
   const leadIds = rawLeads.map((l) => l.id)
   const { data: callLogsRaw } = leadIds.length > 0
