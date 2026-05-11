@@ -619,6 +619,8 @@ export function LeadsClient({
         totalCount={applyFilters(leads, { ...filters, statuses: [] }, currentUserId).length}
         activeStatuses={filters.statuses}
         onStatusClick={handleStatusFilter}
+        coldOnly={filters.coldOnly}
+        onColdOnlyToggle={() => updateFilters({ coldOnly: !filters.coldOnly, page: 1 })}
       />
 
       {/* ── Filters ── */}
@@ -641,17 +643,6 @@ export function LeadsClient({
           </div>
         </div>
       )}
-
-      <div className="flex items-center">
-        <Button
-          type="button"
-          variant={filters.coldOnly ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => updateFilters({ coldOnly: !filters.coldOnly, page: 1 })}
-        >
-          Cold Leads
-        </Button>
-      </div>
 
       {/* ── Toolbar: results count + per-page + columns ── */}
       <div className="flex flex-col gap-2">

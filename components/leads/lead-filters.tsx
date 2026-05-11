@@ -238,13 +238,13 @@ export function LeadFiltersPanel({
                     type="button"
                     onClick={() => toggleStatus(status)}
                     className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all',
+                      'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all duration-150',
                       active
-                        ? cn(meta.badge, 'shadow-sm scale-[1.02]')
-                        : 'border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground',
+                        ? cn(meta.pill, 'border-current shadow-sm ring-1 ring-current/30')
+                        : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
                     )}
                   >
-                    <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', active ? meta.dot : 'bg-muted-foreground/40')} />
+                    <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', active ? meta.dot : 'bg-current opacity-40')} />
                     {meta.label}
                   </button>
                 )

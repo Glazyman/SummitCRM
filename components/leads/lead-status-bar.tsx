@@ -5,10 +5,12 @@ import { STATUS_CONFIG, ALL_STATUSES } from './status-config'
 import type { LeadStatus, StatusCount } from './types'
 
 interface LeadStatusBarProps {
-  counts:         StatusCount[]
-  totalCount:     number
-  activeStatuses: LeadStatus[]
-  onStatusClick:  (status: LeadStatus) => void
+  counts:            StatusCount[]
+  totalCount:        number
+  activeStatuses:    LeadStatus[]
+  onStatusClick:     (status: LeadStatus) => void
+  coldOnly:          boolean
+  onColdOnlyToggle:  () => void
 }
 
 /**
@@ -20,6 +22,8 @@ export function LeadStatusBar({
   totalCount,
   activeStatuses,
   onStatusClick,
+  coldOnly,
+  onColdOnlyToggle,
 }: LeadStatusBarProps) {
   const countMap = new Map(counts.map((c) => [c.status, c.count]))
 
@@ -70,9 +74,7 @@ export function LeadStatusBar({
                 : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
             )}
           >
-            <span
-              className={cn('h-1.5 w-1.5 rounded-full', active ? meta.dot : 'bg-current opacity-40')}
-            />
+            <span className={cn('h-1.5 w-1.5 rounded-full', active ? meta.dot : 'bg-current opacity-40')} />
             <span>{meta.label}</span>
             <span className={cn(
               'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
@@ -83,6 +85,25 @@ export function LeadStatusBar({
           </button>
         )
       })}
+
+      {/* Separator */}
+      <span className="mx-0.5 h-4 w-px shrink-0 bg-border" />
+
+      {/* Cold Leads toggle */}
+      <button
+        type="button"
+        onClick={onColdOnlyToggle}
+        className={cn(
+          'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
+          'border transition-all duration-150',
+          coldOnly
+            ? 'border-cyan-300 bg-cyan-100 text-cyan-800 shadow-sm ring-1 ring-cyan-300/50'
+            : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+        )}
+      >
+        <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', coldOnly ? 'bg-cyan-500' : 'bg-current opacity-40')} />
+        Cold Leads
+      </button>
     </div>
   )
 }
