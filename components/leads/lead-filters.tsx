@@ -5,8 +5,8 @@ import { Search, X, SlidersHorizontal, ChevronDown, User, CalendarDays } from 'l
 import { cn } from '@/lib/utils'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { CalendarPicker } from '@/components/ui/calendar-picker'
-import { STATUS_CONFIG, ALL_STATUSES } from './status-config'
-import type { LeadFilters, LeadStatus } from './types'
+import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } from './status-config'
+import type { LeadFilters, LeadStatus, InterestStatus } from './types'
 
 interface FilterBatch  { id: string; name: string }
 interface FilterMember { id: string; name: string }
@@ -45,6 +45,7 @@ export function LeadFiltersPanel({
   // Count active filters (for the badge)
   const activeFilterCount = [
     filters.statuses.length > 0,
+    filters.interests.length > 0,
     !!filters.batchId,
     !!filters.assignedTo,
     filters.coldOnly,
@@ -59,6 +60,13 @@ export function LeadFiltersPanel({
       ? filters.statuses.filter((s) => s !== status)
       : [...filters.statuses, status]
     onChange({ statuses: next, page: 1 })
+  }
+
+  function toggleInterest(interest: InterestStatus) {
+    const next = filters.interests.includes(interest)
+      ? filters.interests.filter((s) => s !== interest)
+      : [...filters.interests, interest]
+    onChange({ interests: next, page: 1 })
   }
 
   // Active filter chips (shown below the top bar when filters are on but panel is collapsed)
@@ -77,6 +85,20 @@ export function LeadFiltersPanel({
       activeChips.push({
         label: `${filters.statuses.length} statuses`,
         onRemove: () => onChange({ statuses: [], page: 1 }),
+      })
+    }
+  }
+
+  if (filters.interests.length > 0) {
+    if (filters.interests.length === 1) {
+      activeChips.push({
+        label: INTEREST_CONFIG[filters.interests[0]].label,
+        onRemove: () => onChange({ interests: [], page: 1 }),
+      })
+    } else {
+      activeChips.push({
+        label: `${filters.interests.length} interests`,
+        onRemove: () => onChange({ interests: [], page: 1 }),
       })
     }
   }
@@ -241,6 +263,33 @@ export function LeadFiltersPanel({
                       'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium transition-all duration-150',
                       active
                         ? cn(meta.pill, 'border-current shadow-sm ring-1 ring-current/30')
+                        : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
+                    )}
+                  >
+                    <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', active ? meta.dot : 'bg-current opacity-40')} />
+                    {meta.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Interest pills */}
+          <div className="px-5 pb-3">
+            <p className="mb-2.5 text-xs font-semibold text-muted-foreground">Interest</p>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_INTEREST_STATUSES.map((interest) => {
+                const meta   = INTEREST_CONFIG[interest]
+                const active = filters.interests.includes(interest)
+                return (
+                  <button
+                    key={interest}
+                    type="button"
+                    onClick={() => toggleInterest(interest)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium transition-all duration-150',
+                      active
+                        ? cn(meta.badge, 'shadow-sm scale-[1.02]')
                         : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
                     )}
                   >

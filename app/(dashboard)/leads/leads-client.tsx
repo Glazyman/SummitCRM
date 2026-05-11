@@ -74,6 +74,9 @@ function applyFilters(leads: LeadRow[], filters: LeadFilters, currentUserId: str
     // Status multi-filter
     if (filters.statuses.length > 0 && !filters.statuses.includes(lead.status)) return false
 
+    // Interest multi-filter
+    if (filters.interests.length > 0 && !filters.interests.includes(lead.interest_status)) return false
+
     // Batch
     if (filters.batchId && lead.batch_id !== filters.batchId) return false
 
@@ -136,6 +139,7 @@ export function LeadsClient({
     return {
       search:     p.get('q')          ?? '',
       statuses:   (p.get('status')?.split(',').filter(Boolean) ?? []) as LeadStatus[],
+      interests:  (p.get('interest')?.split(',').filter(Boolean) ?? []) as import('@/types/database').InterestStatus[],
       batchId:    p.get('batch')      ?? null,
       assignedTo: p.get('assigned')   ?? null,
       myLeads:    p.get('my') === '1',
@@ -251,8 +255,9 @@ export function LeadsClient({
   // ── URL sync ──────────────────────────────────────────────────────────
   React.useEffect(() => {
     const params = new URLSearchParams()
-    if (filters.search)              params.set('q',        filters.search)
-    if (filters.statuses.length > 0) params.set('status',   filters.statuses.join(','))
+    if (filters.search)               params.set('q',        filters.search)
+    if (filters.statuses.length > 0)  params.set('status',   filters.statuses.join(','))
+    if (filters.interests.length > 0) params.set('interest', filters.interests.join(','))
     if (filters.batchId)             params.set('batch',    filters.batchId)
     if (filters.assignedTo)          params.set('assigned', filters.assignedTo)
     if (filters.myLeads)             params.set('my',       '1')
@@ -589,7 +594,7 @@ export function LeadsClient({
           <p className="mt-0.5 text-sm text-muted-foreground">
             {totalCount.toLocaleString()} lead{totalCount !== 1 ? 's' : ''}
             {filters.batchId && batches.find(b => b.id === filters.batchId) && ` · ${batches.find(b => b.id === filters.batchId)!.name}`}
-            {(filters.search || filters.statuses.length > 0 || filters.coldOnly) && ' matching filters'}
+            {(filters.search || filters.statuses.length > 0 || filters.interests.length > 0 || filters.coldOnly) && ' matching filters'}
           </p>
         </div>
 

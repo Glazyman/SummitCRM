@@ -50,6 +50,7 @@ export type SortDir = 'asc' | 'desc'
 export interface LeadFilters {
   search:     string
   statuses:   LeadStatus[]    // multi-select
+  interests:  InterestStatus[] // multi-select
   batchId:    string | null
   assignedTo: string | null
   myLeads:    boolean
@@ -65,6 +66,7 @@ export interface LeadFilters {
 export const DEFAULT_FILTERS: LeadFilters = {
   search:     '',
   statuses:   [],
+  interests:  [],
   batchId:    null,
   assignedTo: null,
   myLeads:    false,
