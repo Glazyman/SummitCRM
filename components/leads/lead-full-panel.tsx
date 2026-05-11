@@ -400,7 +400,6 @@ export function LeadFullPanel({
                         >
                           <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
                           {m.label}
-                          {s === lead.status && <span className="ml-auto text-xs text-muted-foreground">current</span>}
                         </DropdownMenuItem>
                       )
                     })}
@@ -414,7 +413,7 @@ export function LeadFullPanel({
                       variant="outline"
                       className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', INTEREST_CONFIG[lead.interest_status].badge)}
                     >
-                      {INTEREST_CONFIG[lead.interest_status].icon} {INTEREST_CONFIG[lead.interest_status].label}
+                      {INTEREST_CONFIG[lead.interest_status].label}
                       <ChevronDown className="h-2.5 w-2.5 opacity-60" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -429,8 +428,7 @@ export function LeadFullPanel({
                           className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}
                         >
                           <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
-                          {m.icon} {m.label}
-                          {s === lead.interest_status && <span className="ml-auto text-xs text-muted-foreground">current</span>}
+                          {m.label}
                         </DropdownMenuItem>
                       )
                     })}

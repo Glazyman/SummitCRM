@@ -99,9 +99,6 @@ export function LeadActionBar({
                   >
                     <span className={cn('h-2 w-2 rounded-full', m.dot)} />
                     {m.label}
-                    {s === lead.status && (
-                      <span className="ml-auto text-xs text-muted-foreground">current</span>
-                    )}
                   </DropdownMenuItem>
                 )
               })}
@@ -116,7 +113,7 @@ export function LeadActionBar({
                   'h-8 gap-1.5 text-xs',
                   interestMeta && `${interestMeta.badge} border`
                 )}>
-                  {interestMeta?.icon} {interestMeta?.label ?? 'Interest'}
+                  {interestMeta?.label ?? 'Interest'}
                   <ChevronDown className="h-3 w-3 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
@@ -131,10 +128,7 @@ export function LeadActionBar({
                       className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}
                     >
                       <span className={cn('h-2 w-2 rounded-full', m.dot)} />
-                      {m.icon} {m.label}
-                      {s === lead.interest_status && (
-                        <span className="ml-auto text-xs text-muted-foreground">current</span>
-                      )}
+                      {m.label}
                     </DropdownMenuItem>
                   )
                 })}
@@ -164,9 +158,6 @@ export function LeadActionBar({
                       {m.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                     </div>
                     {m.name}
-                    {m.id === lead.assigned_to && (
-                      <span className="ml-auto text-xs text-muted-foreground">current</span>
-                    )}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
