@@ -43,7 +43,7 @@ export default async function LeadsPage() {
         .eq('workspace_id', workspaceId)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
-        .limit(1000)
+        .limit(5000)
 
       // Reps only see leads assigned to them
       if (isRep) leadsQuery = leadsQuery.eq('assigned_to', user.id)
