@@ -212,6 +212,7 @@ function ColumnHeader({ colId, sortBy, sortDir, onSort, isAdmin }: {
     case 'phone':         return plain('Phone')
     case 'company_phone': return plain('Company Phone')
     case 'title':         return plain('Job Title')
+    case 'website':       return plain('Website')
     case 'batch':         return plain('Batch')
     case 'tags':          return plain('Tags')
     case 'assigned':      return isAdmin ? plain('Assigned To') : null
@@ -292,6 +293,18 @@ function LeadCell({ colId, lead, isAdmin, onStatusChange, onInterestChange }: {
       )
     case 'title':
       return <td className="px-5 py-4 text-muted-foreground">{lead.title ?? <span className="text-muted-foreground/40">—</span>}</td>
+    case 'website':
+      return (
+        <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+          {lead.website
+            ? <a href={lead.website} target="_blank" rel="noopener noreferrer"
+                 className="flex items-center gap-1 text-xs text-primary hover:underline max-w-[150px] truncate">
+                <ExternalLink className="h-3 w-3 shrink-0" />
+                {lead.website.replace(/^https?:\/\//, '')}
+              </a>
+            : <span className="text-muted-foreground/40 text-xs">—</span>}
+        </td>
+      )
     case 'last_activity':
       return (
         <td className="px-5 py-4 text-xs text-muted-foreground">

@@ -91,6 +91,7 @@ export type ColumnId =
   | 'phone'
   | 'company_phone'
   | 'title'
+  | 'website'
 
 export interface ColumnDef {
   id:         ColumnId
@@ -113,6 +114,7 @@ export const COLUMNS: ColumnDef[] = [
   { id: 'last_activity', label: 'Last Activity',  sortField: 'last_activity_at',optional: true,  defaultOn: true  },
   { id: 'company_phone', label: 'Company Phone',                                optional: true,  defaultOn: false },
   { id: 'title',         label: 'Job Title',                                    optional: true,  defaultOn: false },
+  { id: 'website',       label: 'Website',                                      optional: true,  defaultOn: false },
   { id: 'tags',          label: 'Tags',                                         optional: true,  defaultOn: false },
   { id: 'batch',         label: 'Batch',                                        optional: true,  defaultOn: false },
 ]
