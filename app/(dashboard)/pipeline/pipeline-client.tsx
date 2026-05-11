@@ -4,15 +4,15 @@ import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  Plus, GripVertical, Search, Columns3, List,
-  MoreHorizontal, TrendingUp, Users, CheckCircle2,
+  Plus, Search, Columns3, List,
+  MoreHorizontal, TrendingUp, Users, CheckCircle2, Activity,
+  DollarSign, Calendar, Phone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { STATUS_CONFIG, INTEREST_CONFIG } from '@/components/leads/status-config'
+import { INTEREST_CONFIG } from '@/components/leads/status-config'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
 import type { InterestStatus } from '@/types/database'
-import type { LeadStatus } from '@/components/leads/types'
 
 interface PipelineStage {
   id: string; name: string; color: string; position: number
@@ -41,6 +41,15 @@ function timeAgo(iso: string) {
   return `${Math.floor(d / 30)}mo ago`
 }
 
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// Deterministic pastel avatar bg
+const AVATAR_COLORS = ['#f6c89f','#cfd6e4','#d8c2ec','#bfe2cf','#f3d3d3','#c2d9f0','#f7deb3']
+function avatarColor(name: string) {
+  return AVATAR_COLORS[(name.charCodeAt(0) ?? 0) % AVATAR_COLORS.length]
+}
 
 export default function PipelineClient({ stages, initialLeads, isAdmin, currentUserId }: Props) {
   const router = useRouter()
@@ -49,20 +58,12 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
   const [dragOverStage,  setDragOverStage]  = React.useState<string | null>(null)
   const [search,         setSearch]         = React.useState('')
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
-  const [pipelineView, setPipelineView] = React.useState<'kanban' | 'list'>(() => {
-    try {
-      const saved = localStorage.getItem('pipeline_view_mode')
-      return saved === 'list' ? 'list' : 'kanban'
-    } catch {
-      return 'kanban'
-    }
+  const [pipelineView,   setPipelineView]   = React.useState<'kanban' | 'list'>(() => {
+    try { return localStorage.getItem('pipeline_view_mode') === 'list' ? 'list' : 'kanban' } catch { return 'kanban' }
   })
   const didDragRef = React.useRef(false)
 
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLeads(initialLeads)
-  }, [initialLeads])
+  React.useEffect(() => { setLeads(initialLeads) }, [initialLeads])
 
   const leadsByStage = React.useMemo(() => {
     const q = search.toLowerCase()
@@ -115,171 +116,193 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
     }
   }
 
-  const totalLeads = leads.length
-  const unassigned = leadsByStage.get(null)?.length ?? 0
-
-  // ── Derived stats ─────────────────────────────────────────────────────
+  const totalLeads      = leads.length
+  const inPipeline      = leads.filter(l => l.pipeline_stage_id !== null).length
   const contactedCount  = leads.filter(l => ['called','voicemail','no_answer','contacted','replied'].includes(l.status)).length
   const interestedCount = leads.filter(l => l.interest_status === 'interested').length
+  const unassigned      = leadsByStage.get(null)?.length ?? 0
 
   return (
-    <div className="flex flex-col h-full min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
 
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border bg-card sticky top-0 z-10">
-        <div>
-          <h1 className="text-base font-semibold tracking-tight">Sales Pipeline</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {totalLeads.toLocaleString()} leads · {stages.length} stages
-            {unassigned > 0 && <span className="text-amber-500 font-medium"> · {unassigned.toLocaleString()} unassigned</span>}
-          </p>
+      {/* ── Page title + toolbar ── */}
+      <div className="px-6 pt-6 pb-4 space-y-5">
+        <h1 className="text-2xl font-bold tracking-[-0.025em]">Sales Pipeline</h1>
+
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard
+            icon={<TrendingUp className="h-4 w-4" />}
+            label="Total Leads"
+            value={totalLeads.toLocaleString()}
+            sub={{ bold: `${stages.length} stages`, rest: 'in workspace' }}
+          />
+          <StatCard
+            icon={<Activity className="h-4 w-4" />}
+            label="In Pipeline"
+            value={inPipeline.toLocaleString()}
+            sub={{ bold: `${unassigned}`, rest: 'unassigned' }}
+            deltaUp={inPipeline > 0}
+          />
+          <StatCard
+            icon={<Users className="h-4 w-4" />}
+            label="Contacted"
+            value={contactedCount.toLocaleString()}
+            sub={{ bold: `${totalLeads > 0 ? Math.round((contactedCount / totalLeads) * 100) : 0}%`, rest: 'of pipeline' }}
+            deltaUp={contactedCount > 0}
+          />
+          <StatCard
+            icon={<CheckCircle2 className="h-4 w-4" />}
+            label="Interested"
+            value={interestedCount.toLocaleString()}
+            sub={{ bold: `${totalLeads > 0 ? Math.round((interestedCount / totalLeads) * 100) : 0}%`, rest: 'conversion rate' }}
+            deltaUp={interestedCount > 0}
+            accent
+          />
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        {/* Toolbar */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Search */}
+          <div className="flex items-center gap-2.5 h-[38px] rounded-xl border border-border bg-card px-3 w-64">
+            <Search className="h-[15px] w-[15px] text-muted-foreground shrink-0" />
             <input
               type="text"
-              placeholder="Search leads…"
+              placeholder="Search leads or company…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="h-9 w-52 rounded-lg border border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+              className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground outline-none"
             />
           </div>
-          <div className="flex rounded-lg border border-border overflow-hidden">
+
+          {/* View toggle */}
+          <div className="flex items-center h-[38px] rounded-xl border border-border bg-card overflow-hidden">
             <button type="button"
               onClick={() => { setPipelineView('kanban'); try { localStorage.setItem('pipeline_view_mode', 'kanban') } catch {} }}
-              className={cn('flex h-9 items-center gap-1.5 px-3.5 text-sm font-medium transition-colors',
-                pipelineView === 'kanban' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+              className={cn(
+                'flex h-full items-center gap-1.5 px-3.5 text-[13px] font-medium transition-colors',
+                pipelineView === 'kanban'
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground'
               )}>
-              <Columns3 className="h-4 w-4" /> Kanban
+              <Columns3 className="h-3.5 w-3.5" /> Kanban
             </button>
-            <div className="w-px bg-border" />
+            <div className="w-px h-full bg-border" />
             <button type="button"
               onClick={() => { setPipelineView('list'); try { localStorage.setItem('pipeline_view_mode', 'list') } catch {} }}
-              className={cn('flex h-9 items-center gap-1.5 px-3.5 text-sm font-medium transition-colors',
-                pipelineView === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+              className={cn(
+                'flex h-full items-center gap-1.5 px-3.5 text-[13px] font-medium transition-colors',
+                pipelineView === 'list'
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground'
               )}>
-              <List className="h-4 w-4" /> List
+              <List className="h-3.5 w-3.5" /> List
             </button>
           </div>
-          <Button asChild size="sm">
-            <Link href="/leads"><Plus className="h-4 w-4" /> Add Lead</Link>
+
+          <div className="flex-1" />
+
+          {/* Add Lead */}
+          <Button asChild size="sm" className="h-[38px] rounded-xl px-4 text-[13px] gap-1.5">
+            <Link href="/leads">
+              <Plus className="h-3.5 w-3.5" /> Add Lead
+            </Link>
           </Button>
         </div>
       </div>
 
-      {/* ── KPI stat cards ── */}
-      <div className="grid grid-cols-3 gap-4 px-6 py-5 border-b border-border bg-card">
-        <StatCard
-          icon={<TrendingUp className="h-4 w-4" />}
-          label="Total Leads"
-          value={totalLeads.toLocaleString()}
-          sub={`${stages.length} stages`}
-        />
-        <StatCard
-          icon={<Users className="h-4 w-4" />}
-          label="Contacted"
-          value={contactedCount.toLocaleString()}
-          sub={`${totalLeads > 0 ? Math.round((contactedCount / totalLeads) * 100) : 0}% of pipeline`}
-        />
-        <StatCard
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          label="Interested"
-          value={interestedCount.toLocaleString()}
-          sub={`${totalLeads > 0 ? Math.round((interestedCount / totalLeads) * 100) : 0}% conversion rate`}
-          accent
-        />
-      </div>
-
-      {/* ── Views ── */}
+      {/* ── Kanban view ── */}
       {pipelineView === 'kanban' ? (
-      <div className="flex-1 overflow-x-auto">
-        <div className="flex gap-5 px-6 py-6 min-h-full items-start"
-          style={{ minWidth: `${stages.length * 300 + 96}px` }}>
+        <div className="flex-1 overflow-x-auto">
+          <div className="flex gap-4 px-6 pb-10 pt-1 items-start"
+            style={{ minWidth: `${stages.length * 320 + 96}px` }}>
+            {stages.map(stage => {
+              const stageLeads = leadsByStage.get(stage.id) ?? []
+              const isOver     = dragOverStage === stage.id
 
-          {stages.map(stage => {
-            const stageLeads = leadsByStage.get(stage.id) ?? []
-            const isOver     = dragOverStage === stage.id
+              return (
+                <div key={stage.id} className="flex flex-col w-[300px] shrink-0 gap-3">
 
-            return (
-              <div key={stage.id} className="flex flex-col w-[276px] shrink-0">
-
-                {/* Column header */}
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
-                  <span className="text-sm font-semibold">{stage.name}</span>
-                  <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-bold text-muted-foreground tabular-nums">
-                    {stageLeads.length}
-                  </span>
-                  {stage.is_won  && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500 text-white">WON</span>}
-                  {stage.is_lost && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-red-500 text-white">LOST</span>}
-                </div>
-
-                {/* Drop zone */}
-                <div
-                  className={cn(
-                    'flex flex-col gap-3 flex-1 min-h-[120px] rounded-2xl p-1 transition-colors',
-                    isOver && 'bg-primary/5 ring-2 ring-primary/20 ring-inset',
-                  )}
-                  onDragOver={e => handleDragOver(e, stage.id)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={e => handleDrop(e, stage.id)}
-                >
-                  <div className="flex flex-col gap-3 flex-1 overflow-y-auto max-h-[calc(100vh-300px)]">
-                    {stageLeads.length === 0 && (
-                      <div className={cn(
-                        'flex items-center justify-center h-20 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition-colors',
-                        isOver ? 'border-primary/40 text-primary' : 'border-border/50',
-                      )}>
-                        {isOver ? 'Drop here' : 'No leads'}
-                      </div>
-                    )}
-                    {stageLeads.map(lead => (
-                      <KanbanCard
-                        key={lead.id}
-                        lead={lead}
-                        stageColor={stage.color}
-                        isDragging={draggingId === lead.id}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                        onOpen={() => { if (!didDragRef.current) setSelectedLeadId(lead.id) }}
-                      />
-                    ))}
+                  {/* Column header card */}
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-card">
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ background: stage.color }} />
+                      <span className="text-[13.5px] font-semibold">{stage.name}</span>
+                      {stage.is_won  && <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white">WON</span>}
+                      {stage.is_lost && <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">LOST</span>}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {stageLeads.length} {stageLeads.length === 1 ? 'lead' : 'leads'}
+                    </span>
                   </div>
 
-                  {/* Add lead */}
-                  <Link
-                    href="/leads"
-                    className="flex items-center gap-1.5 w-full px-3 py-2.5 rounded-xl border border-dashed border-border/60 text-xs font-medium text-muted-foreground hover:bg-card hover:border-border hover:text-foreground transition-all"
+                  {/* Drop zone */}
+                  <div
+                    className={cn(
+                      'flex flex-col gap-2.5 flex-1 min-h-[120px] rounded-2xl p-1 transition-colors',
+                      isOver && 'bg-primary/5 ring-2 ring-primary/20 ring-inset',
+                    )}
+                    onDragOver={e => handleDragOver(e, stage.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={e => handleDrop(e, stage.id)}
                   >
-                    <Plus className="h-3.5 w-3.5" /> Add lead
-                  </Link>
+                    <div className="flex flex-col gap-2.5 flex-1">
+                      {stageLeads.length === 0 && (
+                        <div className={cn(
+                          'flex items-center justify-center h-20 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition-colors',
+                          isOver ? 'border-primary/40 text-primary' : 'border-border/50',
+                        )}>
+                          {isOver ? 'Drop here' : 'No leads'}
+                        </div>
+                      )}
+                      {stageLeads.map(lead => (
+                        <KanbanCard
+                          key={lead.id}
+                          lead={lead}
+                          stageColor={stage.color}
+                          isDragging={draggingId === lead.id}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          onOpen={() => { if (!didDragRef.current) setSelectedLeadId(lead.id) }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Add lead */}
+                    <Link
+                      href="/leads"
+                      className="flex items-center justify-center gap-1.5 w-full px-3 py-2.5 mt-1 rounded-xl border border-dashed border-border/70 text-[13px] font-medium text-muted-foreground hover:border-border hover:text-foreground transition-all bg-background/50"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add lead
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
-      </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+        /* ── List view ── */
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {stages.map((stage) => {
             const stageLeads = leadsByStage.get(stage.id) ?? []
             const isOver = dragOverStage === stage.id
             return (
               <div
                 key={stage.id}
-                className={cn('rounded-2xl border border-border bg-card transition-colors', isOver && 'ring-2 ring-primary/25 bg-primary/5')}
+                className={cn('rounded-2xl border border-border bg-card shadow-card transition-colors', isOver && 'ring-2 ring-primary/25 bg-primary/5')}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, stage.id)}
               >
                 <div className="flex items-center justify-between border-b border-border px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
+                    <span className="h-2 w-2 rounded-full" style={{ background: stage.color }} />
                     <p className="text-sm font-semibold">{stage.name}</p>
-                    <span className="text-xs text-muted-foreground">{stageLeads.length}</span>
+                    {stage.is_won  && <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white">WON</span>}
+                    {stage.is_lost && <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">LOST</span>}
                   </div>
+                  <span className="text-xs text-muted-foreground">{stageLeads.length} leads</span>
                 </div>
                 {stageLeads.length === 0 ? (
                   <p className="px-4 py-6 text-sm text-muted-foreground">No leads in this stage.</p>
@@ -287,6 +310,7 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
                   <div className="divide-y divide-border">
                     {stageLeads.map((lead) => {
                       const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
+                      const interestMeta = INTEREST_CONFIG[lead.interest_status as InterestStatus]
                       return (
                         <button
                           key={lead.id}
@@ -295,15 +319,31 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
                           onDragStart={(e) => handleDragStart(e, lead.id)}
                           onDragEnd={handleDragEnd}
                           onClick={() => setSelectedLeadId(lead.id)}
-                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40"
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-secondary/40 transition-colors"
                         >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{name}</p>
-                            <p className="truncate text-xs text-muted-foreground">{lead.company ?? 'No company'} · {lead.email}</p>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                              style={{ background: avatarColor(name), color: '#3a2a1d' }}
+                            >
+                              {name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-[13px] font-semibold">{name}</p>
+                              <p className="truncate text-xs text-muted-foreground">{lead.company ?? 'No company'} · {lead.email}</p>
+                            </div>
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {lead.last_contacted_at ? `Last contacted ${timeAgo(lead.last_contacted_at)}` : `Added ${timeAgo(lead.created_at)}`}
-                          </span>
+                          <div className="flex items-center gap-3 shrink-0">
+                            {interestMeta && (
+                              <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border', interestMeta.badge)}>
+                                <span className={cn('h-1.5 w-1.5 rounded-full', interestMeta.dot)} />
+                                {interestMeta.label}
+                              </span>
+                            )}
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {lead.last_contacted_at ? `Contacted ${timeAgo(lead.last_contacted_at)}` : `Added ${timeAgo(lead.created_at)}`}
+                            </span>
+                          </div>
                         </button>
                       )
                     })}
@@ -334,7 +374,7 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
   )
 }
 
-// ── Kanban card ───────────────────────────────────────────────────────────
+// ── Kanban card ───────────────────────────────────────────────────────────────
 function KanbanCard({
   lead, stageColor, isDragging, onDragStart, onDragEnd, onOpen,
 }: {
@@ -345,13 +385,9 @@ function KanbanCard({
   const name         = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
   const initials     = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
   const interestMeta = INTEREST_CONFIG[lead.interest_status as InterestStatus]
-  const dateLabel    = lead.last_contacted_at
-    ? new Date(lead.last_contacted_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-    : new Date(lead.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-
-  // Deterministic pastel for the avatar background
-  const avatarColors = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444']
-  const avatarBg = avatarColors[(name.charCodeAt(0) ?? 0) % avatarColors.length]
+  const dateIso      = lead.last_contacted_at ?? lead.created_at
+  const dateLabel    = fmtDate(dateIso)
+  const bg           = avatarColor(name)
 
   return (
     <div
@@ -360,20 +396,19 @@ function KanbanCard({
       onDragEnd={onDragEnd}
       onClick={onOpen}
       className={cn(
-        'group bg-card rounded-xl border border-border/50 shadow-sm',
-        'cursor-pointer select-none transition-all duration-150',
-        isDragging
-          ? 'opacity-40 scale-[0.97] shadow-none cursor-grabbing'
-          : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-border hover:-translate-y-px',
+        'rounded-xl border border-border bg-card shadow-card cursor-pointer select-none',
+        'transition-all duration-150',
+        isDragging ? 'opacity-40 scale-[0.97] shadow-none cursor-grabbing' : 'hover:-translate-y-px hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-border',
       )}
     >
-      <div className="p-4">
+      <div className="p-3.5 flex flex-col gap-2.5">
 
-        {/* Row 1: name + ··· menu */}
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <p className="text-[13px] font-semibold text-foreground leading-snug line-clamp-2">
-            {name}
-          </p>
+        {/* Title + ··· */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[13.5px] font-semibold leading-snug truncate">{name}</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{lead.company ?? <span className="italic opacity-50">No company</span>}</p>
+          </div>
           <button
             type="button"
             onClick={e => e.stopPropagation()}
@@ -383,53 +418,55 @@ function KanbanCard({
           </button>
         </div>
 
-        {/* Row 2: company */}
-        <p className="text-[11px] text-muted-foreground truncate mb-3">
-          {lead.company ?? <span className="italic opacity-60">No company</span>}
-        </p>
-
-        {/* Row 3: status dot + date  (mirrors "$value · date" from screenshot) */}
-        <div className="flex items-center gap-1.5 mb-3.5">
-          <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: stageColor }} />
-          <span className="text-xs text-muted-foreground">{dateLabel}</span>
-          {lead.phone && (
-            <>
-              <span className="text-muted-foreground/40">·</span>
-              <a
-                href={`tel:${lead.phone}`}
-                onClick={e => e.stopPropagation()}
-                className="text-xs text-muted-foreground hover:text-primary transition-colors truncate"
-              >
-                {lead.phone}
-              </a>
-            </>
+        {/* Phone + date */}
+        <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
+          {lead.phone ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Phone className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+              {lead.phone}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <Phone className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+              <span className="opacity-40">—</span>
+            </span>
           )}
+          <span className="h-1 w-1 rounded-full bg-border shrink-0" />
+          <span className="inline-flex items-center gap-1.5">
+            <Calendar className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+            {dateLabel}
+          </span>
         </div>
 
         {/* Divider */}
-        <div className="border-t border-border/60 mb-3" />
+        <div className="h-px bg-border/60" />
 
-        {/* Footer: avatar + name + interest badge */}
+        {/* Avatar + interest pill */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <div
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
-              style={{ backgroundColor: avatarBg }}
+              className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[9px] font-bold border border-black/5"
+              style={{ background: bg, color: '#3a2a1d' }}
             >
               {initials}
             </div>
-            <span className="text-xs text-muted-foreground truncate">
+            <span className="text-[12px] text-muted-foreground truncate">
               {lead.first_name ?? lead.email.split('@')[0]}
             </span>
           </div>
 
-          {interestMeta && (
+          {interestMeta ? (
             <span className={cn(
               'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border shrink-0',
               interestMeta.badge,
             )}>
               <span className={cn('h-1.5 w-1.5 rounded-full', interestMeta.dot)} />
               {interestMeta.label}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border border-border bg-secondary text-muted-foreground shrink-0">
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+              Pending
             </span>
           )}
         </div>
@@ -438,32 +475,43 @@ function KanbanCard({
   )
 }
 
-// ── Stat card ─────────────────────────────────────────────────────────────
-function StatCard({ icon, label, value, sub, accent }: {
-  icon:   React.ReactNode
-  label:  string
-  value:  string
-  sub:    string
-  accent?: boolean
+// ── Stat card ─────────────────────────────────────────────────────────────────
+function StatCard({
+  icon, label, value, sub, deltaUp, accent,
+}: {
+  icon: React.ReactNode; label: string; value: string
+  sub: { bold: string; rest: string }; deltaUp?: boolean; accent?: boolean
 }) {
   return (
     <div className={cn(
-      'rounded-xl border p-4 transition-colors',
-      accent
-        ? 'border-emerald-200 bg-emerald-50/60'
-        : 'border-border bg-background',
+      'rounded-2xl border bg-card p-5 shadow-card',
+      accent ? 'border-emerald-200' : 'border-border',
     )}>
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-        <span className={accent ? 'text-emerald-600' : ''}>{icon}</span>
+      <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+        <span className={accent ? 'text-emerald-600' : 'text-muted-foreground'}>{icon}</span>
         {label}
       </div>
-      <p className={cn(
-        'text-2xl font-bold tracking-tight',
-        accent ? 'text-emerald-700' : 'text-foreground',
-      )}>
-        {value}
+      <div className="mt-3.5 flex items-end gap-3">
+        <p className={cn(
+          'text-[32px] font-bold leading-none tracking-[-0.02em]',
+          accent ? 'text-emerald-700' : 'text-foreground',
+        )}>
+          {value}
+        </p>
+        {deltaUp !== undefined && (
+          <span className={cn(
+            'mb-0.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold',
+            deltaUp
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-red-100 text-red-600',
+          )}>
+            {deltaUp ? '+' : ''}{ Number(value) > 0 ? value : '0' }
+          </span>
+        )}
+      </div>
+      <p className="mt-3.5 text-[12.5px] text-muted-foreground">
+        <span className="font-semibold text-foreground">{sub.bold}</span>{' '}{sub.rest}
       </p>
-      <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
     </div>
   )
 }
