@@ -135,9 +135,10 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
   const dealsWon        = leads.filter(l => l.pipeline_stage_id && wonStageIds.has(l.pipeline_stage_id)).length
   const dealsInProgress = leads.filter(l => l.pipeline_stage_id && !wonStageIds.has(l.pipeline_stage_id) && !lostStageIds.has(l.pipeline_stage_id)).length
 
-  // Pipeline value = sum of questionnaire revenue across ALL leads with data
-  const pipelineValue = leads.reduce((sum, l) => sum + (l.pipeline_value ?? 0), 0)
-  const pipelineLeadsWithValue = leads.filter(l => (l.pipeline_value ?? 0) > 0).length
+  // Pipeline value = revenue total of leads currently in a pipeline stage
+  const inPipelineLeads = leads.filter(l => l.pipeline_stage_id !== null)
+  const pipelineValue = inPipelineLeads.reduce((sum, l) => sum + (l.pipeline_value ?? 0), 0)
+  const pipelineLeadsWithValue = inPipelineLeads.filter(l => (l.pipeline_value ?? 0) > 0).length
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
