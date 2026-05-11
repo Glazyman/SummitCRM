@@ -33,11 +33,10 @@ export function LeadStatusBar({
       <button
         type="button"
         onClick={() => {
-          // Clicking "All" clears all status filters
           activeStatuses.forEach((s) => onStatusClick(s))
         }}
         className={cn(
-          'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
+          'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium',
           'border transition-all duration-150',
           activeStatuses.length === 0
             ? 'border-primary bg-primary text-primary-foreground shadow-sm'
@@ -46,7 +45,7 @@ export function LeadStatusBar({
       >
         <span>All</span>
         <span className={cn(
-          'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
+          'rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
           activeStatuses.length === 0 ? 'bg-primary-foreground/20' : 'bg-border'
         )}>
           {totalCount.toLocaleString()}
@@ -67,7 +66,7 @@ export function LeadStatusBar({
             type="button"
             onClick={() => onStatusClick(status)}
             className={cn(
-              'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
+              'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium',
               'border transition-all duration-150',
               active
                 ? cn(meta.pill, 'border-current shadow-sm ring-1 ring-current/30')
@@ -77,7 +76,7 @@ export function LeadStatusBar({
             <span className={cn('h-1.5 w-1.5 rounded-full', active ? meta.dot : 'bg-current opacity-40')} />
             <span>{meta.label}</span>
             <span className={cn(
-              'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
+              'rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
               active ? 'bg-current/20' : 'bg-border'
             )}>
               {count.toLocaleString()}
@@ -94,7 +93,7 @@ export function LeadStatusBar({
         type="button"
         onClick={onColdOnlyToggle}
         className={cn(
-          'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
+          'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium',
           'border transition-all duration-150',
           coldOnly
             ? 'border-cyan-300 bg-cyan-100 text-cyan-800 shadow-sm ring-1 ring-cyan-300/50'

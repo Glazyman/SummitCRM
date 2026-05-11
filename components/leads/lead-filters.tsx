@@ -176,7 +176,7 @@ export function LeadFiltersPanel({
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-lg bg-primary px-1 text-[10px] font-bold text-primary-foreground">
                 {activeFilterCount}
               </span>
             )}
@@ -206,13 +206,13 @@ export function LeadFiltersPanel({
           {activeChips.map((chip) => (
             <span
               key={chip.label}
-              className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 py-0.5 pl-2.5 pr-1.5 text-xs font-medium text-primary"
+              className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 py-0.5 pl-2.5 pr-1.5 text-xs font-medium text-primary"
             >
               {chip.label}
               <button
                 type="button"
                 onClick={chip.onRemove}
-                className="flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-primary/20 transition-colors"
+                className="flex h-3.5 w-3.5 items-center justify-center rounded-lg hover:bg-primary/20 transition-colors"
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -238,7 +238,7 @@ export function LeadFiltersPanel({
                     type="button"
                     onClick={() => toggleStatus(status)}
                     className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all duration-150',
+                      'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium transition-all duration-150',
                       active
                         ? cn(meta.pill, 'border-current shadow-sm ring-1 ring-current/30')
                         : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
