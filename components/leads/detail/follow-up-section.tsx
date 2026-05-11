@@ -197,7 +197,8 @@ function AddFollowUpModal({ open, teamMembers, currentUserId, isAdmin, onClose, 
   const [type,       setType]       = React.useState<FollowUpType>('callback')
   const [title,      setTitle]      = React.useState('')
   const [notes,      setNotes]      = React.useState('')
-  const [dueAt,      setDueAt]      = React.useState(defaultDueAt())
+  const [dueDate,    setDueDate]    = React.useState(() => splitDateTime(defaultDueAt()).date)
+  const [dueTime,    setDueTime]    = React.useState(() => splitDateTime(defaultDueAt()).time)
   const [assignedTo, setAssignedTo] = React.useState(currentUserId)
   const [saving,     setSaving]     = React.useState(false)
   const [error,      setError]      = React.useState<string | null>(null)
@@ -206,7 +207,9 @@ function AddFollowUpModal({ open, teamMembers, currentUserId, isAdmin, onClose, 
     if (open) {
       setType('callback')
       setTitle(FOLLOW_UP_TYPES[0].title)
-      setNotes(''); setDueAt(defaultDueAt())
+      setNotes('')
+      const def = splitDateTime(defaultDueAt())
+      setDueDate(def.date); setDueTime(def.time)
       setAssignedTo(currentUserId); setError(null)
     }
   }, [open, currentUserId])
@@ -219,15 +222,13 @@ function AddFollowUpModal({ open, teamMembers, currentUserId, isAdmin, onClose, 
 
   async function handleSave() {
     const effectiveTitle = title.trim() || FOLLOW_UP_TYPES.find(f => f.id === type)?.label || 'Follow-up'
-    if (!dueAt) { setError('Please set a follow-up date.'); return }
+    if (!dueDate) { setError('Please set a follow-up date.'); return }
     setSaving(true)
     try {
       await onSave({
         title:       effectiveTitle,
         notes,
-        // Convert the datetime-local value (local time in browser) to a proper UTC ISO
-        // string before sending. Without this, the server (UTC) would misparse it.
-        due_at:      new Date(dueAt).toISOString(),
+        due_at:      new Date(joinDateTime(dueDate, dueTime || '09:00')).toISOString(),
         assigned_to: isAdmin ? assignedTo : currentUserId,
       })
     } catch (err) {
@@ -284,13 +285,14 @@ function AddFollowUpModal({ open, teamMembers, currentUserId, isAdmin, onClose, 
             />
           </div>
 
-          {/* Due date — full width, prominent */}
+          {/* Due date — calendar + time picker */}
           <div className="space-y-1.5">
             <Label>Follow-up date & time <span className="text-destructive">*</span></Label>
-            <Input
-              type="datetime-local"
-              value={dueAt}
-              onChange={(e) => { setDueAt(e.target.value); setError(null) }}
+            <DateTimePicker
+              date={dueDate}
+              time={dueTime}
+              onDateChange={(v) => { setDueDate(v); setError(null) }}
+              onTimeChange={(v) => { setDueTime(v); setError(null) }}
             />
           </div>
 
@@ -332,7 +334,7 @@ function AddFollowUpModal({ open, teamMembers, currentUserId, isAdmin, onClose, 
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving || !dueAt}>
+          <Button onClick={handleSave} disabled={saving || !dueDate}>
             {saving ? 'Saving…' : 'Schedule'}
           </Button>
         </DialogFooter>
@@ -354,17 +356,18 @@ interface EditFollowUpModalProps {
 function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onClose, onSave }: EditFollowUpModalProps) {
   const [title,      setTitle]      = React.useState(followUp.title)
   const [notes,      setNotes]      = React.useState(followUp.notes ?? '')
-  const [dueAt,      setDueAt]      = React.useState(() => toLocalDatetimeInput(new Date(followUp.due_at)))
+  const [dueDate,    setDueDate]    = React.useState(() => splitDateTime(toLocalDatetimeInput(new Date(followUp.due_at))).date)
+  const [dueTime,    setDueTime]    = React.useState(() => splitDateTime(toLocalDatetimeInput(new Date(followUp.due_at))).time)
   const [assignedTo, setAssignedTo] = React.useState(followUp.assigned_to ?? currentUserId)
   const [saving,     setSaving]     = React.useState(false)
   const [error,      setError]      = React.useState<string | null>(null)
 
   async function handleSave() {
     if (!title.trim()) { setError('Title is required.'); return }
-    if (!dueAt)        { setError('Please set a date.'); return }
+    if (!dueDate)      { setError('Please set a date.'); return }
     setSaving(true)
     try {
-      await onSave({ title: title.trim(), notes, due_at: new Date(dueAt).toISOString(), assigned_to: assignedTo })
+      await onSave({ title: title.trim(), notes, due_at: new Date(joinDateTime(dueDate, dueTime || '09:00')).toISOString(), assigned_to: assignedTo })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save.')
     } finally {
@@ -394,10 +397,11 @@ function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onCl
 
           <div className="space-y-1.5">
             <Label>Follow-up date & time <span className="text-destructive">*</span></Label>
-            <Input
-              type="datetime-local"
-              value={dueAt}
-              onChange={(e) => { setDueAt(e.target.value); setError(null) }}
+            <DateTimePicker
+              date={dueDate}
+              time={dueTime}
+              onDateChange={(v) => { setDueDate(v); setError(null) }}
+              onTimeChange={(v) => { setDueTime(v); setError(null) }}
             />
           </div>
 
@@ -437,7 +441,7 @@ function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onCl
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving || !dueAt || !title.trim()}>
+          <Button onClick={handleSave} disabled={saving || !dueDate || !title.trim()}>
             {saving ? 'Saving…' : 'Save changes'}
           </Button>
         </DialogFooter>
@@ -446,15 +450,58 @@ function EditFollowUpModal({ followUp, teamMembers, currentUserId, isAdmin, onCl
   )
 }
 
+// ── Calendar + time picker component ─────────────────────────────────────
+function DateTimePicker({
+  date, time,
+  onDateChange, onTimeChange,
+}: {
+  date: string; time: string
+  onDateChange: (v: string) => void
+  onTimeChange: (v: string) => void
+}) {
+  return (
+    <div className="flex gap-2">
+      <div className="flex-1">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => onDateChange(e.target.value)}
+          className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+      <div className="w-32">
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => onTimeChange(e.target.value)}
+          className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+    </div>
+  )
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-/** Format a Date as the local "YYYY-MM-DDTHH:MM" string that datetime-local inputs expect. */
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** Split a local datetime (YYYY-MM-DDTHH:MM) into date + time parts. */
+function splitDateTime(dt: string): { date: string; time: string } {
+  const [date, time] = dt.split('T')
+  return { date: date ?? '', time: time?.slice(0, 5) ?? '09:00' }
+}
+
+/** Combine date + time parts into a local datetime string. */
+function joinDateTime(date: string, time: string): string {
+  return `${date}T${time}`
+}
+
+/** Format a Date as the local "YYYY-MM-DDTHH:MM" string. */
 function toLocalDatetimeInput(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** Default follow-up time: tomorrow at 9 AM in local time. */
+/** Default follow-up: tomorrow at 9 AM local time. */
 function defaultDueAt(): string {
   const d = new Date()
   d.setDate(d.getDate() + 1)
