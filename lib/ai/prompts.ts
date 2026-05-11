@@ -2,8 +2,9 @@
  * lib/ai/prompts.ts
  *
  * Prompt builder for the snapshot-email task. The AI rewrites the
- * intake answers into a Summit-Mergers-style company snapshot,
- * synthesising "KEY HIGHLIGHTS" bullets from the data.
+ * intake answers into a Summit Mergers deal teaser email — the
+ * advisor-style narrative format that Glazy uses when introducing an
+ * opportunity to a strategic acquirer or PE-backed HVAC platform.
  */
 
 export interface SnapshotLead {
@@ -29,51 +30,56 @@ export interface SnapshotPromptInput {
 }
 
 // ── Style example — embedded so the model has a concrete target. ─────────
-const STYLE_EXAMPLE = `A1 HEATING AND COOLING
-Residential HVAC – Install & Service
-West Virginia / Ohio | www.a1heatingandcooling.com
+const STYLE_EXAMPLE = `Hi,
 
-──────────────────────────────────
+We have an HVAC opportunity that may be a fit for your platform.
 
-FINANCIAL OVERVIEW
-  Revenue:          $2.0M
-  EBITDA:           ~$600K (30%)
-  EBITDA Margin:    ~30%
+Business is a well-established HVAC contractor based in Arizona with 13 years of operating history and a strong residential foundation complemented by light commercial work.
 
-OPERATIONS
-  Employees:        5+ (Non-Union)
-  Market Focus:     95% Residential / 5% Commercial
-  Service Area:     West Virginia & Ohio
-  Years in Business: 39
+Company Snapshot
 
-SERVICE MIX
-  Install & Retrofit:     50%
-  Service & Maintenance:  50%
+Revenue:
+  2024: ~$3.68M (elevated by completion of a one-time $1M commercial project)
+  2025E: ~$3.1M
 
-PROJECT SIZE
-  Average Job:      $300 – $12K
-  Largest Project:  $30K
+Gross Profit:
+  2024: ~$2.27M
+  2025E: ~$1.9M
 
-OWNERSHIP & TRANSITION
-  Owner:            Husband & wife (Beckie Wells)
-  Key Employees:    None
-  Transition Plan:  Owners planning to retire
+Team:
+  12 employees
+  Non-union
 
-──────────────────────────────────
+Market Mix:
+  Predominantly residential with light commercial exposure. Management estimates approximately ~75% residential / ~25% commercial.
 
-KEY HIGHLIGHTS
-  - Nearly 4 decades of operating history and brand recognition
-  - Strong EBITDA margins (30%)
-  - Balanced revenue split between install and service/maintenance
-  - Lean operation with 5+ employees
-  - Clean transition — owners retiring, no key employee risk
-  - Established presence across West Virginia and Ohio
+Service Mix:
+  Service & maintenance
+  Residential replacement and retrofit installations
+  Light commercial retrofit and maintenance
+  No ground-up new construction
 
-──────────────────────────────────
+Job Profile:
+  Residential average ticket: ~$12K–$15K
+  Occasional larger commercial projects undertaken opportunistically.
 
-CONTACT
-  (304) 481-1320
-  NWells@a1heatingandcooling.com`
+Project History:
+  Largest project was a $1M commercial job completed in 2024 for a mining customer. Project is fully completed and was a one-time opportunity. Customer remains active on the maintenance side. Currently has an additional ~$700K commercial job in the pipeline.
+
+Geography:
+  Arizona
+
+Years in Operation:
+  13 years
+
+Ownership:
+  Founder-owned (husband and wife)
+  Owners planning for retirement
+
+Facilities & Assets:
+  Company operates out of an approximately 10,000 SF facility with office, warehouse, full in-house sheet metal shop, internal parts house with caged and logged inventory, and secured yard for vehicles and trailers.
+  Real estate is not for sale and would be leased back post-close.
+  Transaction includes vehicles, operating supplies, and equipment.`
 
 export function buildSnapshotPrompt({ lead, answers, questions }: SnapshotPromptInput): {
   system: string
@@ -99,23 +105,27 @@ export function buildSnapshotPrompt({ lead, answers, questions }: SnapshotPrompt
   ].join('\n')
 
   const system =
-`You are a senior M&A analyst at Summit Mergers writing a one-page company snapshot for an HVAC acquisition memo.
+`You are a senior M&A advisor at Summit Mergers writing a deal teaser email to a strategic acquirer (often a PE-backed HVAC platform). Tone is informed, plain, and confident — a senior advisor briefing a buyer, not a marketing pitch.
 
-Voice: plain, factual, confident. No fluff, no hype, no sales language.
-Constraint: use ONLY the facts the user provides. Never invent metrics, history, customers, or context that isn't in the input.
+Constraint: use ONLY the facts the user provides. Never invent revenue, margins, dates, owner names, customers, geographic detail, equipment, facility size, or any other context that isn't in the input data. If a section has no data, omit the entire section (no labels without content).
 
-Format requirements (match exactly):
-- Plain text only — no markdown, no backticks.
-- ALL-CAPS section headers, no leading whitespace.
-- Two-space indentation for data rows under each header.
-- Align values in a column by padding labels with spaces (look at the example).
-- Use the long-dash divider "──────────────────────────────────" between major blocks.
-- KEY HIGHLIGHTS section has 5-7 bullets, each starting with "  - ".
-- Bullets synthesise the strongest, most defensible selling points from the data — operating history, margin quality, revenue mix, service area, transition story, etc.
-- Do NOT add headers for empty data (skip the section if no fields apply).
-- Final block is CONTACT — name, phone, email (skip rows that are blank).
+Format requirements (match the example exactly):
+- Plain text only. No markdown, no asterisks, no backticks.
+- Open with "Hi," on its own line (the admin will replace with the recipient name before sending).
+- One short pitch sentence: "We have an HVAC opportunity that may be a fit for your platform." (or similar — adjust trade if the intake says something other than HVAC).
+- One short narrative paragraph (2-3 sentences) summarising the business: years operating, geography, primary revenue mix, anything that frames the deal.
+- Then the literal heading "Company Snapshot" on its own line, followed by a blank line.
+- Sections under Company Snapshot use a single-line label ending with a colon (Title Case, no caps lock), then indented bullets under it (two leading spaces, no dash or symbol prefix). Each bullet is a short factual line or a brief prose sentence.
 
-Output ONLY the snapshot text — no commentary, no preamble, no trailing explanation.`
+Section order — include only the sections with data, in this order:
+  Revenue · Gross Profit (or EBITDA — use whichever metric the intake provides; label it accurately) · Team · Market Mix · Service Mix · Job Profile · Project History · Geography · Years in Operation · Ownership · Facilities & Assets
+
+Within sections:
+- If you only have one number, put it on a single bullet line. Do not invent year-over-year splits.
+- Combine related details into one bullet when natural (e.g. "12 employees" and "Non-union" as separate bullets is fine; merging is also fine).
+- Render dollar amounts as the intake supplied them ($3.1M, ~$600K, etc.).
+
+Output ONLY the email body. No subject line. No commentary before or after.`
 
   const user =
 `Here is the company information.
@@ -131,7 +141,7 @@ STYLE EXAMPLE (format target, not content)
 ${STYLE_EXAMPLE}
 \`\`\`
 
-Write the snapshot for this company now. Plain text only.`
+Write the deal teaser email for this company now. Plain text only.`
 
   return { system, user }
 }

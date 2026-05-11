@@ -105,10 +105,12 @@ interface QuestionnaireProps {
   readOnly?: boolean
   /**
    * When provided, an "Email Snapshot" button is shown next to Save.
-   * Parent receives the live edit-state (answers + questions) so it can
-   * build the snapshot using the surrounding lead profile.
+   * Parent gets the live edit-state and must return the Gmail compose URL.
+   * The button shows a spinner while awaiting, then swaps to a real
+   * "Open Gmail draft" anchor — clicking the anchor is a fresh user gesture,
+   * which prevents popup blockers from intercepting the new tab.
    */
-  onEmailSnapshot?: (live: QuestionnaireData) => void
+  onEmailSnapshot?: (live: QuestionnaireData) => Promise<string>
 }
 
 // ── Yes / No toggle ──────────────────────────────────────────────────────────
@@ -261,18 +263,24 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
   const [questions, setQuestions] = React.useState<QuestionDef[]>(
     data?.questions ?? DEFAULT_QUESTIONS
   )
-  const [saving, setSaving] = React.useState(false)
-  const [saved,  setSaved]  = React.useState(false)
-  const [dirty,  setDirty]  = React.useState(false)
+  const [saving,    setSaving]    = React.useState(false)
+  const [saved,     setSaved]     = React.useState(false)
+  const [dirty,     setDirty]     = React.useState(false)
+  const [emailing,  setEmailing]  = React.useState(false)
+  const [emailUrl,  setEmailUrl]  = React.useState<string | null>(null)
+  const [emailErr,  setEmailErr]  = React.useState<string | null>(null)
 
   const [addingCustom, setAddingCustom] = React.useState(false)
   const [newQLabel,    setNewQLabel]    = React.useState('')
   const [newQType,     setNewQType]     = React.useState<'text' | 'textarea'>('text')
 
+  // Any edit invalidates the pending snapshot URL so the admin can't open
+  // a stale draft from before the change.
   function setAnswer(id: string, value: string) {
     setAnswers((a) => ({ ...a, [id]: value }))
     setDirty(true)
     setSaved(false)
+    setEmailUrl(null)
   }
 
   function addCustomQuestion() {
@@ -284,6 +292,7 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
     setAddingCustom(false)
     setDirty(true)
     setSaved(false)
+    setEmailUrl(null)
   }
 
   function removeCustomQuestion(id: string) {
@@ -291,6 +300,7 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
     setAnswers((a) => { const next = { ...a }; delete next[id]; return next })
     setDirty(true)
     setSaved(false)
+    setEmailUrl(null)
   }
 
   async function handleSave() {
@@ -319,16 +329,52 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
         </div>
         <div className="flex items-center gap-2">
           {onEmailSnapshot && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => onEmailSnapshot({ answers, questions })}
-              title="Open a Gmail draft with the snapshot"
-            >
-              <Mail className="h-3.5 w-3.5" />
-              Email Snapshot
-            </Button>
+            emailUrl ? (
+              // Real anchor → fresh user gesture, never blocked by popup blockers.
+              <a
+                href={emailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setEmailUrl(null)}
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 text-xs font-medium text-emerald-600 hover:bg-emerald-500/15 transition-colors"
+                title="Opens a new Gmail tab with the prefilled draft"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                Open Gmail draft
+              </a>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                disabled={emailing}
+                onClick={async () => {
+                  setEmailing(true)
+                  setEmailErr(null)
+                  try {
+                    const url = await onEmailSnapshot({ answers, questions })
+                    setEmailUrl(url)
+                  } catch (err) {
+                    setEmailErr(err instanceof Error ? err.message : 'Failed to generate snapshot')
+                  } finally {
+                    setEmailing(false)
+                  }
+                }}
+                title="Ask the AI to write a snapshot email, then open it in Gmail"
+              >
+                {emailing ? (
+                  <>
+                    <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-3.5 w-3.5" />
+                    Email Snapshot
+                  </>
+                )}
+              </Button>
+            )
           )}
           {!readOnly && (
             <Button

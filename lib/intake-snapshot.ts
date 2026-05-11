@@ -24,6 +24,7 @@ export interface SnapshotQuestionDef {
 }
 
 export interface SnapshotInput {
+  lead_id?:  string
   lead:      SnapshotLead
   answers:   Record<string, string>
   questions: SnapshotQuestionDef[]
@@ -196,6 +197,40 @@ export function buildSnapshot({ lead, answers, questions }: SnapshotInput): stri
   return parts.join('\n\n') + '\n'
 }
 
+// ── Visual bold for plain-text email ──────────────────────────────────────
+// Gmail's compose URL accepts plain text only, so we use the Unicode
+// Mathematical Sans-Serif Bold block (U+1D5D4…). Modern mail clients
+// render these as bold by default.
+function toUnicodeBold(text: string): string {
+  let out = ''
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0
+    if (code >= 0x41 && code <= 0x5A)      out += String.fromCodePoint(0x1D5D4 + code - 0x41)  // A-Z
+    else if (code >= 0x61 && code <= 0x7A) out += String.fromCodePoint(0x1D5EE + code - 0x61)  // a-z
+    else if (code >= 0x30 && code <= 0x39) out += String.fromCodePoint(0x1D7EC + code - 0x30)  // 0-9
+    else out += ch
+  }
+  return out
+}
+
+/**
+ * Bold the section headers in a snapshot email body. Targets:
+ *   - the literal line "Company Snapshot"
+ *   - any non-indented line that is a label ending in `:` (Revenue:, Team:, etc.)
+ * Indented lines (bullets/data) are left alone.
+ */
+export function styleSnapshotBody(body: string): string {
+  return body
+    .split('\n')
+    .map((line) => {
+      if (/^\s/.test(line)) return line
+      if (line.trim() === 'Company Snapshot')        return toUnicodeBold(line)
+      if (/^[A-Z][A-Za-z0-9 &/'-]*:\s*$/.test(line)) return toUnicodeBold(line)
+      return line
+    })
+    .join('\n')
+}
+
 // ── Gmail compose URL ─────────────────────────────────────────────────────
 /**
  * Build a Gmail compose URL. Uses encodeURIComponent (%20 for spaces) for
@@ -215,20 +250,14 @@ export function buildGmailComposeUrl(opts: {
 }
 
 /**
- * Open a Gmail draft for this lead's snapshot in a new tab.
+ * Generate the Gmail compose URL for this lead's snapshot.
  *
  * Tries the AI-polished version via /api/ai/snapshot-email first, falls back
- * to the deterministic template if AI is unavailable or errors. Opens an
- * about:blank tab synchronously (to avoid popup blockers) and navigates it
- * once the body is ready.
+ * to the deterministic template if AI is unavailable. Always resolves with a
+ * usable URL — the caller is responsible for opening it from a fresh user
+ * gesture (e.g. an <a target="_blank"> click) to avoid popup blockers.
  */
-export async function openSnapshotEmail(input: SnapshotInput): Promise<void> {
-  // Open a tab immediately — Safari/Chrome block window.open from async
-  // callbacks unless it happens inside the user-gesture stack.
-  const tab = typeof window !== 'undefined'
-    ? window.open('about:blank', '_blank', 'noopener,noreferrer')
-    : null
-
+export async function prepareSnapshotEmail(input: SnapshotInput): Promise<string> {
   let subject: string
   let body:    string
   let source:  'ai' | 'template' = 'template'
@@ -254,12 +283,11 @@ export async function openSnapshotEmail(input: SnapshotInput): Promise<void> {
     subject = company ? `${company} – Snapshot` : 'Deal Snapshot'
   }
 
-  const url = buildGmailComposeUrl({ subject, body })
+  const styledBody = styleSnapshotBody(body)
+  const url        = buildGmailComposeUrl({ subject, body: styledBody })
   if (typeof console !== 'undefined') {
     console.log(`[Intake Snapshot] source: ${source}, url length: ${url.length}`)
-    console.log('[Intake Snapshot] body:\n' + body)
+    console.log('[Intake Snapshot] body:\n' + styledBody)
   }
-
-  if (tab) tab.location.href = url
-  else if (typeof window !== 'undefined') window.open(url, '_blank', 'noopener,noreferrer')
+  return url
 }
