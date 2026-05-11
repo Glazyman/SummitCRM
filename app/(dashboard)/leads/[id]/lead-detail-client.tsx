@@ -23,7 +23,7 @@ const TABS = [
   { id: 'activity',      label: 'Activity',      Icon: Activity      },
   { id: 'followups',     label: 'Follow-ups',    Icon: Clock         },
   { id: 'calls',         label: 'Calls',         Icon: Phone         },
-  { id: 'questionnaire', label: 'Questionnaire', Icon: ClipboardList },
+  { id: 'questionnaire', label: 'Intake',         Icon: ClipboardList },
 ] as const
 
 type TabId = typeof TABS[number]['id']

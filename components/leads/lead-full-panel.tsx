@@ -29,7 +29,7 @@ const TABS = [
   { id: 'activity',      label: 'Activity',      Icon: Activity      },
   { id: 'followups',     label: 'Follow-ups',    Icon: Clock         },
   { id: 'calls',         label: 'Calls',         Icon: Phone         },
-  { id: 'questionnaire', label: 'Questionnaire', Icon: ClipboardList },
+  { id: 'questionnaire', label: 'Intake',         Icon: ClipboardList },
 ] as const
 
 type TabId = typeof TABS[number]['id']
@@ -382,7 +382,7 @@ export function LeadFullPanel({
                     type="button"
                     onClick={() => setActiveTab(id)}
                     className={cn(
-                      'flex shrink-0 items-center gap-1.5 border-b-2 px-4 py-2.5 text-xs font-medium transition-colors whitespace-nowrap',
+                      'flex shrink-0 items-center gap-1 border-b-2 px-3 py-2.5 text-xs font-medium transition-colors whitespace-nowrap',
                       activeTab === id
                         ? 'border-primary text-primary'
                         : 'border-transparent text-muted-foreground hover:text-foreground'
