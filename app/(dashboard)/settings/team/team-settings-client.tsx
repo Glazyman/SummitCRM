@@ -127,17 +127,13 @@ function InviteForm({ onInvite }: { onInvite: (email: string, role: WorkspaceRol
           />
         </div>
         <div className="sm:w-40 space-y-1.5">
-          <Label htmlFor="invite-role">Role</Label>
-          <select
-            id="invite-role"
+          <Label>Role</Label>
+          <SelectMenu
             value={role}
-            onChange={(e) => setRole(e.target.value as WorkspaceRole)}
-            className="w-full h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            {availableRoles.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
+            onChange={(v) => setRole(v as WorkspaceRole)}
+            options={availableRoles.map((r) => ({ value: r.value, label: r.label }))}
+            className="w-full"
+          />
         </div>
       </div>
 
