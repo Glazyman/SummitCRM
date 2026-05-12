@@ -8,7 +8,6 @@ import { createClient } from '@/lib/supabase/client'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
-import { FollowUpBell }     from '@/components/notifications/followup-bell'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { WorkspaceRole } from '@/types/database'
 
@@ -240,9 +239,10 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
             <Search className="h-4 w-4" />
           </button>
 
-          {/* Notifications — wrapped in a round white pill */}
+          {/* One bell for everyone — mentions + lead-assigned + today's
+              activities + upcoming activities, all in the same dropdown. */}
           <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-secondary transition-colors relative z-30">
-            {role === 'rep' ? <FollowUpBell /> : <NotificationBell />}
+            <NotificationBell />
           </div>
 
           {/* User dropdown — round avatar pill */}
