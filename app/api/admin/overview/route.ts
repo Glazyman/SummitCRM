@@ -84,8 +84,7 @@ export async function GET(req: Request) {
           .from('ai_usage_logs')
           .select('total_tokens, cost_usd')
           .eq('workspace_id', wsId)
-          .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
-          .eq('cached', false),
+          .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
 
         adminClient
           .from('sending_accounts')

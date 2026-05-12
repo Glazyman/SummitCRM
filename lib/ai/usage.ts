@@ -40,9 +40,6 @@ export async function logUsage(input: LogUsageInput): Promise<void> {
         insert: (rows: object) => Promise<{ error: { message: string; code?: string } | null; data: unknown }>
       }
     }
-    // Schema note: matches the live `ai_usage_logs` table — no `cached`
-    // column (the migration in repo declares it, but it's not in the
-    // deployed schema; PostgREST rejects the insert if we send it).
     const row = {
       workspace_id:      input.workspace_id,
       user_id:           input.user_id,

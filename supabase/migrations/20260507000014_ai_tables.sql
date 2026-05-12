@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS ai_usage_logs (
   completion_tokens   integer NOT NULL DEFAULT 0 CHECK (completion_tokens >= 0),
   total_tokens        integer NOT NULL DEFAULT 0 CHECK (total_tokens >= 0),
   cost_usd            numeric(12, 8) NOT NULL DEFAULT 0,
-  cached              boolean NOT NULL DEFAULT false,
   created_at          timestamptz NOT NULL DEFAULT now()
 );
 
