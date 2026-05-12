@@ -51,9 +51,11 @@ export async function GET(req: NextRequest) {
     const period = req.nextUrl.searchParams.get('period') ?? 'week'
     const range  = periodRange(period)
     const wsId   = member.workspace_id
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
 
     // Fetch everything in parallel
-    const [membersRes, callsRes, followUpsRes, leadsRes, statusActivitiesRes] = await Promise.all([
+    const [membersRes, callsRes, followUpsRes, leadsRes, statusActivitiesRes,
+           leadsCalledTodayRes, workspaceRes] = await Promise.all([
       admin.from('workspace_members').select('user_id, role').eq('workspace_id', wsId).eq('is_active', true),
       admin.from('call_logs')
         .select('logged_by, outcome, called_at')
@@ -70,7 +72,27 @@ export async function GET(req: NextRequest) {
         .eq('type', 'lead_status_changed')
         .gte('created_at', range.start)
         .lte('created_at', range.end),
+      // Unique leads each rep called TODAY (independent of the period
+      // toggle — daily target is always "today").
+      admin.rpc('get_unique_leads_called_by_rep', {
+        p_workspace_id: wsId,
+        p_since:        startOfToday.toISOString(),
+      }),
+      // Workspace settings → default daily target + per-rep overrides
+      admin.from('workspaces').select('settings').eq('id', wsId).single(),
     ])
+
+    const leadsCalledRows = (leadsCalledTodayRes.data ?? []) as Array<{ user_id: string; leads_called: number }>
+    const leadsCalledTodayByUser = new Map(leadsCalledRows.map((r) => [r.user_id, Number(r.leads_called)]))
+
+    const wsSettings = (workspaceRes.data as { settings?: Record<string, unknown> } | null)?.settings ?? {}
+    const workspaceDefault = Number(wsSettings.daily_call_target)
+    const defaultTarget = Number.isFinite(workspaceDefault) && workspaceDefault > 0 ? Math.floor(workspaceDefault) : 100
+    const overrideMap = (wsSettings.rep_daily_call_targets ?? {}) as Record<string, unknown>
+    const targetForUser = (uid: string) => {
+      const o = Number(overrideMap[uid])
+      return Number.isFinite(o) && o > 0 ? Math.floor(o) : defaultTarget
+    }
 
     const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
     const memberIds = members.map((m) => m.user_id)
@@ -143,6 +165,10 @@ export async function GET(req: NextRequest) {
           followUpsCompleted: fuCompleted,
           leadsAssigned:    myLeads.length,
           leadsActive:      active,
+          // Daily progress vs target — always reflects today, not the
+          // selected period.
+          leadsCalledToday: leadsCalledTodayByUser.get(uid) ?? 0,
+          dailyCallTarget:  targetForUser(uid),
         }
       })
       .sort((a, b) => b.calls - a.calls)

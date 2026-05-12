@@ -20,6 +20,10 @@ interface RepStat {
   followUpsCompleted: number
   leadsAssigned:     number
   leadsActive:       number
+  /** Unique leads this rep called today (ignores period toggle). */
+  leadsCalledToday:  number
+  /** Daily target (workspace default + per-rep override). */
+  dailyCallTarget:   number
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -244,6 +248,9 @@ export function RepPerformancePanel() {
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
                     <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Rep</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground" title="Unique leads called today vs daily target">
+                      Today / Target
+                    </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Calls</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Answered</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Voicemail</th>
@@ -264,6 +271,30 @@ export function RepPerformancePanel() {
                           </div>
                           <p className="font-medium text-sm">{rep.name}</p>
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {(() => {
+                          const target = rep.dailyCallTarget || 100
+                          const done   = rep.leadsCalledToday
+                          const pct    = Math.min(100, Math.round((done / target) * 100))
+                          const hit    = done >= target
+                          return (
+                            <div className="flex flex-col items-center gap-1 min-w-[80px]">
+                              <span className={cn(
+                                'text-sm font-semibold tabular-nums',
+                                hit ? 'text-emerald-600' : done === 0 ? 'text-muted-foreground/40' : 'text-foreground'
+                              )}>
+                                {done} / {target}
+                              </span>
+                              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className={cn('h-full rounded-full transition-all', hit ? 'bg-emerald-500' : 'bg-primary')}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={cn('inline-flex items-center justify-center h-7 w-7 rounded-full text-sm font-bold',
