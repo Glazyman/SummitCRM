@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { findUserByEmail, invalidateUsersCache } from '@/lib/users-cache'
+import { findUserByEmail } from '@/lib/users'
 
 // POST /api/team/accept-invite — accept invite, create account, join workspace
 export async function POST(req: NextRequest) {
@@ -66,8 +66,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: createErr?.message ?? 'Failed to create account' }, { status: 500 })
     }
     userId = newUser.user.id
-    // New user → bust the cache so subsequent /leads etc. see them.
-    invalidateUsersCache()
+    // (No cache to invalidate anymore — the RPC reads live from auth.users.)
   }
 
   // Upsert workspace membership

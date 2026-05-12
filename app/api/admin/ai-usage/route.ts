@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
-import { getUsersById } from '@/lib/users-cache'
+import { getUsersById } from '@/lib/users'
 import type { UsageRow, UsageSummary, AiModel } from '@/lib/ai'
 
 export async function GET(_req: Request) {
@@ -69,9 +69,9 @@ export async function GET(_req: Request) {
     }
     const recentRaw = (recentRes.data ?? []) as RawRow[]
 
-    // Resolve only the user IDs that appear in the recent rows (cached, no full scan).
+    // Resolve only the user IDs that appear in the recent rows (workspace-scoped RPC).
     const userIds   = Array.from(new Set(recentRaw.map((r) => r.user_id).filter(Boolean)))
-    const usersById = await getUsersById(adminRaw, userIds)
+    const usersById = await getUsersById(adminRaw, member.workspace_id, userIds)
 
     // Resolve lead company names in one query.
     const leadIds = Array.from(new Set(recentRaw.map((r) => r.lead_id).filter((id): id is string => Boolean(id))))

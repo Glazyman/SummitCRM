@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getUsersById } from '@/lib/users-cache'
+import { getUsersById } from '@/lib/users'
 import { ImportPageClient } from './import-page-client'
 
 export const metadata: Metadata = { title: 'Import Leads' }
@@ -46,7 +46,8 @@ export default async function ImportPage() {
   ])
 
   const memberIds = (membersResult.data ?? []).map((m: { user_id: string }) => m.user_id)
-  const usersById = await getUsersById(adminClient, memberIds)
+  // If workspaceId is undefined we short-circuit via empty memberIds anyway.
+  const usersById = await getUsersById(adminClient, workspaceId ?? '', memberIds)
 
   const teamMembers = memberIds.map(id => ({ id, name: usersById.get(id) ?? id }))
 

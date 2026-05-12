@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getUsersById } from '@/lib/users-cache'
+import { getUsersById } from '@/lib/users'
 import { ActivitiesClient } from './activities-client'
 
 export const metadata: Metadata = { title: 'Activities' }
@@ -44,7 +44,7 @@ export default async function ActivitiesPage() {
       activities = activitiesResult.data ?? []
 
       const memberIds = ((membersResult.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
-      const usersById = await getUsersById(admin, memberIds)
+      const usersById = await getUsersById(admin, workspaceId, memberIds)
       teamMembers = memberIds.map((id) => ({ id, name: usersById.get(id) ?? id }))
     }
   }

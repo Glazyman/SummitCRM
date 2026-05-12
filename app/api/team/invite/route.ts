@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { findUserByEmail } from '@/lib/users-cache'
+import { findUserByEmail } from '@/lib/users'
 import type { WorkspaceRole } from '@/types/database'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

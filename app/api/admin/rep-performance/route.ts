@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
-import { getUsersById } from '@/lib/users-cache'
+import { getUsersById } from '@/lib/users'
 
 function periodRange(period: string) {
   const now   = new Date()
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
 
     const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
     const memberIds = members.map((m) => m.user_id)
-    const nameById  = await getUsersById(admin, memberIds)
+    const nameById  = await getUsersById(admin, wsId, memberIds)
     const calls     = (callsRes.data ?? []) as Array<{ logged_by: string; outcome: string; called_at: string }>
     const statusActivities = (statusActivitiesRes.data ?? []) as Array<{ user_id: string; metadata: Record<string, unknown> | null }>
     const followUps = (followUpsRes.data ?? []) as Array<{ assigned_to: string | null; completed_at: string | null; due_at: string }>

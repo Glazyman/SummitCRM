@@ -5,7 +5,7 @@
 import { NextResponse } from 'next/server'
 import { cookies }      from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
-import { getUsersByIdsFull } from '@/lib/users-cache'
+import { getUsersByIdsFull } from '@/lib/users'
 
 export async function GET(req: Request) {
   try {
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
 
     const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
     const memberIds = members.map((m) => m.user_id)
-    const memberUsers = await getUsersByIdsFull(admin, memberIds)
+    const memberUsers = await getUsersByIdsFull(admin, wsId, memberIds)
     const calls     = (callsRes.data ?? []) as Array<{ logged_by: string; outcome: string }>
     const followUps = (followUpsRes.data ?? []) as Array<{ assigned_to: string | null; completed_at: string | null; due_at: string }>
     // RPC returns [{assigned_to, status, cnt}] — expand into flat rows for existing logic

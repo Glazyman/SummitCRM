@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
-import { getUsersById } from '@/lib/users-cache'
+import { getUsersById } from '@/lib/users'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -46,10 +46,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     if (!leadRes.data) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
-    // Resolve user names via admin client (30s cached, no full-table scan).
+    // Resolve user names via workspace-scoped SQL RPC.
     const memberIds = ((membersRes.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
     const adminClient = createAdminClient()
-    const usersById = await getUsersById(adminClient, memberIds)
+    const usersById = await getUsersById(adminClient, workspaceId, memberIds)
 
     const batchNames = new Map(
       ((batchesRes.data ?? []) as Array<{ id: string; name: string }>).map((b) => [b.id, b.name])

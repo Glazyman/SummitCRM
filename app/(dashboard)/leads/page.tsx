@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
-import { getUsersById } from '@/lib/users-cache'
+import { getUsersById } from '@/lib/users'
 import { LeadsClient }       from './leads-client'
 import { Spinner } from '@/components/ui/spinner'
 import type { LeadRow } from '@/components/leads/types'
@@ -68,7 +68,7 @@ export default async function LeadsPage() {
 
       const memberIds = ((membersResult.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
       const adminClient = createAdminClient()
-      const usersById = await getUsersById(adminClient, memberIds)
+      const usersById = await getUsersById(adminClient, workspaceId, memberIds)
 
       teamMembers = memberIds.map((id) => ({ id, name: usersById.get(id) ?? id }))
 

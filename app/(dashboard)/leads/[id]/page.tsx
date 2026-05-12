@@ -3,7 +3,7 @@ import { notFound }      from 'next/navigation'
 import { Spinner }       from '@/components/ui/spinner'
 import LeadDetailClient  from './lead-detail-client'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
-import { getUsersById } from '@/lib/users-cache'
+import { getUsersById } from '@/lib/users'
 import type { ActivityEntry, EmailHistoryItem, FollowUp, LeadDetail, TeamMember } from '@/components/leads/detail/types'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -49,7 +49,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
 
   const memberIds = ((membersResult.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
   const adminClient = createAdminClient()
-  const usersById = await getUsersById(adminClient, memberIds)
+  const usersById = await getUsersById(adminClient, workspaceId, memberIds)
 
   const batchNames = new Map(((batchesResult.data ?? []) as Array<{ id: string; name: string }>).map((b) => [b.id, b.name]))
   const rawLead = leadResult.data as {
