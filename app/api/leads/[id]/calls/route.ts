@@ -4,6 +4,17 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 const DEFAULT_FOLLOWUP_HOUR = 11 // 11 AM — change this to adjust follow-up time
 
+// Logging a call should bring the lead's status in line with the outcome
+// (inverse of STATUS_TO_CALL_OUTCOME in /api/leads/[id]/route.ts). 'answered'
+// and 'callback_requested' both map to 'called' — a conversation happened.
+const OUTCOME_TO_STATUS: Record<string, string> = {
+  answered:           'called',
+  voicemail:          'voicemail',
+  no_answer:          'no_answer',
+  wrong_number:       'wrong_number',
+  callback_requested: 'called',
+}
+
 function tomorrowAt(hour: number) {
   const d = new Date()
   d.setDate(d.getDate() + 1)
@@ -86,7 +97,7 @@ export async function POST(
   // Verify lead belongs to workspace; reps can only log calls for their own leads
   const { data: lead, error: leadErr } = await admin
     .from('leads')
-    .select('id, workspace_id, assigned_to')
+    .select('id, workspace_id, assigned_to, status')
     .eq('id', leadId)
     .eq('workspace_id', member.workspace_id)
     .single()
@@ -126,6 +137,26 @@ export async function POST(
       call_log_id:  call.id,
     },
   })
+
+  // Mirror the outcome onto lead.status so the lead reflects the call.
+  // (The PATCH-status path auto-creates a call_logs row in the inverse
+  // direction; this path is the equivalent for the Log Call UI.)
+  const targetStatus = OUTCOME_TO_STATUS[outcome]
+  if (targetStatus && targetStatus !== lead.status) {
+    await admin
+      .from('leads')
+      .update({ status: targetStatus })
+      .eq('id', leadId)
+      .eq('workspace_id', lead.workspace_id)
+
+    await admin.from('activity_logs').insert({
+      workspace_id: lead.workspace_id,
+      lead_id:      leadId,
+      user_id:      user.id,
+      type:         'lead_status_changed',
+      metadata:     { from: lead.status, to: targetStatus, auto_from_call: true },
+    })
+  }
 
   const followUpSuggestion = (outcome === 'voicemail' || outcome === 'no_answer')
     ? {
