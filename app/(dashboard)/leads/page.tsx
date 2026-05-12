@@ -95,31 +95,20 @@ export default async function LeadsPage() {
         updated_at: string
       }>)
 
-      const leadIds = rawLeads.map((l) => l.id)
-      const { data: callLogsRaw } = leadIds.length > 0
-        ? await adminForLeads
-            .from('call_logs')
-            .select('lead_id, called_at, outcome')
-            .in('lead_id', leadIds)
-            .order('called_at', { ascending: false })
-            .range(0, 49999)
-        : { data: [] as Array<{ lead_id: string; called_at: string; outcome: string | null }> }
-
-      const lastContactedMap = new Map<string, string>()
-      const lastCallOutcomeMap = new Map<string, string>()
-      for (const row of (callLogsRaw ?? []) as Array<{ lead_id: string; called_at: string; outcome: string | null }>) {
-        if (!lastContactedMap.has(row.lead_id)) lastContactedMap.set(row.lead_id, row.called_at)
-        if (!lastCallOutcomeMap.has(row.lead_id)) lastCallOutcomeMap.set(row.lead_id, row.outcome ?? '')
-      }
-
-      leads = rawLeads.map((lead) => ({
+      // last_contacted_at + last_call_outcome are now denormalized columns on
+      // leads, kept fresh by trg_call_logs_sync_last_contacted. No call_logs
+      // join needed here.
+      leads = (rawLeads as Array<typeof rawLeads[number] & {
+        last_contacted_at: string | null
+        last_call_outcome: string | null
+      }>).map((lead) => ({
         ...lead,
         interest_status:  lead.interest_status  ?? 'pending',
         pipeline_stage_id: lead.pipeline_stage_id ?? null,
         batch_name:        lead.batch_id ? batchNames.get(lead.batch_id) ?? null : null,
         assigned_name:     lead.assigned_to ? usersById.get(lead.assigned_to) ?? null : null,
-        last_contacted_at: lastContactedMap.get(lead.id) ?? null,
-        last_call_outcome: lastCallOutcomeMap.get(lead.id) || null,
+        last_contacted_at: lead.last_contacted_at ?? null,
+        last_call_outcome: lead.last_call_outcome ?? null,
         last_activity_at:  null,
         tags:              [],
         custom_fields:     lead.custom_fields ?? {},

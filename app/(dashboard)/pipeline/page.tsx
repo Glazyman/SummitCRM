@@ -66,30 +66,17 @@ export default async function PipelinePage() {
 
   const leadIds = rawLeads.map((l) => l.id)
 
-  // Fetch call logs and custom_fields (for revenue) in parallel
-  const [callLogsResult, customFieldsResult] = await Promise.all([
-    leadIds.length > 0
-      ? supabase
-          .from('call_logs')
-          .select('lead_id, called_at')
-          .in('lead_id', leadIds)
-          .order('called_at', { ascending: false })
-      : Promise.resolve({ data: [] }),
-    leadIds.length > 0
-      ? admin
-          .from('leads')
-          .select('id, custom_fields')
-          .in('id', leadIds)
-          .is('deleted_at', null)
-      : Promise.resolve({ data: [] }),
-  ])
+  // last_contacted_at now lives directly on the lead row (denormalized via
+  // trg_call_logs_sync_last_contacted). Only fetch custom_fields here for
+  // revenue calculation.
+  const customFieldsResult = leadIds.length > 0
+    ? await admin
+        .from('leads')
+        .select('id, custom_fields')
+        .in('id', leadIds)
+        .is('deleted_at', null)
+    : { data: [] }
 
-  const lastContactedMap = new Map<string, string>()
-  for (const row of ((callLogsResult.data ?? []) as Array<{ lead_id: string; called_at: string }>)) {
-    if (!lastContactedMap.has(row.lead_id)) lastContactedMap.set(row.lead_id, row.called_at)
-  }
-
-  // Build revenue map from questionnaire answers
   const revenueMap = new Map<string, number>()
   for (const row of ((customFieldsResult.data ?? []) as Array<{ id: string; custom_fields: Record<string, unknown> }>)) {
     const answers = (row.custom_fields?._questionnaire as any)?.answers ?? {}
@@ -97,9 +84,9 @@ export default async function PipelinePage() {
     if (rev > 0) revenueMap.set(row.id, rev)
   }
 
-  const leadsWithContact = rawLeads.map((lead) => ({
+  const leadsWithContact = (rawLeads as Array<typeof rawLeads[number] & { last_contacted_at: string | null }>).map((lead) => ({
     ...lead,
-    last_contacted_at: lastContactedMap.get(lead.id) ?? null,
+    last_contacted_at: lead.last_contacted_at ?? null,
     pipeline_value:    revenueMap.get(lead.id) ?? 0,
   }))
 
