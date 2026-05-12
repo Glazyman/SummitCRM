@@ -68,6 +68,10 @@ export function LeadsClient({
   const router       = useRouter()
   const pathname     = usePathname()
   const searchParams = useSearchParams()
+  // useTransition marks the URL push as non-urgent: React keeps the
+  // current page (table + counts) rendered while the new server
+  // component fetches in the background. No blank flash on page switch.
+  const [isNavPending, startNavTransition] = React.useTransition()
 
   // ── Build initial filters from URL params ────────────────────────────
   const filtersFromUrl = React.useMemo((): LeadFilters => {
@@ -216,7 +220,9 @@ export function LeadsClient({
     const next  = `${pathname}${qs ? `?${qs}` : ''}`
     const curQS = searchParams.toString()
     const curr  = `${pathname}${curQS ? `?${curQS}` : ''}`
-    if (next !== curr) router.push(next, { scroll: false })
+    if (next !== curr) {
+      startNavTransition(() => router.push(next, { scroll: false }))
+    }
   }, [filters, pathname, router, searchParams])
 
   // ── Handlers ──────────────────────────────────────────────────────────
