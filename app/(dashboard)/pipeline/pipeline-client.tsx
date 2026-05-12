@@ -10,6 +10,10 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu'
 import { INTEREST_CONFIG } from '@/components/leads/status-config'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
 import type { InterestStatus } from '@/types/database'
@@ -107,6 +111,25 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
     e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverStage(sid)
   }
   function handleDragLeave() { setDragOverStage(null) }
+
+  // Move a lead between pipeline stages (used by drag-drop and the
+  // 3-dot menu on each card).
+  async function moveLeadToStage(leadId: string, sid: string) {
+    const lead = leads.find(l => l.id === leadId)
+    if (!lead || lead.pipeline_stage_id === sid) return
+    setLeads(p => p.map(l => l.id === leadId ? { ...l, pipeline_stage_id: sid } : l))
+    try {
+      await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pipeline_stage_id: sid }),
+      })
+      router.refresh()
+    } catch {
+      // Roll back optimistic update
+      setLeads(p => p.map(l => l.id === leadId ? { ...l, pipeline_stage_id: lead.pipeline_stage_id } : l))
+    }
+  }
+
   async function handleDrop(e: React.DragEvent, sid: string) {
     e.preventDefault(); setDragOverStage(null)
     if (!draggingId) return
@@ -270,10 +293,12 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
                           key={lead.id}
                           lead={lead}
                           stageColor={stage.color}
+                          stages={stages}
                           isDragging={draggingId === lead.id}
                           onDragStart={handleDragStart}
                           onDragEnd={handleDragEnd}
                           onOpen={() => { if (!didDragRef.current) setSelectedLeadId(lead.id) }}
+                          onMoveToStage={moveLeadToStage}
                         />
                       ))}
                     </div>
@@ -386,11 +411,12 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
 
 // ── Kanban card ───────────────────────────────────────────────────────────────
 function KanbanCard({
-  lead, stageColor, isDragging, onDragStart, onDragEnd, onOpen,
+  lead, stageColor, stages, isDragging, onDragStart, onDragEnd, onOpen, onMoveToStage,
 }: {
-  lead: PipelineLead; stageColor: string; isDragging: boolean
+  lead: PipelineLead; stageColor: string; stages: PipelineStage[]; isDragging: boolean
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void; onOpen: () => void
+  onMoveToStage: (leadId: string, stageId: string) => void
 }) {
   const name         = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
   const initials     = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -419,13 +445,40 @@ function KanbanCard({
             <p className="text-[13.5px] font-semibold leading-snug truncate">{name}</p>
             <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{lead.company ?? <span className="italic opacity-50">No company</span>}</p>
           </div>
-          <button
-            type="button"
-            onClick={e => e.stopPropagation()}
-            className="shrink-0 mt-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={e => e.stopPropagation()}
+                className="shrink-0 mt-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                aria-label="Card actions"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" minWidth="190px">
+              <DropdownMenuLabel>Move to stage</DropdownMenuLabel>
+              {stages.map(s => (
+                <DropdownMenuItem
+                  key={s.id}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (s.id !== lead.pipeline_stage_id) onMoveToStage(lead.id, s.id)
+                  }}
+                  className={cn(s.id === lead.pipeline_stage_id && 'opacity-50 cursor-default')}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{ backgroundColor: s.color }}
+                  />
+                  {s.name}
+                  {s.id === lead.pipeline_stage_id && (
+                    <span className="ml-auto text-xs text-muted-foreground">current</span>
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Phone + date */}
