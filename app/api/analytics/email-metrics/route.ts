@@ -2,6 +2,9 @@
  * GET /api/analytics/email-metrics
  * Aggregate email stats for a date range. rep+ access.
  * Reps see only their own data.
+ *
+ * Aggregation runs inside Postgres via get_email_metrics_analytics() —
+ * single jsonb response bypasses PostgREST's 1000-row cap.
  */
 import { NextResponse } from 'next/server'
 import { cookies }      from 'next/headers'
@@ -28,33 +31,19 @@ export async function GET(req: Request) {
     const isRep = member.role === 'rep'
     const repId = isRep ? user.id : (searchParams.get('rep_id') ?? null)
 
-    let query = adminClient.from('emails').select('status')
-      .eq('workspace_id', member.workspace_id)
-      .gte('sent_at', start).lte('sent_at', end)
-      .not('status', 'eq', 'queued')
-
-    if (repId) query = query.eq('sent_by', repId) as typeof query
-
-    // PostgREST caps select at 1000 rows; bump so the metric counts are
-    // accurate at 10k+ emails.
-    const { data: rows } = await query.range(0, 99999) as { data: Array<{ status: string }> | null }
-    const all = rows ?? []
-
-    const sent    = all.length
-    const opened  = all.filter(e => ['opened','clicked','replied'].includes(e.status)).length
-    const clicked = all.filter(e => e.status === 'clicked').length
-    const replied = all.filter(e => e.status === 'replied').length
-    const bounced = all.filter(e => e.status === 'bounced').length
-    const r = (n: number) => sent > 0 ? Math.round((n / sent) * 1000) / 10 : 0
-
-    return NextResponse.json({
-      period: { start, end },
-      totals: {
-        sent, opened, clicked, replied, bounced,
-        open_rate: r(opened), click_rate: r(clicked),
-        reply_rate: r(replied), bounce_rate: r(bounced),
-      },
+    const { data, error } = await adminClient.rpc('get_email_metrics_analytics', {
+      p_workspace_id: member.workspace_id,
+      p_start:        start,
+      p_end:          end,
+      p_rep_id:       repId,
     })
+
+    if (error) {
+      console.error('[get_email_metrics_analytics]', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(data ?? { period: { start, end }, totals: {} })
   } catch (err) {
     console.error('[GET /api/analytics/email-metrics]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })

@@ -31,19 +31,17 @@ export async function GET(req: Request) {
     let total = 0
 
     if (isRep) {
-      // PostgREST caps at 1000 rows by default — bump so a rep with 3k+
-      // assigned leads gets accurate funnel counts.
+      // Rep-scoped status counts via SQL aggregate RPC — single jsonb
+      // response so PostgREST's 1000-row cap is irrelevant.
       const { data: rows } = await adminClient
-        .from('leads')
-        .select('status')
-        .eq('workspace_id', member.workspace_id)
-        .eq('assigned_to', user.id)
-        .is('deleted_at', null)
-        .range(0, 99999) as { data: Array<{ status: string }> | null }
+        .rpc('get_leads_status_counts_for_rep', {
+          p_workspace_id: member.workspace_id,
+          p_user_id:      user.id,
+        }) as { data: Array<{ status: string; cnt: number }> | null }
       for (const row of rows ?? []) {
-        counts.set(row.status, (counts.get(row.status) ?? 0) + 1)
+        counts.set(row.status, Number(row.cnt))
+        total += Number(row.cnt)
       }
-      total = (rows ?? []).length
     } else {
       const { data: rows } = await adminClient
         .rpc('get_leads_status_counts', { p_workspace_id: member.workspace_id }) as
