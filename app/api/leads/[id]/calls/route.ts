@@ -113,7 +113,8 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Log activity
+  // Log activity. Include call_log_id so the activity-delete route can
+  // cascade-delete the underlying call when the user removes this entry.
   await admin.from('activity_logs').insert({
     workspace_id: lead.workspace_id,
     lead_id:      leadId,
@@ -122,6 +123,7 @@ export async function POST(
     metadata: {
       outcome,
       duration_sec: duration_sec ?? null,
+      call_log_id:  call.id,
     },
   })
 

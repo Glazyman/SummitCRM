@@ -102,6 +102,12 @@ const interestStatusSchema = z.enum(['pending', 'interested', 'not_interested'])
 
 const optionalText = (max: number) => z.string().max(max).nullable().optional()
 
+// US state codes (50 + DC) or empty string (clear field).
+const stateField = z.union([
+  z.literal(''),
+  z.string().regex(/^[A-Z]{2}$/),
+]).nullable().optional()
+
 const patchSchema = z.object({
   first_name:        optionalText(100),
   last_name:         optionalText(100),
@@ -115,7 +121,13 @@ const patchSchema = z.object({
   interest_status:   interestStatusSchema.optional(),
   pipeline_stage_id: z.string().uuid().nullable().optional(),
   assigned_to:       z.string().uuid().nullable().optional(),
+  // Stored inside leads.custom_fields, not as top-level columns.
+  contact_state:     stateField,
+  company_state:     stateField,
 })
+
+const CUSTOM_FIELDS_KEYS = ['contact_state', 'company_state'] as const
+type CustomFieldKey = typeof CUSTOM_FIELDS_KEYS[number]
 
 const nullableTextFields = [
   'first_name',
@@ -159,7 +171,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const adminClient = createAdminClient()
     const patch = normalizeLeadPatch(parsed.data)
-    if (Object.keys(patch).length === 0) {
+    const willTouchCustomFields = CUSTOM_FIELDS_KEYS.some((k) => k in parsed.data)
+    if (Object.keys(patch).length === 0 && !willTouchCustomFields) {
       return NextResponse.json({ error: 'No changes provided' }, { status: 400 })
     }
 
@@ -177,7 +190,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { data: existing } = await supabase
       .from('leads')
-      .select('id, status, interest_status, pipeline_stage_id, assigned_to')
+      .select('id, status, interest_status, pipeline_stage_id, assigned_to, custom_fields')
       .eq('id', id)
       .eq('workspace_id', member.workspace_id)
       .is('deleted_at', null)
@@ -188,6 +201,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           interest_status: string | null
           pipeline_stage_id: string | null
           assigned_to: string | null
+          custom_fields: Record<string, unknown> | null
         } | null
         error: unknown
       }
@@ -227,6 +241,29 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
     }
 
+    // ── custom_fields merge (contact_state / company_state) ──────────────
+    // These fields live inside the jsonb column. Merge into the existing
+    // object so other custom keys (e.g. revenue) aren't clobbered. Empty
+    // string clears the key.
+    const customFieldsPatch: Record<string, string> = {}
+    let touchedCustomFields = false
+    for (const key of CUSTOM_FIELDS_KEYS) {
+      if (key in parsed.data) {
+        touchedCustomFields = true
+        const value = parsed.data[key as CustomFieldKey]
+        if (value && value.length > 0) customFieldsPatch[key] = value
+      }
+    }
+    if (touchedCustomFields) {
+      const existingFields = (existing.custom_fields ?? {}) as Record<string, unknown>
+      const merged: Record<string, unknown> = { ...existingFields, ...customFieldsPatch }
+      // Empty / null state input means "clear" — remove the key entirely.
+      for (const key of CUSTOM_FIELDS_KEYS) {
+        if (key in parsed.data && !customFieldsPatch[key]) delete merged[key]
+      }
+      ;(patch as Record<string, unknown>).custom_fields = merged
+    }
+
     // ── Persist via admin client (bypasses RLS) ───────────────────────────
     const { data: lead, error: updateError } = await adminClient
       .from('leads')
@@ -259,24 +296,38 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         metadata: { from: existing.status, to: patch.status },
       })
 
-      // Auto-log a call when switching to a call-related status
+      // Auto-log a call when switching to a call-related status. Capture
+      // the inserted call_logs.id so the paired activity_log can reference
+      // it — letting the activity-DELETE handler cascade-remove the call.
       const callOutcome = STATUS_TO_CALL_OUTCOME[patch.status]
       if (callOutcome) {
-        await adminClient.from('call_logs').insert({
-          lead_id:      id,
-          workspace_id: member.workspace_id,
-          logged_by:    user.id,
-          outcome:      callOutcome,
-          duration_sec: null,
-          notes:        null,
-        })
-        logInserts.push({
-          workspace_id: member.workspace_id,
-          lead_id:      id,
-          user_id:      user.id,
-          type:         'call_logged',
-          metadata:     { outcome: callOutcome, duration_sec: null, auto_logged: true },
-        })
+        const { data: insertedCall } = await adminClient
+          .from('call_logs')
+          .insert({
+            lead_id:      id,
+            workspace_id: member.workspace_id,
+            logged_by:    user.id,
+            outcome:      callOutcome,
+            duration_sec: null,
+            notes:        null,
+          })
+          .select('id')
+          .single() as { data: { id: string } | null }
+
+        if (insertedCall) {
+          logInserts.push({
+            workspace_id: member.workspace_id,
+            lead_id:      id,
+            user_id:      user.id,
+            type:         'call_logged',
+            metadata:     {
+              outcome:      callOutcome,
+              duration_sec: null,
+              auto_logged:  true,
+              call_log_id:  insertedCall.id,
+            },
+          })
+        }
       }
     }
 

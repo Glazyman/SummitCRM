@@ -15,6 +15,7 @@ import {
   DropdownMenuItem, DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } from '@/components/leads/status-config'
+import { US_STATES } from '@/lib/us-states'
 import type { LeadDetail, TeamMember, LeadStatus, InterestStatus } from './types'
 
 interface LeadProfileCardProps {
@@ -54,7 +55,12 @@ export function LeadProfileCard({
 }: LeadProfileCardProps) {
   const [editing, setEditing]     = React.useState(false)
   const [saving,  setSaving]      = React.useState(false)
-  const [draft,   setDraft]       = React.useState<Partial<LeadDetail>>({})
+  // Draft holds Partial<LeadDetail> plus the two custom_fields-backed
+  // state fields. The PATCH route accepts these at the top level and
+  // merges them into custom_fields server-side.
+  const [draft,   setDraft]       = React.useState<
+    Partial<LeadDetail> & { contact_state?: string; company_state?: string }
+  >({})
   const [batchEditing, setBatchEditing] = React.useState(false)
   const [batchDraft, setBatchDraft]     = React.useState('')
   const [batchSaving, setBatchSaving]   = React.useState(false)
@@ -74,6 +80,8 @@ export function LeadProfileCard({
       company:     lead.company     ?? '',
       website:     lead.website     ?? '',
       linkedin_url:lead.linkedin_url ?? '',
+      contact_state: (lead.custom_fields?.contact_state as string | undefined) ?? '',
+      company_state: (lead.custom_fields?.company_state as string | undefined) ?? '',
     })
     setEditing(true)
   }
@@ -87,7 +95,9 @@ export function LeadProfileCard({
     if (!draft.email?.trim()) return
     setSaving(true)
     try {
-      await onSave(draft)
+      // Cast: draft contains the two extra state fields that the API
+      // PATCH route accepts and merges into custom_fields.
+      await onSave(draft as Partial<LeadDetail>)
       setEditing(false)
       setDraft({})
     } finally {
@@ -405,10 +415,43 @@ export function LeadProfileCard({
           )}
         </ProfileField>
 
-        {/* State — from custom_fields, read-only */}
-        {lead.custom_fields?.contact_state && (
-          <ProfileField icon={<MapPin className="h-3.5 w-3.5" />} label="State">
-            <span className="text-sm">{lead.custom_fields.contact_state}</span>
+        {/* Contact State — custom_fields-backed, editable */}
+        {(editing || lead.custom_fields?.contact_state) && (
+          <ProfileField icon={<MapPin className="h-3.5 w-3.5" />} label="Contact State">
+            {editing ? (
+              <select
+                value={draft.contact_state ?? ''}
+                onChange={(e) => setDraft((d) => ({ ...d, contact_state: e.target.value }))}
+                className={cn(fieldInput)}
+              >
+                <option value="">—</option>
+                {US_STATES.map((s) => (
+                  <option key={s.code} value={s.code}>{s.code} · {s.name}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-sm">{lead.custom_fields?.contact_state}</span>
+            )}
+          </ProfileField>
+        )}
+
+        {/* Company State — custom_fields-backed, editable */}
+        {(editing || lead.custom_fields?.company_state) && (
+          <ProfileField icon={<Building2 className="h-3.5 w-3.5" />} label="Company State">
+            {editing ? (
+              <select
+                value={draft.company_state ?? ''}
+                onChange={(e) => setDraft((d) => ({ ...d, company_state: e.target.value }))}
+                className={cn(fieldInput)}
+              >
+                <option value="">—</option>
+                {US_STATES.map((s) => (
+                  <option key={s.code} value={s.code}>{s.code} · {s.name}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-sm">{lead.custom_fields?.company_state}</span>
+            )}
           </ProfileField>
         )}
 
