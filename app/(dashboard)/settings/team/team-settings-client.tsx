@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SelectMenu } from '@/components/ui/select-menu'
 import type { WorkspaceRole } from '@/types/database'
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -551,22 +552,25 @@ export default function TeamSettingsClient({
                   <div className="flex items-center gap-2">
                     {isAdmin && !member.is_me && !member.is_protected_owner ? (
                       <>
-                        <select
+                        <SelectMenu
+                          size="sm"
                           value={member.role}
-                          onChange={(e) => handleRoleChange(member.id, e.target.value as WorkspaceRole)}
-                          className="h-7 rounded-lg border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                        >
-                          {(['rep', 'admin'] as WorkspaceRole[]).map((r) => (
-                            <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                          ))}
-                        </select>
-                        <button
+                          onChange={(v) => handleRoleChange(member.id, v as WorkspaceRole)}
+                          options={[
+                            { value: 'rep',   label: ROLE_LABELS.rep   },
+                            { value: 'admin', label: ROLE_LABELS.admin },
+                          ]}
+                          className="w-24"
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
                           onClick={() => handleDeleteMember(member.id, member.full_name ?? member.email ?? 'this member')}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
                           title="Delete member"
                         >
                           <Trash2 className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </>
                     ) : (
                       <div className="flex items-center gap-2">
