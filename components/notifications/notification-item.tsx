@@ -11,10 +11,13 @@ interface Props {
   notification: Notification
   onRead:    (id: string) => void
   onDismiss: (id: string) => void
+  /** Called when the user clicks the row to navigate — lets the parent
+   *  panel close the dropdown so the destination page is unobstructed. */
+  onNavigate?: () => void
   compact?:  boolean
 }
 
-export function NotificationItem({ notification: n, onRead, onDismiss, compact }: Props) {
+export function NotificationItem({ notification: n, onRead, onDismiss, onNavigate, compact }: Props) {
   const router = useRouter()
   const meta   = NOTIFICATION_META[n.type] ?? NOTIFICATION_META.system
 
@@ -26,6 +29,7 @@ export function NotificationItem({ notification: n, onRead, onDismiss, compact }
   const handleClick = () => {
     if (!n.is_read) onRead(n.id)
     if (n.link) router.push(n.link)
+    onNavigate?.()
   }
 
   return (

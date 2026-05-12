@@ -138,6 +138,7 @@ export function NotificationPanel({ open, anchorRef, onClose }: Props) {
                     notification={n}
                     onRead={markRead}
                     onDismiss={dismiss}
+                    onNavigate={onClose}
                     compact
                   />
                 ))}
@@ -158,6 +159,7 @@ export function NotificationPanel({ open, anchorRef, onClose }: Props) {
                     notification={n}
                     onRead={markRead}
                     onDismiss={dismiss}
+                    onNavigate={onClose}
                     compact
                   />
                 ))}
