@@ -8,24 +8,47 @@ import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
 import { getUsersById } from '@/lib/users'
 
-function periodRange(period: string) {
-  const now   = new Date()
-  const start = new Date(now)
+/** Parse "YYYY-MM-DD" into a Date at local midnight. Falls back to today. */
+function parseAnchor(raw: string | null): Date {
+  if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [y, m, d] = raw.split('-').map(Number)
+    const dt = new Date(y, m - 1, d)
+    if (!Number.isNaN(dt.getTime())) return dt
+  }
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return today
+}
 
-  if (period === 'today') {
-    start.setHours(0, 0, 0, 0)
-  } else if (period === 'week') {
+/**
+ * Returns [start, end) in ISO for the requested period anchored on `date`.
+ * `period`:
+ *   day   → exactly that calendar day
+ *   week  → Mon–Sun containing that date
+ *   month → calendar month containing that date
+ * Accepts the legacy "today" alias for "day".
+ */
+function periodRange(period: string, anchor: Date) {
+  const start = new Date(anchor)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+
+  if (period === 'week') {
     const day = start.getDay()
     const diff = day === 0 ? -6 : 1 - day // Monday start
     start.setDate(start.getDate() + diff)
-    start.setHours(0, 0, 0, 0)
-  } else {
-    // month
+    end.setTime(start.getTime())
+    end.setDate(end.getDate() + 7)
+  } else if (period === 'month') {
     start.setDate(1)
-    start.setHours(0, 0, 0, 0)
+    end.setTime(start.getTime())
+    end.setMonth(end.getMonth() + 1)
+  } else {
+    // day (or legacy "today")
+    end.setDate(end.getDate() + 1)
   }
 
-  return { start: start.toISOString(), end: now.toISOString() }
+  return { start: start.toISOString(), end: end.toISOString() }
 }
 
 export async function GET(req: NextRequest) {
@@ -48,19 +71,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Admin required' }, { status: 403 })
     }
 
-    const period = req.nextUrl.searchParams.get('period') ?? 'week'
-    const range  = periodRange(period)
-    const wsId   = member.workspace_id
-    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
+    const rawPeriod = req.nextUrl.searchParams.get('period') ?? 'week'
+    const period    = rawPeriod === 'today' ? 'day' : rawPeriod
+    const anchor    = parseAnchor(req.nextUrl.searchParams.get('date'))
+    const range     = periodRange(period, anchor)
+    const wsId      = member.workspace_id
 
     // Fetch everything in parallel
     const [membersRes, callsRes, followUpsRes, leadsRes, statusActivitiesRes,
-           leadsCalledTodayRes, workspaceRes] = await Promise.all([
+           leadsCalledInPeriodRes, workspaceRes] = await Promise.all([
       admin.from('workspace_members').select('user_id, role').eq('workspace_id', wsId).eq('is_active', true),
       admin.from('call_logs')
         .select('logged_by, outcome, called_at')
         .eq('workspace_id', wsId)
-        .gte('called_at', range.start),
+        .gte('called_at', range.start)
+        .lt('called_at',  range.end),
       admin.from('follow_ups')
         .select('assigned_to, completed_at, due_at')
         .eq('workspace_id', wsId),
@@ -71,19 +96,19 @@ export async function GET(req: NextRequest) {
         .eq('workspace_id', wsId)
         .eq('type', 'lead_status_changed')
         .gte('created_at', range.start)
-        .lte('created_at', range.end),
-      // Unique leads each rep called TODAY (independent of the period
-      // toggle — daily target is always "today").
-      admin.rpc('get_unique_leads_called_by_rep', {
+        .lt('created_at',  range.end),
+      // Unique leads each rep called IN THIS PERIOD — bounded range.
+      admin.rpc('get_unique_leads_called_by_rep_range', {
         p_workspace_id: wsId,
-        p_since:        startOfToday.toISOString(),
+        p_start:        range.start,
+        p_end:          range.end,
       }),
       // Workspace settings → default daily target + per-rep overrides
       admin.from('workspaces').select('settings').eq('id', wsId).single(),
     ])
 
-    const leadsCalledRows = (leadsCalledTodayRes.data ?? []) as Array<{ user_id: string; leads_called: number }>
-    const leadsCalledTodayByUser = new Map(leadsCalledRows.map((r) => [r.user_id, Number(r.leads_called)]))
+    const leadsCalledRows = (leadsCalledInPeriodRes.data ?? []) as Array<{ user_id: string; leads_called: number }>
+    const leadsCalledByUser = new Map(leadsCalledRows.map((r) => [r.user_id, Number(r.leads_called)]))
 
     const wsSettings = (workspaceRes.data as { settings?: Record<string, unknown> } | null)?.settings ?? {}
     const workspaceDefault = Number(wsSettings.daily_call_target)
@@ -165,15 +190,16 @@ export async function GET(req: NextRequest) {
           followUpsCompleted: fuCompleted,
           leadsAssigned:    myLeads.length,
           leadsActive:      active,
-          // Daily progress vs target — always reflects today, not the
-          // selected period.
-          leadsCalledToday: leadsCalledTodayByUser.get(uid) ?? 0,
-          dailyCallTarget:  targetForUser(uid),
+          // Unique leads called in the selected period (day/week/month).
+          // Plus the rep's daily target — UI decides whether to show
+          // "X / Target" (day view) or just "X" (week/month view).
+          leadsCalledInPeriod: leadsCalledByUser.get(uid) ?? 0,
+          dailyCallTarget:     targetForUser(uid),
         }
       })
       .sort((a, b) => b.calls - a.calls)
 
-    return NextResponse.json({ reps, period, range })
+    return NextResponse.json({ reps, period, range, anchor: anchor.toISOString().slice(0, 10) })
   } catch (err) {
     console.error('[GET /api/admin/rep-performance]', err)
     return NextResponse.json({ error: 'Failed to load rep performance' }, { status: 500 })

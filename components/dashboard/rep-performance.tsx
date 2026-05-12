@@ -1,13 +1,13 @@
 'use client'
 
 import * as React from 'react'
-import { Phone, Calendar, Users, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Phone, Calendar, Users, RefreshCw, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 
-type Period = 'today' | 'week' | 'month'
+type Period = 'day' | 'week' | 'month'
 
 interface RepStat {
   id:                string
@@ -20,16 +20,80 @@ interface RepStat {
   followUpsCompleted: number
   leadsAssigned:     number
   leadsActive:       number
-  /** Unique leads this rep called today (ignores period toggle). */
-  leadsCalledToday:  number
+  /** Unique leads this rep called in the selected period. */
+  leadsCalledInPeriod: number
   /** Daily target (workspace default + per-rep override). */
-  dailyCallTarget:   number
+  dailyCallTarget:     number
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
-  today: 'Today',
-  week:  'This Week',
-  month: 'This Month',
+  day:   'Day',
+  week:  'Week',
+  month: 'Month',
+}
+
+function toDateString(d: Date) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth() === b.getMonth() &&
+         a.getDate() === b.getDate()
+}
+
+function startOfWeek(d: Date) {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  const day = x.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  x.setDate(x.getDate() + diff)
+  return x
+}
+
+function periodLabel(period: Period, anchor: Date): string {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const sameDay = isSameDay(anchor, today)
+
+  if (period === 'day') {
+    if (sameDay) return 'Today'
+    const yest = new Date(today); yest.setDate(today.getDate() - 1)
+    if (isSameDay(anchor, yest)) return 'Yesterday'
+    return anchor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: anchor.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })
+  }
+  if (period === 'week') {
+    const start = startOfWeek(anchor)
+    const end   = new Date(start); end.setDate(start.getDate() + 6)
+    const sameYear = start.getFullYear() === end.getFullYear() && start.getFullYear() === today.getFullYear()
+    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const endStr   = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })
+    if (isSameDay(start, startOfWeek(today))) return `This week (${startStr} – ${endStr})`
+    return `${startStr} – ${endStr}`
+  }
+  // month
+  const sameMonth = anchor.getFullYear() === today.getFullYear() && anchor.getMonth() === today.getMonth()
+  const label = anchor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  return sameMonth ? `This month (${label})` : label
+}
+
+function stepAnchor(period: Period, anchor: Date, delta: 1 | -1): Date {
+  const d = new Date(anchor)
+  if (period === 'day')   d.setDate(d.getDate() + delta)
+  if (period === 'week')  d.setDate(d.getDate() + (7 * delta))
+  if (period === 'month') d.setMonth(d.getMonth() + delta)
+  return d
+}
+
+function isAtOrPastToday(period: Period, anchor: Date): boolean {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  if (period === 'day')   return anchor >= today
+  if (period === 'week')  return startOfWeek(anchor).getTime() >= startOfWeek(today).getTime()
+  // month
+  return anchor.getFullYear() > today.getFullYear() ||
+         (anchor.getFullYear() === today.getFullYear() && anchor.getMonth() >= today.getMonth())
 }
 
 const OUTCOME_META: Record<string, { label: string; color: string }> = {
@@ -164,14 +228,17 @@ function CallsByRepPanel({ reps }: { reps: RepStat[] }) {
 // ── Main component ────────────────────────────────────────────────────────
 export function RepPerformancePanel() {
   const [period, setPeriod]   = React.useState<Period>('week')
+  const [anchor, setAnchor]   = React.useState<Date>(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d
+  })
   const [reps, setReps]       = React.useState<RepStat[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError]     = React.useState<string | null>(null)
 
-  const load = React.useCallback(async (p: Period) => {
+  const load = React.useCallback(async (p: Period, a: Date) => {
     setLoading(true); setError(null)
     try {
-      const res  = await fetch(`/api/admin/rep-performance?period=${p}`)
+      const res  = await fetch(`/api/admin/rep-performance?period=${p}&date=${toDateString(a)}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setReps(json.reps ?? [])
@@ -182,26 +249,41 @@ export function RepPerformancePanel() {
     }
   }, [])
 
-  React.useEffect(() => { load(period) }, [period, load])
+  React.useEffect(() => { load(period, anchor) }, [period, anchor, load])
 
   React.useEffect(() => {
-    const handler = () => { if (document.visibilityState === 'visible') load(period) }
+    const handler = () => { if (document.visibilityState === 'visible') load(period, anchor) }
     document.addEventListener('visibilitychange', handler)
     return () => document.removeEventListener('visibilitychange', handler)
-  }, [period, load])
+  }, [period, anchor, load])
+
+  const isAtToday = isAtOrPastToday(period, anchor)
+  const canGoNext = !isAtToday
+  // When switching period, snap anchor back to today so we don't end up
+  // on a stale historical view that doesn't make sense for the new period.
+  function changePeriod(p: Period) {
+    setPeriod(p)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    setAnchor(today)
+  }
+  function jumpToday() {
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    setAnchor(today)
+  }
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-border">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Rep Performance</h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Period toggle */}
           <div className="flex rounded-lg border border-border overflow-hidden">
             {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (
-              <button key={p} type="button" onClick={() => setPeriod(p)}
+              <button key={p} type="button" onClick={() => changePeriod(p)}
                 className={cn('px-3 py-1 text-xs font-medium transition-colors',
                   period === p ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}>
@@ -209,7 +291,48 @@ export function RepPerformancePanel() {
               </button>
             ))}
           </div>
-          <button type="button" onClick={() => load(period)}
+
+          {/* Date stepper */}
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-background overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setAnchor((a) => stepAnchor(period, a, -1))}
+              className="px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Previous period"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="px-2 text-xs font-medium tabular-nums whitespace-nowrap min-w-[120px] text-center">
+              {periodLabel(period, anchor)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setAnchor((a) => stepAnchor(period, a, 1))}
+              disabled={!canGoNext}
+              className={cn(
+                'px-2 py-1 transition-colors',
+                canGoNext
+                  ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  : 'text-muted-foreground/30 cursor-not-allowed'
+              )}
+              aria-label="Next period"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Jump to today */}
+          {!isAtToday && (
+            <button
+              type="button"
+              onClick={jumpToday}
+              className="px-2.5 py-1 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              Today
+            </button>
+          )}
+
+          <button type="button" onClick={() => load(period, anchor)}
             className={cn('text-muted-foreground hover:text-foreground transition-colors', loading && 'animate-spin')}>
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
@@ -248,8 +371,9 @@ export function RepPerformancePanel() {
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
                     <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Rep</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground" title="Unique leads called today vs daily target">
-                      Today / Target
+                    <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground"
+                        title="Unique leads called in the selected period">
+                      {period === 'day' ? 'Leads / Target' : 'Leads in period'}
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Calls</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Answered</th>
@@ -273,9 +397,9 @@ export function RepPerformancePanel() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {(() => {
+                        {period === 'day' ? (() => {
                           const target = rep.dailyCallTarget || 100
-                          const done   = rep.leadsCalledToday
+                          const done   = rep.leadsCalledInPeriod
                           const pct    = Math.min(100, Math.round((done / target) * 100))
                           const hit    = done >= target
                           return (
@@ -294,7 +418,14 @@ export function RepPerformancePanel() {
                               </div>
                             </div>
                           )
-                        })()}
+                        })() : (
+                          <span className={cn(
+                            'text-sm font-semibold tabular-nums',
+                            rep.leadsCalledInPeriod > 0 ? 'text-foreground' : 'text-muted-foreground/40'
+                          )}>
+                            {rep.leadsCalledInPeriod}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={cn('inline-flex items-center justify-center h-7 w-7 rounded-full text-sm font-bold',
