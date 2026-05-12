@@ -49,7 +49,9 @@ function leadName(lead: Lead | null) {
   return n || lead.email
 }
 
-function fmtDate(iso: string) {
+type DueBucket = 'past' | 'today' | 'future'
+
+function fmtDate(iso: string): { label: string; bucket: DueBucket } {
   const d   = new Date(iso)
   const now = new Date()
   // Compare calendar days so a 11pm follow-up still reads "Today" at 8am
@@ -57,10 +59,10 @@ function fmtDate(iso: string) {
   const dueMidnight   = new Date(d.getFullYear(),   d.getMonth(),   d.getDate())
   const days = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / 86400000)
   const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  if (days < 0)   return { label: `${Math.abs(days)}d overdue`, overdue: true }
-  if (days === 0) return { label: `Today · ${timeStr}`, overdue: false }
-  if (days === 1) return { label: `Tomorrow · ${timeStr}`, overdue: false }
-  return { label: `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${timeStr}`, overdue: false }
+  if (days < 0)   return { label: `${Math.abs(days)}d overdue`, bucket: 'past' }
+  if (days === 0) return { label: `Today · ${timeStr}`, bucket: 'today' }
+  if (days === 1) return { label: `Tomorrow · ${timeStr}`, bucket: 'future' }
+  return { label: `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${timeStr}`, bucket: 'future' }
 }
 
 /** Tomorrow at 9 AM in local time. */
@@ -398,6 +400,17 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
               const linger = justCompleted.has(a.id)
               const assignee = teamMembers.find((m) => m.id === a.assigned_to)
 
+              // Color buckets only apply when the follow-up is open (not done).
+              // `linger` (just-completed flash) and selected-row highlight take
+              // precedence over the bucket tint.
+              const bucketTint = !done && !linger && selectedActivity?.id !== a.id
+                ? due.bucket === 'past'
+                  ? 'bg-red-50/60 dark:bg-red-950/15 border-l-2 border-l-red-500'
+                  : due.bucket === 'today'
+                  ? 'bg-amber-50/60 dark:bg-amber-950/15 border-l-2 border-l-amber-500'
+                  : ''
+                : ''
+
               return (
                 <tr
                   key={a.id}
@@ -405,6 +418,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
                   className={cn(
                     'group transition-all cursor-pointer',
                     done && !linger ? 'opacity-40' : 'hover:bg-muted/30',
+                    bucketTint,
                     linger && 'bg-emerald-50/50 dark:bg-emerald-950/20',
                     selectedActivity?.id === a.id && 'bg-primary/5'
                   )}
@@ -464,7 +478,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
 
                   {/* Due */}
                   <td className="px-3 py-3 whitespace-nowrap">
-                    <span className={cn('flex items-center gap-1 text-xs font-medium', due.overdue ? 'text-red-500' : 'text-muted-foreground')}>
+                    <span className={cn('flex items-center gap-1 text-xs font-medium', due.bucket === 'past' ? 'text-red-500' : 'text-muted-foreground')}>
                       <Clock className="h-3 w-3 shrink-0" />
                       {due.label}
                     </span>
