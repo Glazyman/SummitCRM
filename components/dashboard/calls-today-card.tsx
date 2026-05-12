@@ -58,7 +58,17 @@ export function CallsTodayCard() {
 
       <div className="max-h-[320px] overflow-y-auto">
         {loading ? (
-          <div className="px-5 py-8 text-sm text-muted-foreground">Loading calls…</div>
+          // Skeleton rows — fixed height matches the real cards so the
+          // dashboard layout doesn't jump when data arrives.
+          <div className="divide-y divide-border animate-pulse">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="px-5 py-3 space-y-1.5">
+                <div className="h-3.5 w-32 rounded bg-muted" />
+                <div className="h-3 w-44 rounded bg-muted/60" />
+                <div className="h-3 w-24 rounded bg-muted/60" />
+              </div>
+            ))}
+          </div>
         ) : calls.length === 0 ? (
           <div className="px-5 py-8 text-sm text-muted-foreground">No calls logged yet today.</div>
         ) : (
