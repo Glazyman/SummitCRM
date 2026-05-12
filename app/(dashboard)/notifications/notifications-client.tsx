@@ -8,15 +8,13 @@ import { NotificationItem } from '@/components/notifications/notification-item'
 import type { NotificationType } from '@/components/notifications/types'
 import { NOTIFICATION_META } from '@/components/notifications/types'
 
+// Only types the product actually emits. Older types (replies, bounces,
+// campaigns, AI, quota) belonged to the email era and are no longer sent.
 const TYPE_OPTIONS: { value: NotificationType | 'all'; label: string }[] = [
-  { value: 'all',              label: 'All' },
-  { value: 'reply_received',   label: 'Replies' },
-  { value: 'follow_up_due',    label: 'Follow-ups' },
-  { value: 'lead_assigned',    label: 'Assigned' },
-  { value: 'bounce',           label: 'Bounces' },
-  { value: 'quota_warning',    label: 'Quota' },
-  { value: 'campaign_complete',label: 'Campaigns' },
-  { value: 'ai_batch_complete',label: 'AI' },
+  { value: 'all',           label: 'All' },
+  { value: 'mention',       label: 'Note mentions' },
+  { value: 'follow_up_due', label: 'Follow-ups' },
+  { value: 'lead_assigned', label: 'Lead assigned' },
 ]
 
 export function NotificationsClient() {

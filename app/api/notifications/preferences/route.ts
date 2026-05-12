@@ -2,16 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 
+// Only types the product currently emits. The DB enum still carries
+// legacy email-era types (reply_received, bounce, etc.) but no code
+// inserts them — listing those here would surface a row in the UI
+// that the user can toggle for no reason.
 const ALL_TYPES = [
-  'reply_received',
-  'bounce',
-  'campaign_complete',
-  'quota_warning',
+  'mention',
   'follow_up_due',
   'lead_assigned',
-  'ai_budget_warning',
-  'ai_budget_critical',
-  'ai_batch_complete',
 ]
 
 async function getWorkspaceId(supabase: Awaited<ReturnType<typeof createServerClient>>, userId: string) {

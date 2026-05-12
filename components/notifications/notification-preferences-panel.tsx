@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Save, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { NOTIFICATION_META } from './types'
+import { ACTIVE_NOTIFICATION_TYPES, NOTIFICATION_META } from './types'
 import type { NotificationPreference, NotificationType } from './types'
 
-const ALL_TYPES: NotificationType[] = ['lead_assigned', 'follow_up_due']
+// Only types the product actually emits. Anything in here gets a toggle.
+const ALL_TYPES: NotificationType[] = ACTIVE_NOTIFICATION_TYPES
 
 /** Build a full preferences array from API response — fills defaults for any missing type */
 function normPrefs(raw: NotificationPreference[]): NotificationPreference[] {
@@ -111,7 +112,7 @@ export function NotificationPreferencesPanel() {
         <div>
           <h3 className="font-semibold text-sm">Notification Preferences</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Choose which notifications you receive and how.
+            Turn off any kind of in-app notification you don't want to see.
           </p>
         </div>
         <button
@@ -139,58 +140,34 @@ export function NotificationPreferencesPanel() {
       )}
 
       <div className="rounded-lg border overflow-hidden">
-        {/* Header row */}
-        <div className="hidden sm:grid sm:grid-cols-[1fr_90px_110px] gap-4 px-4 py-2.5 bg-muted/50 border-b">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notification</span>
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">In-app</span>
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">Daily digest</span>
-        </div>
-
         {ALL_TYPES.map((type, i) => {
           const meta = NOTIFICATION_META[type]
-          const pref = prefs.find((p) => p.type === type) ?? { type, in_app: true, email_digest: true }
+          const pref = prefs.find((p) => p.type === type) ?? { type, in_app: true, email_digest: false }
           return (
             <div
               key={type}
               className={cn(
-                'px-4 py-3',
-                'flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_90px_110px] sm:items-center sm:gap-4',
+                'flex items-center justify-between gap-4 px-4 py-3',
                 i < ALL_TYPES.length - 1 && 'border-b'
               )}
             >
-              {/* Notification info */}
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <span className={cn(
                   'w-7 h-7 rounded-md flex items-center justify-center text-sm flex-shrink-0',
                   meta.bgColor, meta.color
                 )}>
                   {meta.icon}
                 </span>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium">{meta.label}</p>
-                  <p className="text-xs text-muted-foreground">{meta.description}</p>
+                  <p className="text-xs text-muted-foreground truncate">{meta.description}</p>
                 </div>
               </div>
-
-              {/* Toggles — inline labels on mobile */}
-              <div className="flex items-center justify-between sm:contents">
-                <div className="flex items-center gap-2 sm:justify-center">
-                  <span className="text-xs text-muted-foreground sm:hidden">In-app</span>
-                  <Toggle
-                    checked={pref.in_app}
-                    onChange={(v) => update(type, 'in_app', v)}
-                    label={`${meta.label} in-app notifications`}
-                  />
-                </div>
-                <div className="flex items-center gap-2 sm:justify-center">
-                  <span className="text-xs text-muted-foreground sm:hidden">Email digest</span>
-                  <Toggle
-                    checked={pref.email_digest}
-                    onChange={(v) => update(type, 'email_digest', v)}
-                    label={`${meta.label} email digest`}
-                  />
-                </div>
-              </div>
+              <Toggle
+                checked={pref.in_app}
+                onChange={(v) => update(type, 'in_app', v)}
+                label={`Toggle ${meta.label}`}
+              />
             </div>
           )
         })}
