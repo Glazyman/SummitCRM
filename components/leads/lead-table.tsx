@@ -207,7 +207,7 @@ function ColumnHeader({ colId, sortBy, sortDir, onSort, isAdmin }: {
     case 'email':         return <SortHeader field="email"           current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[180px]">Email</SortHeader>
     case 'company':       return <SortHeader field="company"         current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[130px]">Company</SortHeader>
     case 'status':        return <SortHeader field="status"          current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[130px]">Status</SortHeader>
-    case 'last_activity': return plain('Last Activity')
+    case 'last_activity': return <SortHeader field="last_activity_at" current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[120px]">Last Activity</SortHeader>
     case 'interest':      return plain('Interest')
     case 'phone':         return plain('Phone')
     case 'company_phone': return plain('Company Phone')
@@ -306,17 +306,24 @@ function LeadCell({ colId, lead, isAdmin, onStatusChange, onInterestChange }: {
         </td>
       )
     case 'last_activity':
-      return (
-        <td className="px-5 py-4 text-xs text-muted-foreground">
-          {lead.last_contacted_at ? (
-            <span className="whitespace-nowrap">Last contacted {relativeTime(lead.last_contacted_at)}</span>
-          ) : lead.last_activity_at ? (
-            <span className="whitespace-nowrap">Last activity {relativeTime(lead.last_activity_at)}</span>
-          ) : (
-            <span className="text-muted-foreground/40">Not contacted</span>
-          )}
-        </td>
-      )
+      // Show the most recent of last_activity_at (any: call / email / note)
+      // and last_contacted_at (call only). last_activity_at is usually >=
+      // last_contacted_at, but tolerate either being null.
+      {
+        const mostRecent =
+          lead.last_activity_at && lead.last_contacted_at
+            ? (lead.last_activity_at >= lead.last_contacted_at ? lead.last_activity_at : lead.last_contacted_at)
+            : (lead.last_activity_at ?? lead.last_contacted_at ?? null)
+        return (
+          <td className="px-5 py-4 text-xs text-muted-foreground">
+            {mostRecent ? (
+              <span className="whitespace-nowrap">Last activity {relativeTime(mostRecent)}</span>
+            ) : (
+              <span className="text-muted-foreground/40">No activity yet</span>
+            )}
+          </td>
+        )
+      }
     case 'tags':
       return <td className="px-5 py-4"><span className="text-muted-foreground/40 text-xs">—</span></td>
     default:
