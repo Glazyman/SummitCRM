@@ -46,29 +46,34 @@ export default async function PipelinePage() {
   }>
 
   const admin = createAdminClient() as any
-
-  // Load leads via RPC to bypass PostgREST row limit
-  const { data: allLeadsJson } = await admin
-    .rpc('get_workspace_leads_json', { p_workspace_id: member.workspace_id })
-
-  const excluded = new Set(['do_not_contact', 'unsubscribed'])
   const isAdminRole = ['admin', 'super_admin'].includes(member.role)
-  const rawLeads = ((allLeadsJson ?? []) as Array<{
-    id: string; first_name: string | null; last_name: string | null;
-    email: string; company: string | null; title: string | null; phone: string | null;
-    status: string; interest_status: string; pipeline_stage_id: string | null;
-    assigned_to: string | null; batch_id: string | null; created_at: string; updated_at: string
-  }>)
-    .filter((l) => !excluded.has(l.status))
-    // Non-admins only see deals assigned to them. Admins see all.
-    .filter((l) => isAdminRole || l.assigned_to === user.id)
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 
+  // Server-side trim: top 100 per stage by last_activity_at + per-stage counts
+  // + workspace totals, all in one jsonb response. No more loading every lead.
+  const { data: payload } = await admin.rpc('get_pipeline_leads_json', {
+    p_workspace_id:    member.workspace_id,
+    p_assigned_to:     isAdminRole ? null : user.id,
+    p_per_stage_limit: 100,
+    p_search:          null,
+  }) as { data: {
+    leads:  Array<{
+      id: string; first_name: string | null; last_name: string | null;
+      email: string; company: string | null; title: string | null; phone: string | null;
+      status: string; interest_status: string; pipeline_stage_id: string | null;
+      assigned_to: string | null; batch_id: string | null; created_at: string; updated_at: string;
+      last_contacted_at: string | null; last_activity_at: string | null;
+      custom_fields: Record<string, unknown> | null;
+    }>
+    counts: Record<string, number>
+    totals: { total_leads: number; hot_leads: number; deals_won: number; deals_in_progress: number }
+  } | null }
+
+  const rawLeads = payload?.leads ?? []
+  const stageCounts = payload?.counts ?? {}
+  const totals = payload?.totals ?? { total_leads: 0, hot_leads: 0, deals_won: 0, deals_in_progress: 0 }
+
+  // Revenue from questionnaire (only for the visible/trimmed set).
   const leadIds = rawLeads.map((l) => l.id)
-
-  // last_contacted_at now lives directly on the lead row (denormalized via
-  // trg_call_logs_sync_last_contacted). Only fetch custom_fields here for
-  // revenue calculation.
   const customFieldsResult = leadIds.length > 0
     ? await admin
         .from('leads')
@@ -84,13 +89,12 @@ export default async function PipelinePage() {
     if (rev > 0) revenueMap.set(row.id, rev)
   }
 
-  const leadsWithContact = (rawLeads as Array<typeof rawLeads[number] & { last_contacted_at: string | null }>).map((lead) => ({
+  const initialLeads = rawLeads.map((lead) => ({
     ...lead,
     last_contacted_at: lead.last_contacted_at ?? null,
+    last_activity_at:  lead.last_activity_at  ?? null,
     pipeline_value:    revenueMap.get(lead.id) ?? 0,
   }))
-
-  const isAdmin = isAdminRole
 
   const defaultStages = stages.length === 0 ? [
     { id: 'new-lead',    workspace_id: member.workspace_id, name: 'New Lead',      color: '#6366f1', position: 0, is_won: false, is_lost: false, created_at: '', updated_at: '' },
@@ -105,9 +109,11 @@ export default async function PipelinePage() {
   return (
     <PipelineClient
       stages={defaultStages as any}
-      initialLeads={leadsWithContact as any}
+      initialLeads={initialLeads as any}
+      initialStageCounts={stageCounts}
+      initialTotals={totals}
       workspaceId={member.workspace_id}
-      isAdmin={isAdmin}
+      isAdmin={isAdminRole}
       currentUserId={user.id}
     />
   )

@@ -95,12 +95,13 @@ export default async function LeadsPage() {
         updated_at: string
       }>)
 
-      // last_contacted_at + last_call_outcome are now denormalized columns on
-      // leads, kept fresh by trg_call_logs_sync_last_contacted. No call_logs
-      // join needed here.
+      // last_contacted_at + last_call_outcome + last_activity_at are all now
+      // denormalized columns on leads, kept fresh by triggers on call_logs,
+      // emails, notes. No joins needed here.
       leads = (rawLeads as Array<typeof rawLeads[number] & {
         last_contacted_at: string | null
         last_call_outcome: string | null
+        last_activity_at:  string | null
       }>).map((lead) => ({
         ...lead,
         interest_status:  lead.interest_status  ?? 'pending',
@@ -109,7 +110,7 @@ export default async function LeadsPage() {
         assigned_name:     lead.assigned_to ? usersById.get(lead.assigned_to) ?? null : null,
         last_contacted_at: lead.last_contacted_at ?? null,
         last_call_outcome: lead.last_call_outcome ?? null,
-        last_activity_at:  null,
+        last_activity_at:  lead.last_activity_at  ?? null,
         tags:              [],
         custom_fields:     lead.custom_fields ?? {},
       }))

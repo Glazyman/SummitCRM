@@ -30,11 +30,20 @@ interface PipelineLead {
   pipeline_stage_id: string | null; assigned_to: string | null
   batch_id: string | null; created_at: string; updated_at: string
   last_contacted_at: string | null
+  last_activity_at:  string | null
   /** Parsed revenue from questionnaire (0 if not filled) */
   pipeline_value: number
 }
+interface PipelineTotals {
+  total_leads:       number
+  hot_leads:         number
+  deals_won:         number
+  deals_in_progress: number
+}
 interface Props {
   stages: PipelineStage[]; initialLeads: PipelineLead[]
+  initialStageCounts: Record<string, number>
+  initialTotals:      PipelineTotals
   workspaceId: string; isAdmin: boolean; currentUserId: string
 }
 
@@ -64,36 +73,89 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[(name.charCodeAt(0) ?? 0) % AVATAR_COLORS.length]
 }
 
-export default function PipelineClient({ stages, initialLeads, isAdmin, currentUserId }: Props) {
+export default function PipelineClient({ stages, initialLeads, initialStageCounts, initialTotals, isAdmin, currentUserId }: Props) {
   const router = useRouter()
   const [leads,          setLeads]          = React.useState<PipelineLead[]>(initialLeads)
+  const [stageCounts,    setStageCounts]    = React.useState<Record<string, number>>(initialStageCounts)
+  const [totals,         setTotals]         = React.useState<PipelineTotals>(initialTotals)
   const [draggingId,     setDraggingId]     = React.useState<string | null>(null)
   const [dragOverStage,  setDragOverStage]  = React.useState<string | null>(null)
   const [search,         setSearch]         = React.useState('')
+  const [searching,      setSearching]      = React.useState(false)
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
   const [pipelineView,   setPipelineView]   = React.useState<'kanban' | 'list'>(() => {
     try { return localStorage.getItem('pipeline_view_mode') === 'list' ? 'list' : 'kanban' } catch { return 'kanban' }
   })
   const didDragRef = React.useRef(false)
 
+  // When router.refresh() runs (after a mutation), the server component
+  // re-renders and passes new initialLeads/counts/totals. Reset state to
+  // match — overflow-loaded leads are lost, which is acceptable (rare).
   React.useEffect(() => { setLeads(initialLeads) }, [initialLeads])
+  React.useEffect(() => { setStageCounts(initialStageCounts) }, [initialStageCounts])
+  React.useEffect(() => { setTotals(initialTotals) }, [initialTotals])
+
+  // Debounced server-side search. Empty query = restore initial state.
+  React.useEffect(() => {
+    const q = search.trim()
+    if (q.length === 0) {
+      // Restore initial server snapshot
+      setLeads(initialLeads)
+      setStageCounts(initialStageCounts)
+      setTotals(initialTotals)
+      setSearching(false)
+      return
+    }
+    setSearching(true)
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/pipeline/search?q=${encodeURIComponent(q)}`)
+        const json = await res.json() as {
+          leads: PipelineLead[]
+          counts: Record<string, number>
+          totals: PipelineTotals
+        }
+        setLeads(json.leads ?? [])
+        setStageCounts(json.counts ?? {})
+        setTotals(json.totals ?? initialTotals)
+      } catch (err) {
+        console.error('Pipeline search failed', err)
+      } finally {
+        setSearching(false)
+      }
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [search, initialLeads, initialStageCounts, initialTotals])
 
   const leadsByStage = React.useMemo(() => {
-    const q = search.toLowerCase()
-    const filtered = q
-      ? leads.filter(l => [l.first_name, l.last_name, l.email, l.company]
-          .filter(Boolean).join(' ').toLowerCase().includes(q))
-      : leads
     const map = new Map<string | null, PipelineLead[]>()
     for (const s of stages) map.set(s.id, [])
     map.set(null, [])
-    for (const lead of filtered) {
+    for (const lead of leads) {
       const sid = lead.pipeline_stage_id
       if (sid && map.has(sid)) map.get(sid)!.push(lead)
       else map.get(null)!.push(lead)
     }
     return map
-  }, [leads, stages, search])
+  }, [leads, stages])
+
+  // Load the next 100 leads for a stage when "+N more" is clicked.
+  async function loadStageOverflow(stageId: string) {
+    const visible = leadsByStage.get(stageId)?.length ?? 0
+    try {
+      const res = await fetch(`/api/pipeline/stage-overflow?stage_id=${stageId}&offset=${visible}`)
+      const json = await res.json() as { leads: PipelineLead[] }
+      const more = json.leads ?? []
+      if (more.length === 0) return
+      // Merge into leads, de-duping by id in case of overlap
+      setLeads((prev) => {
+        const seen = new Set(prev.map((l) => l.id))
+        return [...prev, ...more.filter((l) => !seen.has(l.id))]
+      })
+    } catch (err) {
+      console.error('Pipeline stage overflow failed', err)
+    }
+  }
 
   function patchLead(id: string, patch: Partial<PipelineLead>) {
     setLeads(p => p.map(l => l.id === id ? { ...l, ...patch } : l))
@@ -148,17 +210,15 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
     }
   }
 
-  const totalLeads    = leads.filter(l => l.pipeline_stage_id !== null).length
-  const unassigned    = leadsByStage.get(null)?.length ?? 0
+  // All four numbers come from the server (accurate across the full
+  // workspace, not just the trimmed top-100-per-stage visible set).
+  const totalLeads      = totals.total_leads
+  const hotLeads        = totals.hot_leads
+  const dealsWon        = totals.deals_won
+  const dealsInProgress = totals.deals_in_progress
+  const unassigned      = stageCounts['__unassigned__'] ?? 0
 
-  // Won stage IDs and lost stage IDs from stage metadata
-  const wonStageIds  = new Set(stages.filter(s => s.is_won).map(s => s.id))
-  const lostStageIds = new Set(stages.filter(s => s.is_lost).map(s => s.id))
-
-  const dealsWon        = leads.filter(l => l.pipeline_stage_id && wonStageIds.has(l.pipeline_stage_id)).length
-  const dealsInProgress = leads.filter(l => l.pipeline_stage_id && !wonStageIds.has(l.pipeline_stage_id) && !lostStageIds.has(l.pipeline_stage_id)).length
-
-  const hotLeads = leads.filter(l => l.interest_status === 'interested' && l.pipeline_stage_id !== null).length
+  const wonStageIds = new Set(stages.filter(s => s.is_won).map(s => s.id))
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
@@ -179,6 +239,9 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
               onChange={e => setSearch(e.target.value)}
               className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground outline-none"
             />
+            {searching && (
+              <span className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+            )}
           </div>
 
           {/* View toggle */}
@@ -251,6 +314,8 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
             style={{ minWidth: `${stages.length * 320 + 96}px` }}>
             {stages.map(stage => {
               const stageLeads = leadsByStage.get(stage.id) ?? []
+              const stageTotal = stageCounts[stage.id] ?? stageLeads.length
+              const hasMore    = stageTotal > stageLeads.length
               const isOver     = dragOverStage === stage.id
 
               return (
@@ -265,7 +330,7 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
                       {stage.is_lost && <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">LOST</span>}
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {stageLeads.length} {stageLeads.length === 1 ? 'lead' : 'leads'}
+                      {stageTotal} {stageTotal === 1 ? 'lead' : 'leads'}
                     </span>
                   </div>
 
@@ -303,6 +368,17 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
                       ))}
                     </div>
 
+                    {/* Load more */}
+                    {hasMore && (
+                      <button
+                        type="button"
+                        onClick={() => loadStageOverflow(stage.id)}
+                        className="w-full px-3 py-2 mt-1 rounded-xl border border-border/70 text-[12px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
+                      >
+                        + {stageTotal - stageLeads.length} more
+                      </button>
+                    )}
+
                     {/* Add lead */}
                     <Link
                       href="/leads"
@@ -321,6 +397,8 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {stages.map((stage) => {
             const stageLeads = leadsByStage.get(stage.id) ?? []
+            const stageTotal = stageCounts[stage.id] ?? stageLeads.length
+            const hasMore    = stageTotal > stageLeads.length
             const isOver = dragOverStage === stage.id
             return (
               <div
@@ -337,7 +415,7 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
                     {stage.is_won  && <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white">WON</span>}
                     {stage.is_lost && <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">LOST</span>}
                   </div>
-                  <span className="text-xs text-muted-foreground">{stageLeads.length} leads</span>
+                  <span className="text-xs text-muted-foreground">{stageTotal} leads</span>
                 </div>
                 {stageLeads.length === 0 ? (
                   <p className="px-4 py-6 text-sm text-muted-foreground">No leads in this stage.</p>
@@ -383,6 +461,15 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
                       )
                     })}
                   </div>
+                )}
+                {hasMore && (
+                  <button
+                    type="button"
+                    onClick={() => loadStageOverflow(stage.id)}
+                    className="w-full px-4 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors border-t border-border"
+                  >
+                    + {stageTotal - stageLeads.length} more
+                  </button>
                 )}
               </div>
             )
