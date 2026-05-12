@@ -41,13 +41,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
       supabase.from('emails').select('id, subject, body_html, sent_by, status, sent_at, opened_at, clicked_at, replied_at, bounced_at, created_at').eq('lead_id', id).order('created_at', { ascending: false }),
       supabase.from('follow_ups').select('id, title, notes, due_at, completed_at, assigned_to').eq('lead_id', id).order('due_at', { ascending: true }),
       supabase.from('call_logs').select('id, outcome, duration_sec, notes, called_at, logged_by').eq('lead_id', id).order('called_at', { ascending: false }),
-      supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('is_active', true),
+      supabase.from('workspace_members').select('user_id, role').eq('workspace_id', workspaceId).eq('is_active', true),
     ])
 
     if (!leadRes.data) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
     // Resolve user names via workspace-scoped SQL RPC.
-    const memberIds = ((membersRes.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
+    const memberRows = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
+    const memberIds  = memberRows.map((m) => m.user_id)
+    const roleById   = new Map(memberRows.map((m) => [m.user_id, m.role]))
     const adminClient = createAdminClient()
     const usersById = await getUsersById(adminClient, workspaceId, memberIds)
 
@@ -116,7 +118,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
       notes: string | null; called_at: string; logged_by: string
     }>).map((c) => ({ ...c, logger_name: usersById.get(c.logged_by) ?? null }))
 
-    const teamMembers = memberIds.map((uid) => ({ id: uid, name: usersById.get(uid) ?? uid }))
+    const teamMembers = memberIds.map((uid) => ({
+      id:   uid,
+      name: usersById.get(uid) ?? uid,
+      role: roleById.get(uid),
+    }))
 
     return NextResponse.json({ lead, activity, emails, followUps, calls, teamMembers, currentUserId, isAdmin })
   } catch (err) {

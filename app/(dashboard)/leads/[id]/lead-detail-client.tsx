@@ -194,12 +194,12 @@ export default function LeadDetailClient({
   }
 
   // ── Note mutations ─────────────────────────────────────────────────────
-  async function handleAddNote(content: string) {
+  async function handleAddNote(content: string, assignedTo: string | null) {
     const data = await requestJson<{ note: { id: string; author_id: string; content: string; created_at: string } }>(
       `/api/leads/${lead.id}/notes`,
       {
         method: 'POST',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, assigned_to: assignedTo }),
       }
     )
     const newEntry: ActivityEntry = {
@@ -492,9 +492,19 @@ export default function LeadDetailClient({
               visible={activeTab === 'activity'}
               alwaysVisible
             >
-              {/* Note editor */}
+              {/* Note editor — reps can only assign to admins, admins can ping anyone but themselves */}
               <div className="mb-6">
-                <NoteEditor onSave={handleAddNote} />
+                <NoteEditor
+                  onSave={handleAddNote}
+                  recipients={(() => {
+                    const me = teamMembers.find((m) => m.id === currentUserId)
+                    const isRep = me?.role === 'rep' || !isAdmin
+                    return teamMembers
+                      .filter((m) => m.id !== currentUserId)
+                      .filter((m) => !isRep || m.role === 'admin' || m.role === 'super_admin')
+                      .map((m) => ({ id: m.id, name: m.name, role: m.role }))
+                  })()}
+                />
               </div>
 
               <ActivityTimeline

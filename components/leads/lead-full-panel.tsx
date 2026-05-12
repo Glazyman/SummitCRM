@@ -171,9 +171,17 @@ export function LeadFullPanel({
   }
 
   // ── Note mutations ────────────────────────────────────────────────────
-  async function handleAddNote(content: string) {
-    const res  = await fetch(`/api/leads/${leadId}/notes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })
+  async function handleAddNote(content: string, assignedTo: string | null) {
+    const res  = await fetch(`/api/leads/${leadId}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, assigned_to: assignedTo }),
+    })
     const json = await res.json()
+    if (!res.ok) {
+      // Bubble up a real error so the editor can show it (e.g. "Reps can only assign to admins")
+      throw new Error(json?.error ?? 'Failed to save note')
+    }
     const note = json.note
     const entry: ActivityEntry = {
       id:            `note-${note.id}`,
@@ -191,6 +199,15 @@ export function LeadFullPanel({
     setData((d) => d ? { ...d, activity: [entry, ...d.activity] } : d)
     setActiveTab('activity')
   }
+
+  // Recipients the current user is allowed to assign a note to.
+  // Reps can only ping admins/super_admins; admins can ping anyone (except self).
+  const currentUserRole = teamMembers.find((m) => m.id === currentUserId)?.role
+  const isCurrentRep = currentUserRole === 'rep'
+  const noteRecipients = teamMembers
+    .filter((m) => m.id !== currentUserId)
+    .filter((m) => !isCurrentRep || (m.role === 'admin' || m.role === 'super_admin'))
+    .map((m) => ({ id: m.id, name: m.name, role: m.role }))
 
   async function handleEditNote(noteId: string, content: string) {
     setData((d) => d ? { ...d, activity: d.activity.map((e) => e.note_id === noteId ? { ...e, note_content: content } : e) } : d)
@@ -445,7 +462,7 @@ export function LeadFullPanel({
             <div className="flex-1 overflow-y-auto p-5">
               {activeTab === 'activity' && (
                 <div className="space-y-5">
-                  <NoteEditor onSave={handleAddNote} />
+                  <NoteEditor onSave={handleAddNote} recipients={noteRecipients} />
                   <ActivityTimeline
                     entries={data.activity}
                     onEditNote={handleEditNote}

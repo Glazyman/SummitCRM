@@ -121,6 +121,7 @@ export interface NewFollowUp {
 
 // ── Team member (for assign dropdowns) ────────────────────────────────────
 export interface TeamMember {
-  id:   string
-  name: string
+  id:    string
+  name:  string
+  role?: string
 }

@@ -1,31 +1,43 @@
 'use client'
 
 import * as React from 'react'
-import { StickyNote, Send } from 'lucide-react'
+import { StickyNote, Send, AtSign } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
 const MAX_LENGTH = 5000
 
+export interface NoteRecipient {
+  id:    string
+  name:  string
+  role?: string
+}
+
 interface NoteEditorProps {
-  onSave: (content: string) => Promise<void>
+  /** Persist a note. Returns once saved. */
+  onSave: (content: string, assignedTo: string | null) => Promise<void>
+  /** Workspace members the current user is allowed to assign notes to.
+   *  Empty list hides the recipient dropdown. */
+  recipients?: NoteRecipient[]
 }
 
 /**
  * Composer for new notes.
- * Character count, submit on Cmd/Ctrl+Enter, textarea auto-grows.
+ * Character count, submit on Cmd/Ctrl+Enter, textarea auto-grows, and
+ * an optional "Assign to" dropdown that mentions a teammate.
  */
-export function NoteEditor({ onSave }: NoteEditorProps) {
-  const [content, setContent]   = React.useState('')
-  const [saving,  setSaving]    = React.useState(false)
-  const [focused, setFocused]   = React.useState(false)
-  const textareaRef             = React.useRef<HTMLTextAreaElement>(null)
+export function NoteEditor({ onSave, recipients }: NoteEditorProps) {
+  const [content,    setContent]    = React.useState('')
+  const [assignedTo, setAssignedTo] = React.useState<string>('')
+  const [saving,     setSaving]     = React.useState(false)
+  const [focused,    setFocused]    = React.useState(false)
+  const textareaRef                 = React.useRef<HTMLTextAreaElement>(null)
 
-  const remaining  = MAX_LENGTH - content.length
-  const isOverflow = remaining < 0
-  const canSubmit  = content.trim().length > 0 && !isOverflow && !saving
+  const remaining   = MAX_LENGTH - content.length
+  const isOverflow  = remaining < 0
+  const canSubmit   = content.trim().length > 0 && !isOverflow && !saving
+  const showAssign  = !!recipients && recipients.length > 0
 
-  // Auto-grow textarea
   function autoResize() {
     const el = textareaRef.current
     if (el) {
@@ -38,8 +50,9 @@ export function NoteEditor({ onSave }: NoteEditorProps) {
     if (!canSubmit) return
     setSaving(true)
     try {
-      await onSave(content.trim())
+      await onSave(content.trim(), assignedTo || null)
       setContent('')
+      setAssignedTo('')
       if (textareaRef.current) textareaRef.current.style.height = 'auto'
     } finally {
       setSaving(false)
@@ -80,27 +93,46 @@ export function NoteEditor({ onSave }: NoteEditorProps) {
       </div>
 
       <div className={cn(
-        'flex items-center justify-between px-3 pb-2.5 pt-1',
+        'flex flex-wrap items-center justify-between gap-2 px-3 pb-2.5 pt-1',
         'transition-opacity',
         focused || content ? 'opacity-100' : 'opacity-0 pointer-events-none'
       )}>
-        {/* Character count */}
-        <span className={cn(
-          'text-xs tabular-nums',
-          isOverflow
-            ? 'text-destructive font-medium'
-            : remaining < 200
-              ? 'text-foreground'
-              : 'text-muted-foreground'
-        )}>
-          {remaining.toLocaleString()} characters remaining
-        </span>
+        {/* Assign-to picker — left side */}
+        <div className="flex items-center gap-2">
+          {showAssign && (
+            <label className="flex items-center gap-1 text-xs">
+              <AtSign className="h-3 w-3 text-muted-foreground" />
+              <select
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                className="h-6 rounded-md border border-border bg-background px-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">No one (just a note)</option>
+                {recipients!.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    Assign to {r.name}{r.role ? ` (${r.role})` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <span className={cn(
+            'text-xs tabular-nums',
+            isOverflow
+              ? 'text-destructive font-medium'
+              : remaining < 200
+                ? 'text-foreground'
+                : 'text-muted-foreground'
+          )}>
+            {remaining.toLocaleString()} left
+          </span>
+        </div>
 
         <div className="flex items-center gap-2">
           {content && (
             <button
               type="button"
-              onClick={() => { setContent(''); if (textareaRef.current) textareaRef.current.style.height = 'auto' }}
+              onClick={() => { setContent(''); setAssignedTo(''); if (textareaRef.current) textareaRef.current.style.height = 'auto' }}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
               Clear
