@@ -178,6 +178,16 @@ export function LeadsClient({
   const totalPages = Math.max(1, Math.ceil(totalCount / perPage))
   const statusCounts: StatusCount[] = serverStatusCounts
 
+  // Visual selection for the checkbox column. In Select-All-Matching mode
+  // we don't populate selectedIds (server operates by filter spec), but
+  // the user still expects every row on the page to LOOK checked.
+  const visualSelectedIds = React.useMemo(() => {
+    if (!selectAllMatching) return selectedIds
+    const s = new Set<string>(selectedIds)
+    for (const l of pageLeads) s.add(l.id)
+    return s
+  }, [selectAllMatching, selectedIds, pageLeads])
+
   // ── URL sync ──────────────────────────────────────────────────────────
   // Server-side pagination: pushing the URL re-runs the server component
   // with the new params (router.push, not replace — replace would silently
@@ -237,6 +247,12 @@ export function LeadsClient({
   }
 
   function handleSelectAll() {
+    // If we're in "select all matching" mode, clicking the header
+    // checkbox should fully clear the selection.
+    if (selectAllMatching) {
+      handleClearSelection()
+      return
+    }
     if (pageLeads.every((l) => selectedIds.has(l.id))) {
       // Deselect page
       setSelectedIds((s) => {
@@ -284,6 +300,16 @@ export function LeadsClient({
   }
 
   function handleSelectRow(id: string) {
+    // Clicking an individual row while in "select all matching" mode
+    // collapses that mode and re-establishes a normal page-level
+    // selection (every other visible row stays checked).
+    if (selectAllMatching) {
+      const next = new Set<string>()
+      for (const l of pageLeads) if (l.id !== id) next.add(l.id)
+      setSelectAllMatching(false)
+      setSelectedIds(next)
+      return
+    }
     setSelectedIds((s) => {
       const next = new Set(s)
       if (next.has(id)) next.delete(id)
@@ -746,7 +772,7 @@ export function LeadsClient({
       {leadView === 'table' ? (
         <LeadTable
           leads={pageLeads}
-          selectedIds={selectedIds}
+          selectedIds={visualSelectedIds}
           sortBy={filters.sortBy}
           sortDir={filters.sortDir}
           visibleColumns={visibleColumns}
