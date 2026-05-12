@@ -207,7 +207,7 @@ function ColumnHeader({ colId, sortBy, sortDir, onSort, isAdmin }: {
     case 'email':         return <SortHeader field="email"           current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[180px]">Email</SortHeader>
     case 'company':       return <SortHeader field="company"         current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[130px]">Company</SortHeader>
     case 'status':        return <SortHeader field="status"          current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[130px]">Status</SortHeader>
-    case 'last_activity': return <SortHeader field="last_activity_at" current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[120px]">Last Activity</SortHeader>
+    case 'last_activity': return plain('Last Activity')
     case 'interest':      return plain('Interest')
     case 'phone':         return plain('Phone')
     case 'company_phone': return plain('Company Phone')

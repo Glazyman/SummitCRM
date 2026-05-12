@@ -23,6 +23,14 @@ import type { NewLeadData } from '@/components/leads/create-lead-modal'
 // ── Types ──────────────────────────────────────────────────────────────────
 interface LeadsClientProps {
   initialLeads:  LeadRow[]
+  /** Total rows matching the current filter, server-computed (across all pages). */
+  totalCount:    number
+  /** Per-status counts from the server, used by the status bar. */
+  statusCounts:  StatusCount[]
+  /** Current page index (1-based) from URL. */
+  page:          number
+  /** Per-page size from URL (25/50/100). */
+  perPage:       number
   batches:       { id: string; name: string }[]
   teamMembers:   { id: string; name: string }[]
   isAdmin:       boolean
@@ -30,7 +38,7 @@ interface LeadsClientProps {
   role?:         string
 }
 
-const PER_PAGE = 50
+const PER_PAGE_OPTIONS = [25, 50, 100] as const
 
 function tomorrowAt11LocalIso() {
   const d = new Date()
@@ -39,89 +47,16 @@ function tomorrowAt11LocalIso() {
   return d.toISOString()
 }
 
-// ── Sorting helper ─────────────────────────────────────────────────────────
-function sortLeads(leads: LeadRow[], by: SortField, dir: 'asc' | 'desc'): LeadRow[] {
-  return [...leads].sort((a, b) => {
-    let av: string | null, bv: string | null
-
-    switch (by) {
-      case 'name':
-        av = [a.first_name, a.last_name].filter(Boolean).join(' ')
-        bv = [b.first_name, b.last_name].filter(Boolean).join(' ')
-        break
-      case 'email':            av = a.email;            bv = b.email;            break
-      case 'company':          av = a.company;          bv = b.company;          break
-      case 'status':           av = a.status;           bv = b.status;           break
-      case 'last_activity_at': av = a.last_activity_at; bv = b.last_activity_at; break
-      case 'created_at':
-      default:                 av = a.created_at;       bv = b.created_at;       break
-    }
-
-    if (!av && !bv) return 0
-    if (!av) return 1
-    if (!bv) return -1
-    const cmp = av.localeCompare(bv)
-    return dir === 'asc' ? cmp : -cmp
-  })
-}
-
-// ── Filter helper ──────────────────────────────────────────────────────────
-function applyFilters(leads: LeadRow[], filters: LeadFilters, currentUserId: string): LeadRow[] {
-  return leads.filter((lead) => {
-    // My leads
-    if (filters.myLeads && lead.assigned_to !== currentUserId) return false
-
-    // Status multi-filter
-    if (filters.statuses.length > 0 && !filters.statuses.includes(lead.status)) return false
-
-    // Interest multi-filter
-    if (filters.interests.length > 0 && !filters.interests.includes(lead.interest_status)) return false
-
-    // Batch
-    if (filters.batchId && lead.batch_id !== filters.batchId) return false
-
-    // Assigned to
-    if (filters.assignedTo === 'unassigned' && lead.assigned_to) return false
-    if (filters.assignedTo && filters.assignedTo !== 'unassigned' && lead.assigned_to !== filters.assignedTo) return false
-
-    // Cold leads: pending + older than 7 days + no-answer/voicemail or never contacted
-    if (filters.coldOnly) {
-      if (lead.interest_status !== 'pending') return false
-      const now = Date.now()
-      const createdMs = new Date(lead.created_at).getTime()
-      if (!Number.isFinite(createdMs) || now - createdMs < 7 * 24 * 60 * 60 * 1000) return false
-      const outcome = lead.last_call_outcome
-      const coldByCall = outcome === 'voicemail' || outcome === 'no_answer' || !lead.last_contacted_at
-      if (!coldByCall) return false
-    }
-
-    // Date range
-    if (filters.dateFrom) {
-      const from = new Date(filters.dateFrom).getTime()
-      if (new Date(lead.created_at).getTime() < from) return false
-    }
-    if (filters.dateTo) {
-      const to = new Date(filters.dateTo).getTime() + 86400000 // inclusive end
-      if (new Date(lead.created_at).getTime() > to) return false
-    }
-
-    // Full-text search
-    if (filters.search) {
-      const q = filters.search.toLowerCase()
-      const hay = [
-        lead.first_name, lead.last_name, lead.email,
-        lead.company, lead.title,
-      ].filter(Boolean).join(' ').toLowerCase()
-      if (!hay.includes(q)) return false
-    }
-
-    return true
-  })
-}
+// (The previous client-side sortLeads / applyFilters helpers are gone now —
+//  the server does both via get_workspace_leads_page.)
 
 // ── Component ──────────────────────────────────────────────────────────────
 export function LeadsClient({
   initialLeads,
+  totalCount: serverTotalCount,
+  statusCounts: serverStatusCounts,
+  page: serverPage,
+  perPage: serverPerPage,
   batches,
   teamMembers,
   isAdmin,
@@ -148,15 +83,21 @@ export function LeadsClient({
       dateTo:     p.get('to')         ?? '',
       sortBy:     (p.get('sort')      ?? 'created_at') as LeadFilters['sortBy'],
       sortDir:    (p.get('dir')       ?? 'desc') as 'asc' | 'desc',
-      page:       parseInt(p.get('page') ?? '1', 10),
-      perPage:    PER_PAGE,
+      page:       serverPage,
+      perPage:    serverPerPage,
     }
-  }, [searchParams])
+  // serverPage / serverPerPage are URL-derived on the server; including them
+  // ensures the local filters object stays in sync with the canonical URL.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, serverPage, serverPerPage])
 
   // ── State ──────────────────────────────────────────────────────────────
   const [filters, setFilters]           = React.useState<LeadFilters>(filtersFromUrl)
   const [leads, setLeads]               = React.useState<LeadRow[]>(initialLeads)
   const [selectedIds, setSelectedIds]   = React.useState<Set<string>>(new Set())
+  // "Select all matching the filter" — bulk operations send the filter
+  // spec instead of an IDs array (avoids 10k+ UUID payloads).
+  const [selectAllMatching, setSelectAllMatching] = React.useState(false)
   const [createOpen, setCreateOpen]     = React.useState(false)
   // Per-user localStorage key — each user's column preferences are saved separately
   const colConfigKey = `leads_column_config_${currentUserId}`
@@ -227,32 +168,22 @@ export function LeadsClient({
     setLeads(initialLeads)
   }, [initialLeads])
 
-  // ── Derive displayed leads ────────────────────────────────────────────
-  const filtered = React.useMemo(
-    () => applyFilters(leads, filters, currentUserId),
-    [leads, filters, currentUserId]
-  )
-  const sorted = React.useMemo(
-    () => sortLeads(filtered, filters.sortBy, filters.sortDir),
-    [filtered, filters.sortBy, filters.sortDir]
-  )
-  const totalCount  = sorted.length
-  const perPage     = filters.perPage === 0 ? totalCount : filters.perPage // 0 = show all
-  const pageLeads   = perPage === totalCount ? sorted : sorted.slice((filters.page - 1) * perPage, filters.page * perPage)
-  const totalPages  = Math.max(1, perPage > 0 ? Math.ceil(totalCount / perPage) : 1)
-
-  // ── Status counts (for status bar) ───────────────────────────────────
-  const statusCounts: StatusCount[] = React.useMemo(() => {
-    const map = new Map<LeadStatus, number>()
-    // Count from non-status-filtered leads (so bar shows correct totals)
-    const baseLeads = applyFilters(leads, { ...filters, statuses: [] }, currentUserId)
-    for (const l of baseLeads) {
-      map.set(l.status, (map.get(l.status) ?? 0) + 1)
-    }
-    return [...map.entries()].map(([status, count]) => ({ status, count }))
-  }, [leads, filters, currentUserId])
+  // ── Display state — server already did the filter/sort/paginate ──────
+  // `leads` is the current page exactly as the server returned it. Counts
+  // come from the server too (totalCount + per-status). No client-side
+  // re-filter / re-sort / re-slice.
+  const totalCount = serverTotalCount
+  const perPage    = serverPerPage
+  const pageLeads  = leads
+  const totalPages = Math.max(1, Math.ceil(totalCount / perPage))
+  const statusCounts: StatusCount[] = serverStatusCounts
 
   // ── URL sync ──────────────────────────────────────────────────────────
+  // Server-side pagination: pushing the URL re-runs the server component
+  // with the new params (router.push, not replace — replace would silently
+  // update history but NOT re-fetch). The page RPC then returns the right
+  // slice + counts. Only push if the URL is actually different to avoid
+  // an infinite loop with filtersFromUrl.
   React.useEffect(() => {
     const params = new URLSearchParams()
     if (filters.search)               params.set('q',        filters.search)
@@ -267,10 +198,14 @@ export function LeadsClient({
     if (filters.sortBy !== 'created_at') params.set('sort', filters.sortBy)
     if (filters.sortDir !== 'desc')      params.set('dir',  filters.sortDir)
     if (filters.page > 1)            params.set('page',     String(filters.page))
+    if (filters.perPage !== 50)      params.set('per',      String(filters.perPage))
 
-    const qs = params.toString()
-    router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false })
-  }, [filters, pathname, router])
+    const qs    = params.toString()
+    const next  = `${pathname}${qs ? `?${qs}` : ''}`
+    const curQS = searchParams.toString()
+    const curr  = `${pathname}${curQS ? `?${curQS}` : ''}`
+    if (next !== curr) router.push(next, { scroll: false })
+  }, [filters, pathname, router, searchParams])
 
   // ── Handlers ──────────────────────────────────────────────────────────
   function updateFilters(patch: Partial<LeadFilters>) {
@@ -320,11 +255,32 @@ export function LeadsClient({
   }
 
   function handleSelectAllFiltered() {
-    setSelectedIds(new Set(sorted.map((l) => l.id)))
+    // Flip into "select all matching" mode — bulk ops will use the
+    // filter spec rather than enumerating IDs. Page-level selectedIds
+    // is also cleared so the UI clearly shows the global selection.
+    setSelectAllMatching(true)
+    setSelectedIds(new Set())
   }
 
   function handleClearSelection() {
     setSelectedIds(new Set())
+    setSelectAllMatching(false)
+  }
+
+  /** Build the filter spec the bulk endpoints expect when scope=all_matching. */
+  function currentFilterSpec() {
+    return {
+      search:              filters.search || null,
+      statuses:            filters.statuses.length  > 0 ? filters.statuses  : null,
+      interests:           filters.interests.length > 0 ? filters.interests : null,
+      batch_id:            filters.batchId,
+      assigned_to:         filters.assignedTo === 'unassigned' ? null : filters.assignedTo,
+      assigned_unassigned: filters.assignedTo === 'unassigned',
+      my_leads:            filters.myLeads,
+      cold_only:           filters.coldOnly,
+      date_from:           filters.dateFrom || null,
+      date_to:             filters.dateTo   || null,
+    }
   }
 
   function handleSelectRow(id: string) {
@@ -364,6 +320,8 @@ export function LeadsClient({
       console.error(err)
       setLeads(previous)
     }
+    // Refresh server props so status_counts and totalCount track changes.
+    router.refresh()
   }
 
   async function handleScheduleStatusFollowUp() {
@@ -403,77 +361,103 @@ export function LeadsClient({
       console.error(err)
       setLeads(previous)
     }
+    router.refresh()
   }
 
   // ── Bulk actions ───────────────────────────────────────────────────────
-  function handleBulkStatus(status: LeadStatus) {
-    const ids = [...selectedIds]
-    setLeads((prev) =>
-      prev.map((l) => ids.includes(l.id) ? { ...l, status, updated_at: new Date().toISOString() } : l)
-    )
-    setSelectedIds(new Set())
-    fetch('/api/leads/bulk', {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ids, status }),
-    }).catch(console.error)
+  // When `selectAllMatching` is on, the request body becomes
+  // { scope: 'all_matching', filter: <spec>, ...fields } and the server
+  // operates over every matching row without us sending IDs. Otherwise
+  // we keep the legacy `{ ids, ...fields }` shape.
+
+  function bulkBody(extra: Record<string, unknown>) {
+    if (selectAllMatching) return { scope: 'all_matching', filter: currentFilterSpec(), ...extra }
+    return { ids: [...selectedIds], ...extra }
+  }
+
+  async function handleBulkStatus(status: LeadStatus) {
+    const ids = selectAllMatching ? null : [...selectedIds]
+    // Optimistic update for the current page only
+    if (ids) {
+      setLeads((prev) =>
+        prev.map((l) => ids.includes(l.id) ? { ...l, status, updated_at: new Date().toISOString() } : l)
+      )
+    }
+    handleClearSelection()
+    try {
+      await fetch('/api/leads/bulk', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(bulkBody({ status })),
+      })
+    } catch (err) {
+      console.error('[bulk status]', err)
+    }
+    router.refresh()
   }
 
   async function handleBulkAssign(userId: string) {
-    const ids    = [...selectedIds]
+    const ids    = selectAllMatching ? null : [...selectedIds]
     const member = teamMembers.find((m) => m.id === userId)
-    // Optimistic update
-    const prev = leads
-    setLeads((l) =>
-      l.map((lead) => ids.includes(lead.id)
-        ? { ...lead, assigned_to: userId || null, assigned_name: member?.name ?? null, updated_at: new Date().toISOString() }
-        : lead
+    if (ids) {
+      setLeads((l) =>
+        l.map((lead) => ids.includes(lead.id)
+          ? { ...lead, assigned_to: userId || null, assigned_name: member?.name ?? null, updated_at: new Date().toISOString() }
+          : lead
+        )
       )
-    )
-    setSelectedIds(new Set())
+    }
+    handleClearSelection()
     try {
-      const res = await fetch('/api/leads/bulk', {
+      await fetch('/api/leads/bulk', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ ids, assigned_to: userId || null }),
+        body:    JSON.stringify(bulkBody({ assigned_to: userId || null })),
       })
-      if (!res.ok) {
-        // Revert on failure
-        setLeads(prev)
-        console.error('[bulk assign] failed:', await res.json().catch(() => ({})))
-      }
     } catch (err) {
-      setLeads(prev)
       console.error('[bulk assign]', err)
     }
+    router.refresh()
   }
 
-  function handleBulkBatch(batchId: string) {
-    const ids   = [...selectedIds]
+  async function handleBulkBatch(batchId: string) {
+    const ids   = selectAllMatching ? null : [...selectedIds]
     const batch = batches.find((b) => b.id === batchId)
-    setLeads((prev) =>
-      prev.map((l) => ids.includes(l.id)
-        ? { ...l, batch_id: batchId, batch_name: batch?.name ?? null, updated_at: new Date().toISOString() }
-        : l
+    if (ids) {
+      setLeads((prev) =>
+        prev.map((l) => ids.includes(l.id)
+          ? { ...l, batch_id: batchId, batch_name: batch?.name ?? null, updated_at: new Date().toISOString() }
+          : l
+        )
       )
-    )
-    setSelectedIds(new Set())
-    fetch('/api/leads/bulk', {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ids, batch_id: batchId }),
-    }).catch(console.error)
+    }
+    handleClearSelection()
+    try {
+      await fetch('/api/leads/bulk', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(bulkBody({ batch_id: batchId })),
+      })
+    } catch (err) {
+      console.error('[bulk batch]', err)
+    }
+    router.refresh()
   }
 
-  function handleBulkDelete() {
-    const ids = [...selectedIds]
-    setLeads((prev) => prev.filter((l) => !ids.includes(l.id)))
-    setSelectedIds(new Set())
-    fetch('/api/leads/bulk', {
-      method:  'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ids }),
-    }).catch(console.error)
+  async function handleBulkDelete() {
+    const ids = selectAllMatching ? null : [...selectedIds]
+    if (ids) setLeads((prev) => prev.filter((l) => !ids.includes(l.id)))
+    handleClearSelection()
+    try {
+      await fetch('/api/leads/bulk', {
+        method:  'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(selectAllMatching ? { scope: 'all_matching', filter: currentFilterSpec() } : { ids }),
+      })
+    } catch (err) {
+      console.error('[bulk delete]', err)
+    }
+    router.refresh()
   }
 
   async function handleDeleteLead(id: string) {
@@ -560,7 +544,9 @@ export function LeadsClient({
 
   function handleExport() {
     const headers = ['Name', 'Email', 'Company', 'Title', 'Status', 'Batch', 'Assigned To', 'Created At']
-    const rows    = filtered.map((l) => [
+    // Exports only the current page. CSV-export-of-all-matching would need
+    // a streaming endpoint; out of scope for now.
+    const rows    = pageLeads.map((l) => [
       [l.first_name, l.last_name].filter(Boolean).join(' '),
       l.email, l.company ?? '', l.title ?? '', l.status,
       l.batch_name ?? '', l.assigned_name ?? '',
@@ -619,9 +605,12 @@ export function LeadsClient({
       </div>
 
       {/* ── Status bar ── */}
+      {/* statusCounts comes from the server and intentionally ignores the
+          status filter, so summing the buckets gives "total across all
+          statuses for the rest of the filters" — what the bar needs. */}
       <LeadStatusBar
         counts={statusCounts}
-        totalCount={applyFilters(leads, { ...filters, statuses: [] }, currentUserId).length}
+        totalCount={statusCounts.reduce((acc, c) => acc + c.count, 0)}
         activeStatuses={filters.statuses}
         onStatusClick={handleStatusFilter}
         coldOnly={filters.coldOnly}
@@ -688,7 +677,7 @@ export function LeadsClient({
             <div className="flex items-center gap-1.5 text-sm">
               <span className="text-muted-foreground hidden sm:inline">Per page:</span>
               <div className="flex rounded-lg border border-border overflow-hidden">
-                {[25, 50, 100, 0].map((n) => (
+                {PER_PAGE_OPTIONS.map((n) => (
                   <button
                     key={n}
                     type="button"
@@ -700,7 +689,7 @@ export function LeadsClient({
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                   >
-                    {n === 0 ? 'All' : n}
+                    {n}
                   </button>
                 ))}
               </div>
@@ -738,8 +727,8 @@ export function LeadsClient({
           </div>
         )}
 
-        {/* "All X selected" confirmation */}
-        {selectedIds.size === totalCount && totalCount > 0 && (
+        {/* "All X selected" confirmation (server-side select-all-matching) */}
+        {selectAllMatching && totalCount > 0 && (
           <div className="flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
             <span className="text-foreground font-medium">All {totalCount.toLocaleString()} leads selected.</span>
             <button
@@ -782,7 +771,7 @@ export function LeadsClient({
       )}
 
       {/* ── Pagination ── */}
-      {totalPages > 1 && filters.perPage !== 0 && (
+      {totalPages > 1 && (
         <Pagination
           page={filters.page}
           totalPages={totalPages}
