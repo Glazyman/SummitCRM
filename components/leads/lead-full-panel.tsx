@@ -201,12 +201,21 @@ export function LeadFullPanel({
   }
 
   // Recipients the current user is allowed to assign a note to.
-  // Reps can only ping admins/super_admins; admins can ping anyone (except self).
+  // - Reps  → admins / super_admins only
+  // - Admins → other admins + the rep currently assigned to THIS lead.
+  //   (Admins can't ping reps who don't own the lead.)
   const currentUserRole = teamMembers.find((m) => m.id === currentUserId)?.role
-  const isCurrentRep = currentUserRole === 'rep'
+  const isCurrentRep   = currentUserRole === 'rep'
+  const isCurrentAdmin = currentUserRole === 'admin' || currentUserRole === 'super_admin'
+  const leadAssignedTo = data?.lead.assigned_to ?? null
   const noteRecipients = teamMembers
     .filter((m) => m.id !== currentUserId)
-    .filter((m) => !isCurrentRep || (m.role === 'admin' || m.role === 'super_admin'))
+    .filter((m) => {
+      const isMemberAdmin = m.role === 'admin' || m.role === 'super_admin'
+      if (isCurrentRep)   return isMemberAdmin
+      if (isCurrentAdmin) return isMemberAdmin || m.id === leadAssignedTo
+      return false
+    })
     .map((m) => ({ id: m.id, name: m.name, role: m.role }))
 
   async function handleEditNote(noteId: string, content: string) {

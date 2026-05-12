@@ -36,12 +36,12 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const { data: lead } = await supabase
       .from('leads')
-      .select('id, first_name, last_name, email')
+      .select('id, first_name, last_name, email, assigned_to')
       .eq('id', leadId)
       .eq('workspace_id', member.workspace_id)
       .is('deleted_at', null)
       .single() as {
-        data: { id: string; first_name: string | null; last_name: string | null; email: string } | null
+        data: { id: string; first_name: string | null; last_name: string | null; email: string; assigned_to: string | null } | null
         error: unknown
       }
 
@@ -50,9 +50,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     // ── Validate the recipient if one is set ─────────────────────────────
     // Rules:
     //   - Recipient must be an active member of the same workspace.
-    //   - If the author is a rep, recipient must be admin/super_admin.
-    //     (Reps can only ping admins; admins can ping anyone.)
-    //   - Self-assignment is allowed but skipped for notification purposes.
+    //   - Reps can only assign notes to admins/super_admins (or themselves).
+    //   - Admins can ping other admins, AND the rep currently assigned to
+    //     this lead. They cannot ping a rep who isn't on this lead.
+    //   - Self-assignment is allowed; notification insert is skipped for self.
     const assignedTo = parsed.data.assigned_to ?? null
     let recipientRole: string | null = null
 
@@ -69,13 +70,25 @@ export async function POST(req: NextRequest, { params }: Params) {
         return NextResponse.json({ error: 'Recipient is not a workspace member' }, { status: 422 })
       }
       recipientRole = recipient.role
-      const isAuthorRep = member.role === 'rep'
-      const isRecipientAdmin = ['admin', 'super_admin'].includes(recipient.role)
-      if (isAuthorRep && assignedTo !== user.id && !isRecipientAdmin) {
-        return NextResponse.json(
-          { error: 'Reps can only assign notes to admins' },
-          { status: 403 },
-        )
+      const isSelf            = assignedTo === user.id
+      const isAuthorRep       = member.role === 'rep'
+      const isAuthorAdmin     = ['admin', 'super_admin'].includes(member.role)
+      const isRecipientAdmin  = ['admin', 'super_admin'].includes(recipient.role)
+      const isRecipientRep    = recipient.role === 'rep'
+
+      if (!isSelf) {
+        if (isAuthorRep && !isRecipientAdmin) {
+          return NextResponse.json(
+            { error: 'Reps can only assign notes to admins' },
+            { status: 403 },
+          )
+        }
+        if (isAuthorAdmin && isRecipientRep && lead.assigned_to !== assignedTo) {
+          return NextResponse.json(
+            { error: 'Admins can only assign notes to the rep who owns this lead' },
+            { status: 403 },
+          )
+        }
       }
     }
 

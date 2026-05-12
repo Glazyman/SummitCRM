@@ -492,16 +492,25 @@ export default function LeadDetailClient({
               visible={activeTab === 'activity'}
               alwaysVisible
             >
-              {/* Note editor — reps can only assign to admins, admins can ping anyone but themselves */}
+              {/* Note editor —
+                  · reps   → can ping admins only
+                  · admins → can ping other admins + the rep currently
+                              assigned to this lead (not other reps)
+              */}
               <div className="mb-6">
                 <NoteEditor
                   onSave={handleAddNote}
                   recipients={(() => {
                     const me = teamMembers.find((m) => m.id === currentUserId)
-                    const isRep = me?.role === 'rep' || !isAdmin
+                    const isCurrentRep = me?.role === 'rep' || !isAdmin
+                    const leadOwnerId  = lead.assigned_to
                     return teamMembers
                       .filter((m) => m.id !== currentUserId)
-                      .filter((m) => !isRep || m.role === 'admin' || m.role === 'super_admin')
+                      .filter((m) => {
+                        const isMemberAdmin = m.role === 'admin' || m.role === 'super_admin'
+                        if (isCurrentRep) return isMemberAdmin
+                        return isMemberAdmin || m.id === leadOwnerId
+                      })
                       .map((m) => ({ id: m.id, name: m.name, role: m.role }))
                   })()}
                 />
