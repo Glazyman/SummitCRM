@@ -32,8 +32,8 @@ export async function GET(req: Request) {
 
     const [membersRes, callsRes, followUpsRes, leadsRes] = await Promise.all([
       admin.from('workspace_members').select('user_id, role').eq('workspace_id', wsId).eq('is_active', true),
-      admin.from('call_logs').select('logged_by, outcome').eq('workspace_id', wsId).gte('called_at', start).lte('called_at', end),
-      admin.from('follow_ups').select('assigned_to, completed_at, due_at').eq('workspace_id', wsId),
+      admin.from('call_logs').select('logged_by, outcome').eq('workspace_id', wsId).gte('called_at', start).lte('called_at', end).range(0, 99999),
+      admin.from('follow_ups').select('assigned_to, completed_at, due_at').eq('workspace_id', wsId).range(0, 99999),
       // RPC aggregate — bypasses PostgREST row limit
       admin.rpc('get_leads_assigned_status_counts', { p_workspace_id: wsId }),
     ])

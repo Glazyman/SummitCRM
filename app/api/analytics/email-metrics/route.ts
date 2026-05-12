@@ -35,7 +35,9 @@ export async function GET(req: Request) {
 
     if (repId) query = query.eq('sent_by', repId) as typeof query
 
-    const { data: rows } = await query as { data: Array<{ status: string }> | null }
+    // PostgREST caps select at 1000 rows; bump so the metric counts are
+    // accurate at 10k+ emails.
+    const { data: rows } = await query.range(0, 99999) as { data: Array<{ status: string }> | null }
     const all = rows ?? []
 
     const sent    = all.length

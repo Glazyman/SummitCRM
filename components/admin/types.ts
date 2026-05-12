@@ -3,7 +3,7 @@
  * Mirror of API response shapes — keeps components independent of fetch logic.
  */
 
-export type DateRangePreset = 'today' | '7d' | '30d' | 'month' | 'custom'
+export type DateRangePreset = 'today' | '7d' | '30d' | 'all' | 'custom'
 
 export interface DateRange {
   start: string   // ISO 8601

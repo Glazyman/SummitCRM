@@ -159,34 +159,29 @@ export default function PipelineClient({ stages, initialLeads, isAdmin, currentU
           </div>
 
           {/* View toggle */}
-          <div className="flex items-center h-[38px] rounded-xl border border-border bg-card overflow-hidden">
-            <button type="button"
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant={pipelineView === 'kanban' ? 'default' : 'outline'}
+              className="gap-1.5"
               onClick={() => { setPipelineView('kanban'); try { localStorage.setItem('pipeline_view_mode', 'kanban') } catch {} }}
-              className={cn(
-                'flex h-full items-center gap-1.5 px-3.5 text-[13px] font-medium transition-colors',
-                pipelineView === 'kanban'
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}>
+            >
               <Columns3 className="h-3.5 w-3.5" /> Kanban
-            </button>
-            <div className="w-px h-full bg-border" />
-            <button type="button"
+            </Button>
+            <Button
+              size="sm"
+              variant={pipelineView === 'list' ? 'default' : 'outline'}
+              className="gap-1.5"
               onClick={() => { setPipelineView('list'); try { localStorage.setItem('pipeline_view_mode', 'list') } catch {} }}
-              className={cn(
-                'flex h-full items-center gap-1.5 px-3.5 text-[13px] font-medium transition-colors',
-                pipelineView === 'list'
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}>
+            >
               <List className="h-3.5 w-3.5" /> List
-            </button>
+            </Button>
           </div>
 
           <div className="flex-1" />
 
           {/* Add Lead */}
-          <Button asChild size="sm" className="h-[38px] rounded-xl px-4 text-[13px] gap-1.5">
+          <Button asChild size="sm" className="gap-1.5">
             <Link href="/leads">
               <Plus className="h-3.5 w-3.5" /> Add Lead
             </Link>

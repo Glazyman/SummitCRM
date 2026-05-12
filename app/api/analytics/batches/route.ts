@@ -36,13 +36,18 @@ export async function GET(req: Request) {
 
     const batchIds = batches.map(b => b.id)
 
+    // PostgREST caps select queries at 1000 rows by default. We only need
+    // batch_id + status to count, so bump the range so per-batch totals are
+    // accurate across larger batches (3k+ leads is normal here).
     const [leadsRes, emailsRes] = await Promise.all([
       adminClient.from('leads').select('batch_id, status')
         .eq('workspace_id', member.workspace_id)
-        .in('batch_id', batchIds).is('deleted_at', null),
+        .in('batch_id', batchIds).is('deleted_at', null)
+        .range(0, 99999),
       adminClient.from('emails').select('batch_id, status')
         .eq('workspace_id', member.workspace_id)
-        .in('batch_id', batchIds),
+        .in('batch_id', batchIds)
+        .range(0, 99999),
     ]) as [
       { data: Array<{ batch_id: string; status: string }> | null },
       { data: Array<{ batch_id: string | null; status: string }> | null }

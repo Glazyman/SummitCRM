@@ -4,7 +4,7 @@
  * components/admin/date-range-picker.tsx
  *
  * Preset-based date range selector that syncs state via URL params.
- * Presets: Today, 7 Days, 30 Days, This Month, Custom
+ * Presets: Today, 7 Days, 30 Days, All Time, Custom
  */
 
 import React, { useState } from 'react'
@@ -20,10 +20,10 @@ interface Preset {
 }
 
 const PRESETS: Preset[] = [
-  { value: 'today', label: 'Today'      },
-  { value: '7d',    label: 'Last 7 days' },
-  { value: '30d',   label: 'Last 30 days'},
-  { value: 'month', label: 'This month'  },
+  { value: 'today', label: 'Today'       },
+  { value: '7d',    label: 'Last 7 days'  },
+  { value: '30d',   label: 'Last 30 days' },
+  { value: 'all',   label: 'All time'     },
 ]
 
 interface DateRangePickerProps {

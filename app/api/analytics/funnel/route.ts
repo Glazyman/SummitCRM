@@ -31,12 +31,15 @@ export async function GET(req: Request) {
     let total = 0
 
     if (isRep) {
+      // PostgREST caps at 1000 rows by default — bump so a rep with 3k+
+      // assigned leads gets accurate funnel counts.
       const { data: rows } = await adminClient
         .from('leads')
         .select('status')
         .eq('workspace_id', member.workspace_id)
         .eq('assigned_to', user.id)
-        .is('deleted_at', null) as { data: Array<{ status: string }> | null }
+        .is('deleted_at', null)
+        .range(0, 99999) as { data: Array<{ status: string }> | null }
       for (const row of rows ?? []) {
         counts.set(row.status, (counts.get(row.status) ?? 0) + 1)
       }

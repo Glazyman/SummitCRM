@@ -174,10 +174,10 @@ function AnalyticsContent({ userRole, userId }: Props) {
     const now = new Date()
     const end = now.toISOString()
     let start = new Date(now)
-    if (range === 'today')       { start.setHours(0, 0, 0, 0) }
-    else if (range === '7d')     { start.setDate(start.getDate() - 7) }
-    else if (range === 'month')  { start = new Date(now.getFullYear(), now.getMonth(), 1) }
-    else                          { start.setDate(start.getDate() - 30) }
+    if (range === 'today')   { start.setHours(0, 0, 0, 0) }
+    else if (range === '7d') { start.setDate(start.getDate() - 7) }
+    else if (range === 'all'){ start = new Date('1970-01-01T00:00:00Z') }
+    else                      { start.setDate(start.getDate() - 30) }
     return { start: start.toISOString(), end }
   }, [range])
 

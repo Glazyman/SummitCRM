@@ -16,8 +16,8 @@ function dateRange(preset: string | null): { start: string; end: string } {
     start.setHours(0, 0, 0, 0)
   } else if (preset === '7d') {
     start.setDate(start.getDate() - 7)
-  } else if (preset === 'month') {
-    start = new Date(now.getFullYear(), now.getMonth(), 1)
+  } else if (preset === 'all') {
+    start = new Date('1970-01-01T00:00:00Z')
   } else {
     // default: 30d
     start.setDate(start.getDate() - 30)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { LogOut, User, Menu, Settings, ChevronDown, Search, X, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -11,24 +11,6 @@ import { NotificationBell } from '@/components/notifications/notification-bell'
 import { FollowUpBell }     from '@/components/notifications/followup-bell'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { WorkspaceRole } from '@/types/database'
-
-// ── Page title from pathname ───────────────────────────────────────────────
-const ROUTE_TITLES: Record<string, string> = {
-  '/dashboard':  'Dashboard',
-  '/leads':      'Leads',
-  '/activities': 'Activities',
-  '/settings':   'Settings',
-  '/pipeline':   'Pipeline',
-}
-
-function getPageTitle(pathname: string): string {
-  for (const [route, title] of Object.entries(ROUTE_TITLES)) {
-    if (pathname === route || (route !== '/dashboard' && pathname.startsWith(route))) {
-      return title
-    }
-  }
-  return 'Summit CRM'
-}
 
 // ── Role badge ────────────────────────────────────────────────────────────
 const ROLE_STYLES: Record<WorkspaceRole, string> = {
@@ -74,7 +56,6 @@ interface SearchLead {
 
 export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) {
   const router   = useRouter()
-  const pathname = usePathname()
   const supabase = createClient()
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -182,7 +163,6 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
   const fullName    = user?.user_metadata?.full_name as string | undefined
   const email       = user?.email ?? ''
   const displayName = fullName ?? email
-  const pageTitle   = getPageTitle(pathname)
 
   return (
     <>
@@ -196,11 +176,6 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
         >
           <Menu className="h-5 w-5" />
         </button>
-
-        {/* Page title — display size */}
-        <h1 className="text-[26px] font-bold leading-none tracking-[-0.035em] min-w-0 truncate">
-          {pageTitle}
-        </h1>
 
         {/* Search pill */}
         <div ref={searchBoxRef} className="relative ml-auto hidden md:block w-64 lg:w-80">
@@ -217,14 +192,10 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
               className="flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground min-w-0"
               placeholder="Search leads, deals, people…"
             />
-            {searchQuery ? (
+            {searchQuery && (
               <button type="button" onClick={() => { setSearchQuery(''); setResultsOpen(false) }} className="shrink-0 text-muted-foreground hover:text-foreground">
                 <X className="h-3.5 w-3.5" />
               </button>
-            ) : (
-              <kbd className="hidden rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground sm:block shrink-0">
-                ⌘K
-              </kbd>
             )}
           </form>
 

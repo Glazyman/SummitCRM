@@ -41,7 +41,9 @@ export async function GET(req: Request) {
     if (repId)      query = query.eq('sent_by',     repId)      as typeof query
     if (campaignId) query = query.eq('campaign_id', campaignId) as typeof query
 
-    const { data: rows } = await query as { data: Array<{ sent_at: string; status: string }> | null }
+    // PostgREST caps select at 1000 rows by default — bump so analytics
+    // aggregates are accurate at 10k+ rows.
+    const { data: rows } = await query.range(0, 99999) as { data: Array<{ sent_at: string; status: string }> | null }
 
     // Bucket by date string
     const dayMap = new Map<string, { sent: number; opened: number; clicked: number; replied: number; bounced: number }>()
