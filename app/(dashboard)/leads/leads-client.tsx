@@ -781,13 +781,16 @@ export function LeadsClient({
         />
       )}
 
-      {/* ── Bulk action bar (slides in from bottom) ── */}
+      {/* ── Bulk action bar (slides in from bottom) ──
+          Visible when either: rows on the page are checked, OR the user
+          flipped into "Select All Matching" mode (selectedIds is empty
+          in that case because we're operating by filter spec). */}
       <BulkActionBar
-        selectedCount={selectedIds.size}
+        selectedCount={selectAllMatching ? totalCount : selectedIds.size}
         batches={batches}
         teamMembers={teamMembers}
         isAdmin={isAdmin}
-        onClearSelection={() => setSelectedIds(new Set())}
+        onClearSelection={handleClearSelection}
         onBulkStatus={handleBulkStatus}
         onBulkAssign={handleBulkAssign}
         onBulkBatch={handleBulkBatch}
