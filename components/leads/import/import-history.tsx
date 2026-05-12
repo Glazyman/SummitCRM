@@ -205,67 +205,48 @@ export function ImportHistory({ records, loading, onRefresh }: ImportHistoryProp
               </div>
             </div>
 
-            {/* Expanded detail */}
+            {/* Expanded detail — only fields not already in the main row */}
             {isExpanded && (
-              <div className="border-t border-border bg-muted/20 px-4 py-4">
+              <div className="border-t border-border bg-muted/20 px-4 py-4 space-y-4">
                 {/* Progress bar */}
                 {rec.totalRows > 0 && (
-                  <div className="mb-4">
+                  <div>
                     <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
                       <span>Import success rate</span>
-                      <span className="font-medium">{successRate}%</span>
+                      <span className="font-medium tabular-nums text-foreground">{successRate}%</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                       <div
-                        className="h-full rounded-full bg-secondary transition-all"
+                        className="h-full rounded-full bg-emerald-500/70 transition-all"
                         style={{ width: `${successRate}%` }}
                       />
                     </div>
                   </div>
                 )}
 
-                {/* Detail grid */}
-                <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                  <DetailItem label="File" value={rec.fileName} />
+                {/* Timestamp + duration grid */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <DetailItem label="Started" value={formatDate(rec.createdAt)} />
-                  <DetailItem label="Completed" value={rec.completedAt ? formatDate(rec.completedAt) : '—'} />
                   <DetailItem
-                    label="Batch"
-                    value={rec.batchName ?? 'None'}
-                    href={rec.batchId ? `/leads?batch=${rec.batchId}` : undefined}
+                    label="Completed"
+                    value={rec.completedAt ? formatDate(rec.completedAt) : '—'}
+                  />
+                  <DetailItem
+                    label="Duration"
+                    value={rec.completedAt ? formatDuration(rec.createdAt, rec.completedAt) : '—'}
                   />
                 </div>
 
-                {/* Actions */}
-                <div className="mt-4 flex gap-2">
-                  {rec.batchId && (
-                    <Button size="sm" variant="outline" asChild>
+                {/* Single primary action — everything else lives in the main row icons */}
+                {rec.batchId && (
+                  <div>
+                    <Button size="sm" variant="outline" asChild className="gap-1.5">
                       <Link href={`/leads?batch=${rec.batchId}`}>
-                        View leads <ExternalLink className="h-3 w-3" />
+                        View leads in this batch <ExternalLink className="h-3 w-3" />
                       </Link>
                     </Button>
-                  )}
-                  {rec.hasErrors && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => downloadErrorReport(rec.id)}
-                    >
-                      <Download className="h-3 w-3" />
-                      Error report
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-destructive hover:text-destructive"
-                    disabled={deletingId === rec.id}
-                    onClick={() => handleDeleteImport(rec.id, rec.fileName, onRefresh, setDeletingId)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    Delete
-                  </Button>
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
