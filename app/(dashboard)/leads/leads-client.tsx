@@ -828,8 +828,18 @@ export function LeadsClient({
             canEditBatch={isAdmin}
             onClose={() => setSelectedLeadId(null)}
             onLeadChange={(patch) => {
-              if (patch.status)          handleStatusChange(selectedLeadId, patch.status, 'panel')
-              if (patch.interest_status) handleInterestChange(selectedLeadId, patch.interest_status)
+              // The side panel already PATCHed the API — only sync the local
+              // list row here. Calling handleStatusChange / handleInterestChange
+              // would fire a second PATCH and, on a race, the parent's catch
+              // block would roll back the list to "new" even though the DB
+              // was correctly updated.
+              setLeads((prev) =>
+                prev.map((l) =>
+                  l.id === selectedLeadId
+                    ? { ...l, ...patch, updated_at: new Date().toISOString() }
+                    : l
+                )
+              )
             }}
           />
         </>
