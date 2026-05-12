@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useLayoutEffect, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Bell, BellOff, CheckCheck, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -8,23 +9,53 @@ import { useNotifications } from './notification-context'
 import { NotificationItem } from './notification-item'
 
 interface Props {
-  open:     boolean
-  onClose:  () => void
+  open:       boolean
+  /** Bell wrapper — panel position is computed from its bounding rect. */
+  anchorRef:  RefObject<HTMLElement | null>
+  onClose:    () => void
 }
 
-export function NotificationPanel({ open, onClose }: Props) {
+export function NotificationPanel({ open, anchorRef, onClose }: Props) {
   const { notifications, unreadCount, isLoading, markRead, markAllRead, dismiss } = useNotifications()
   const panelRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // Portals must render after mount (no SSR document.body).
+  useEffect(() => { setMounted(true) }, [])
+
+  // Position the panel below + aligned-right with the bell.
+  useLayoutEffect(() => {
+    if (!open || !anchorRef.current) return
+    const update = () => {
+      if (!anchorRef.current) return
+      const r = anchorRef.current.getBoundingClientRect()
+      setPos({
+        top:   r.bottom + 8,                          // 8 px gap below the bell
+        right: window.innerWidth - r.right,           // distance from viewport's right edge
+      })
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)   // capture phase — catches scroll on inner containers
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [open, anchorRef])
 
   // Close on outside click
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose()
+      const target = e.target as Node
+      if (panelRef.current?.contains(target)) return
+      if (anchorRef.current?.contains(target)) return  // clicking the bell toggles, don't double-handle
+      onClose()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [open, onClose])
+  }, [open, onClose, anchorRef])
 
   // Close on Escape
   useEffect(() => {
@@ -34,16 +65,19 @@ export function NotificationPanel({ open, onClose }: Props) {
     return () => document.removeEventListener('keydown', handler)
   }, [open, onClose])
 
-  if (!open) return null
+  if (!open || !mounted || !pos) return null
 
   const unread = notifications.filter(n => !n.is_read)
   const read   = notifications.filter(n => n.is_read)
 
-  return (
+  // Render via portal at document.body level — escapes the sticky
+  // header's z-20 stacking context so the panel renders above side
+  // panels (z-50), modals, etc.
+  return createPortal(
     <div
       ref={panelRef}
+      style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 100 }}
       className={cn(
-        'absolute right-0 top-full mt-2 z-50',
         'w-[380px] max-w-[calc(100vw-2rem)]',
         'rounded-xl border bg-popover shadow-card',
         'flex flex-col overflow-hidden',
@@ -136,13 +170,14 @@ export function NotificationPanel({ open, onClose }: Props) {
       {/* Footer */}
       <div className="border-t px-4 py-2.5">
         <Link
-          href="/notifications"
+          href="/settings/notifications"
           onClick={onClose}
           className="block text-center text-xs text-primary hover:underline font-medium"
         >
           View all notifications →
         </Link>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

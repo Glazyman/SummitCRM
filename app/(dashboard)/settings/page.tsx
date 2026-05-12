@@ -26,8 +26,8 @@ const ALL_SECTIONS = [
     href:        '/settings/notifications',
     icon:        Bell,
     title:       'Notifications',
-    description: 'Configure your notification preferences.',
-    adminOnly:   true,
+    description: 'See all notifications sent to you and tune which ones you receive.',
+    adminOnly:   false,
   },
   {
     href:        '/settings/ai-usage',

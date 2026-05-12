@@ -58,7 +58,11 @@ export function NotificationBell() {
         )}
       </button>
 
-      <NotificationPanel open={open} onClose={() => setOpen(false)} />
+      <NotificationPanel
+        open={open}
+        anchorRef={bellRef}
+        onClose={() => setOpen(false)}
+      />
     </div>
   )
 }
