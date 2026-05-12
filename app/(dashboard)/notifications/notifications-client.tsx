@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { useNotifications } from '@/components/notifications/notification-context'
 import { NotificationItem } from '@/components/notifications/notification-item'
 import type { NotificationType } from '@/components/notifications/types'
-import { NOTIFICATION_META } from '@/components/notifications/types'
+import { NOTIFICATION_META, ACTIVE_NOTIFICATION_TYPES } from '@/components/notifications/types'
 
 // Only types the product actually emits. Older types (replies, bounces,
 // campaigns, AI, quota) belonged to the email era and are no longer sent.
@@ -147,14 +147,15 @@ export function NotificationsClient() {
         </div>
       )}
 
-      {/* Notification type legend */}
+      {/* Notification type legend — only the types we actually send */}
       <div className="rounded-xl border p-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
           Notification types
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {(Object.entries(NOTIFICATION_META) as [NotificationType, typeof NOTIFICATION_META[NotificationType]][]).map(
-            ([type, meta]) => (
+          {ACTIVE_NOTIFICATION_TYPES.map((type) => {
+            const meta = NOTIFICATION_META[type]
+            return (
               <div key={type} className="flex items-center gap-2">
                 <span className={cn(
                   'w-6 h-6 rounded-md flex items-center justify-center text-xs flex-shrink-0',
@@ -165,16 +166,13 @@ export function NotificationsClient() {
                 <span className="text-xs text-muted-foreground truncate">{meta.label}</span>
               </div>
             )
-          )}
+          })}
         </div>
       </div>
 
-      {/* Preferences link */}
-      <p className="text-center text-sm text-muted-foreground">
-        Manage what you are notified about in{' '}
-        <a href="/settings/notifications" className="text-primary hover:underline">
-          Notification preferences
-        </a>
+      {/* Preferences live right below this list on the settings page. */}
+      <p className="text-center text-xs text-muted-foreground">
+        Scroll down for notification preferences.
       </p>
     </div>
   )
