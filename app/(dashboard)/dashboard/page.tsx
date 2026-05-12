@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent } from '@/components/ui/card'
 import { OverdueFollowUpsWidget } from '@/components/notifications/overdue-followups-widget'
@@ -16,7 +17,8 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch role for contextual dashboard content
+  // Fetch role for contextual dashboard content. Cheap query — needed
+  // to decide which widgets to render, so kept in the page shell.
   const { data: member } = await supabase
     .from('workspace_members')
     .select('role, workspace_id')
@@ -25,11 +27,6 @@ export default async function DashboardPage() {
     .single() as { data: { role: WorkspaceRole; workspace_id: string } | null; error: unknown }
 
   const role = member?.role
-  const metrics = member && user
-    ? await getDashboardMetrics(supabase, member.workspace_id, user.id, member.role)
-    : emptyDashboardMetrics()
-  const totalLeadsDescription =
-    role === 'rep' || false ? 'assigned to you' : 'in workspace'
 
   return (
     <div className="space-y-5">
@@ -38,83 +35,127 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-semibold tracking-[-0.02em]">Dashboard</h1>
       </div>
 
-      {/* Stats grid */}
-      {role === 'rep' ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Total Leads"
-            value={formatNumber(metrics.totalLeads)}
-            description="assigned to you"
-            icon={Users}
-            color="blue"
-            href="/leads"
+      {/* Stats grid — streamed. Skeleton appears instantly with the
+          page shell; real numbers stream in once getDashboardMetrics
+          resolves (the slow part). */}
+      <Suspense fallback={<StatsRowSkeleton />}>
+        {member && user ? (
+          <DashboardStats
+            workspaceId={member.workspace_id}
+            userId={user.id}
+            role={member.role}
           />
-          <StatCard
-            title="New Leads"
-            value={formatNumber(metrics.newLeads)}
-            description="not yet contacted"
-            icon={Users}
-            color="green"
-            href="/leads?status=new"
-          />
-          <StatCard
-            title="Follow-ups Due"
-            value={formatNumber(metrics.followUpsDue)}
-            description="pending today"
-            icon={Bell}
-            color="amber"
-          />
-          <StatCard
-            title="Leads Called Today"
-            value={`${formatNumber(metrics.callsToday)} / ${formatNumber(metrics.dailyCallTarget)}`}
-            description="unique leads vs. target"
-            icon={PhoneCall}
-            color="purple"
-          />
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Total Leads"
-            value={formatNumber(metrics.totalLeads)}
-            description={totalLeadsDescription}
-            icon={Users}
-            color="blue"
-          />
-          <StatCard
-            title="Interested"
-            value={formatNumber(metrics.interestedLeads)}
-            description="expressed interest"
-            icon={TrendingUp}
-            color="green"
-          />
-          <StatCard
-            title="Calls Logged"
-            value={formatNumber(metrics.callsLogged)}
-            description="this week"
-            icon={PhoneCall}
-            color="purple"
-          />
-          <StatCard
-            title="Follow-ups Due"
-            value={formatNumber(metrics.followUpsDue)}
-            description="pending today"
-            icon={Bell}
-            color="amber"
-          />
-        </div>
-      )}
+        ) : (
+          <StatsRowSkeleton />
+        )}
+      </Suspense>
 
-      {/* Rep: my activity breakdown */}
+      {/* Already client components — fetch their own data after mount. */}
       {role === 'rep' && <MyActivityPanel />}
       {role === 'rep' && <CallsTodayCard />}
-
-      {/* Admin: rep performance table */}
       {(role === 'admin' || role === 'super_admin') && <RepPerformancePanel />}
 
-      {/* Overdue follow-ups widget */}
       <OverdueFollowUpsWidget />
       {role === 'rep' && <QuickLogCallWidget />}
+    </div>
+  )
+}
+
+/** Async server component — runs the slow metrics query in isolation. */
+async function DashboardStats({
+  workspaceId, userId, role,
+}: {
+  workspaceId: string; userId: string; role: WorkspaceRole
+}) {
+  const supabase = await createClient()
+  const metrics  = await getDashboardMetrics(supabase, workspaceId, userId, role)
+  const totalLeadsDescription = role === 'rep' ? 'assigned to you' : 'in workspace'
+
+  if (role === 'rep') {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Leads"
+          value={formatNumber(metrics.totalLeads)}
+          description="assigned to you"
+          icon={Users}
+          color="blue"
+          href="/leads"
+        />
+        <StatCard
+          title="New Leads"
+          value={formatNumber(metrics.newLeads)}
+          description="not yet contacted"
+          icon={Users}
+          color="green"
+          href="/leads?status=new"
+        />
+        <StatCard
+          title="Follow-ups Due"
+          value={formatNumber(metrics.followUpsDue)}
+          description="pending today"
+          icon={Bell}
+          color="amber"
+        />
+        <StatCard
+          title="Leads Called Today"
+          value={`${formatNumber(metrics.callsToday)} / ${formatNumber(metrics.dailyCallTarget)}`}
+          description="unique leads vs. target"
+          icon={PhoneCall}
+          color="purple"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <StatCard
+        title="Total Leads"
+        value={formatNumber(metrics.totalLeads)}
+        description={totalLeadsDescription}
+        icon={Users}
+        color="blue"
+      />
+      <StatCard
+        title="Interested"
+        value={formatNumber(metrics.interestedLeads)}
+        description="expressed interest"
+        icon={TrendingUp}
+        color="green"
+      />
+      <StatCard
+        title="Calls Logged"
+        value={formatNumber(metrics.callsLogged)}
+        description="this week"
+        icon={PhoneCall}
+        color="purple"
+      />
+      <StatCard
+        title="Follow-ups Due"
+        value={formatNumber(metrics.followUpsDue)}
+        description="pending today"
+        icon={Bell}
+        color="amber"
+      />
+    </div>
+  )
+}
+
+/** Skeleton used by the Suspense fallback for the stats row. */
+function StatsRowSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-pulse">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="rounded-2xl border border-border bg-card shadow-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-20 rounded bg-muted" />
+            <div className="h-7 w-7 rounded-lg bg-muted" />
+          </div>
+          <div className="h-8 w-24 rounded bg-muted" />
+          <div className="h-3 w-28 rounded bg-muted/70" />
+        </div>
+      ))}
     </div>
   )
 }
