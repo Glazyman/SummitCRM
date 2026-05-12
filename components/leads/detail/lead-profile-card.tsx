@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } from '@/components/leads/status-config'
 import { US_STATES } from '@/lib/us-states'
+import { CopyableContact } from './copyable-contact'
 import type { LeadDetail, TeamMember, LeadStatus, InterestStatus } from './types'
 
 interface LeadProfileCardProps {
@@ -291,19 +292,25 @@ export function LeadProfileCard({
           ) : (
             <div className="space-y-1">
               {lead.email && (
-                <a href={`mailto:${lead.email}`} className="block font-mono text-xs text-primary hover:underline break-all">
-                  {lead.email}
-                </a>
+                <CopyableContact
+                  value={lead.email}
+                  href={`mailto:${lead.email}`}
+                  className="font-mono text-xs text-primary hover:underline"
+                />
               )}
               {lead.custom_fields?.email_2 && (
-                <a href={`mailto:${lead.custom_fields.email_2}`} className="block font-mono text-xs text-primary/70 hover:underline break-all">
-                  {lead.custom_fields.email_2}
-                </a>
+                <CopyableContact
+                  value={lead.custom_fields.email_2}
+                  href={`mailto:${lead.custom_fields.email_2}`}
+                  className="font-mono text-xs text-primary/70 hover:underline"
+                />
               )}
               {lead.custom_fields?.email_3 && (
-                <a href={`mailto:${lead.custom_fields.email_3}`} className="block font-mono text-xs text-primary/70 hover:underline break-all">
-                  {lead.custom_fields.email_3}
-                </a>
+                <CopyableContact
+                  value={lead.custom_fields.email_3}
+                  href={`mailto:${lead.custom_fields.email_3}`}
+                  className="font-mono text-xs text-primary/70 hover:underline"
+                />
               )}
             </div>
           )}
@@ -326,30 +333,40 @@ export function LeadProfileCard({
           ) : (
             <div className="space-y-1">
               {lead.phone && (
-                <a href={`tel:${lead.phone}`} className="block text-sm hover:underline">
-                  {lead.phone}
-                </a>
+                <CopyableContact
+                  value={lead.phone}
+                  href={`tel:${lead.phone}`}
+                  className="text-sm hover:underline"
+                />
               )}
               {lead.custom_fields?.phone_2 && (
-                <a href={`tel:${lead.custom_fields.phone_2}`} className="block text-sm text-muted-foreground hover:underline">
-                  {lead.custom_fields.phone_2}
-                </a>
+                <CopyableContact
+                  value={lead.custom_fields.phone_2}
+                  href={`tel:${lead.custom_fields.phone_2}`}
+                  className="text-sm text-muted-foreground hover:underline"
+                />
               )}
               {lead.custom_fields?.phone_3 && (
-                <a href={`tel:${lead.custom_fields.phone_3}`} className="block text-sm text-muted-foreground hover:underline">
-                  {lead.custom_fields.phone_3}
-                </a>
+                <CopyableContact
+                  value={lead.custom_fields.phone_3}
+                  href={`tel:${lead.custom_fields.phone_3}`}
+                  className="text-sm text-muted-foreground hover:underline"
+                />
               )}
               {lead.custom_fields?.company_phone && (
                 <div>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-1">Company</p>
-                  <a href={`tel:${lead.custom_fields.company_phone}`} className="block text-sm text-muted-foreground hover:underline">
-                    {lead.custom_fields.company_phone}
-                  </a>
+                  <CopyableContact
+                    value={lead.custom_fields.company_phone}
+                    href={`tel:${lead.custom_fields.company_phone}`}
+                    className="text-sm text-muted-foreground hover:underline"
+                  />
                   {lead.custom_fields?.company_phone_2 && (
-                    <a href={`tel:${lead.custom_fields.company_phone_2}`} className="block text-sm text-muted-foreground hover:underline">
-                      {lead.custom_fields.company_phone_2}
-                    </a>
+                    <CopyableContact
+                      value={lead.custom_fields.company_phone_2}
+                      href={`tel:${lead.custom_fields.company_phone_2}`}
+                      className="text-sm text-muted-foreground hover:underline"
+                    />
                   )}
                 </div>
               )}
