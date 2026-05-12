@@ -65,9 +65,9 @@ export default async function DashboardPage() {
             color="amber"
           />
           <StatCard
-            title="Calls Today"
+            title="Leads Called Today"
             value={`${formatNumber(metrics.callsToday)} / ${formatNumber(metrics.dailyCallTarget)}`}
-            description="daily call target"
+            description="unique leads vs. target"
             icon={PhoneCall}
             color="purple"
           />
@@ -237,13 +237,17 @@ async function getDashboardMetrics(
   } catch {}
 
   try {
-    const { count } = await supabase
-      .from('call_logs')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .eq('logged_by', userId)
-      .gte('called_at', startOfToday.toISOString())
-    callsToday = count ?? 0
+    // "Calls today" tracks UNIQUE leads reached — a rep can dial the same
+    // lead multiple times in a day and that shouldn't double-count against
+    // the target.
+    const { data } = await (supabase as unknown as {
+      rpc: (n: string, a: Record<string, unknown>) => Promise<{ data: number | null }>
+    }).rpc('get_unique_leads_called', {
+      p_workspace_id: workspaceId,
+      p_user_id:      userId,
+      p_since:        startOfToday.toISOString(),
+    })
+    callsToday = Number(data ?? 0)
   } catch {}
 
   const workspaceDefault = Number((workspaceResult.data as { settings?: Record<string, unknown> } | null)?.settings?.daily_call_target)
