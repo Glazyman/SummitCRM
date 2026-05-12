@@ -38,7 +38,8 @@ interface LeadsClientProps {
   role?:         string
 }
 
-const PER_PAGE_OPTIONS = [25, 50, 100] as const
+// 0 is the sentinel for "All" — slower, opt-in.
+const PER_PAGE_OPTIONS = [25, 50, 100, 0] as const
 
 function tomorrowAt11LocalIso() {
   const d = new Date()
@@ -175,7 +176,8 @@ export function LeadsClient({
   const totalCount = serverTotalCount
   const perPage    = serverPerPage
   const pageLeads  = leads
-  const totalPages = Math.max(1, Math.ceil(totalCount / perPage))
+  // perPage === 0 means "All" — single page contains everything.
+  const totalPages = perPage === 0 ? 1 : Math.max(1, Math.ceil(totalCount / perPage))
   const statusCounts: StatusCount[] = serverStatusCounts
 
   // Visual selection for the checkbox column. In Select-All-Matching mode
@@ -208,7 +210,7 @@ export function LeadsClient({
     if (filters.sortBy !== 'created_at') params.set('sort', filters.sortBy)
     if (filters.sortDir !== 'desc')      params.set('dir',  filters.sortDir)
     if (filters.page > 1)            params.set('page',     String(filters.page))
-    if (filters.perPage !== 50)      params.set('per',      String(filters.perPage))
+    if (filters.perPage !== 50)      params.set('per',      filters.perPage === 0 ? 'all' : String(filters.perPage))
 
     const qs    = params.toString()
     const next  = `${pathname}${qs ? `?${qs}` : ''}`
@@ -708,6 +710,7 @@ export function LeadsClient({
                     key={n}
                     type="button"
                     onClick={() => updateFilters({ perPage: n, page: 1 })}
+                    title={n === 0 ? 'Loads every lead in one go — slower' : undefined}
                     className={cn(
                       'px-2.5 py-1 text-xs font-medium transition-colors',
                       (filters.perPage === n)
@@ -715,7 +718,7 @@ export function LeadsClient({
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                   >
-                    {n}
+                    {n === 0 ? 'All' : n}
                   </button>
                 ))}
               </div>

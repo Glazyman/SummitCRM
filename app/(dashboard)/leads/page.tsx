@@ -10,8 +10,10 @@ import type { InterestStatus } from '@/types/database'
 export const metadata: Metadata = { title: 'Leads' }
 export const dynamic = 'force-dynamic'
 
-const ALLOWED_PER_PAGE = [25, 50, 100] as const
+// 0 is the sentinel for "All" (server-side this maps to a large cap).
+const ALLOWED_PER_PAGE = [25, 50, 100, 0] as const
 const DEFAULT_PER_PAGE = 50
+const ALL_PAGE_HARD_CAP = 50_000
 
 function parseIntInRange(raw: string | undefined, defaultValue: number, min = 1, max = 1_000_000) {
   const n = parseInt(raw ?? '', 10)
@@ -20,6 +22,7 @@ function parseIntInRange(raw: string | undefined, defaultValue: number, min = 1,
 }
 
 function parsePerPage(raw: string | undefined): number {
+  if (raw === 'all') return 0
   const n = parseInt(raw ?? '', 10)
   return (ALLOWED_PER_PAGE as readonly number[]).includes(n) ? n : DEFAULT_PER_PAGE
 }
@@ -93,8 +96,10 @@ export default async function LeadsPage({ searchParams }: PageProps) {
           p_date_to:             sParam('to')   || null,
           p_sort_by:             sParam('sort') ?? 'created_at',
           p_sort_dir:            sParam('dir')  ?? 'desc',
-          p_limit:               perPage,
-          p_offset:              (page - 1) * perPage,
+          // perPage === 0 means "All". Use the hard cap so a runaway
+          // workspace can't blow up the response, and skip offset.
+          p_limit:               perPage === 0 ? ALL_PAGE_HARD_CAP : perPage,
+          p_offset:              perPage === 0 ? 0 : (page - 1) * perPage,
         }),
         supabase
           .from('lead_batches')
