@@ -70,7 +70,7 @@ Geography:
   Arizona
 
 Website:
-  acmehvac.com
+  https://acmehvac.com
 
 Years in Operation:
   13 years
@@ -123,7 +123,7 @@ Format requirements (match the example exactly):
 Section order — include only the sections with data, in this order:
   Revenue · Gross Profit (or EBITDA — use whichever metric the intake provides; label it accurately) · Team · Market Mix · Service Mix · Job Profile · Project History · Geography · Website · Years in Operation · Ownership · Facilities & Assets
 
-If a Website is provided in the LEAD PROFILE, render it as a Website section with the bare domain on a single indented bullet (strip the http(s):// prefix and any trailing slash). Do not invent a website if none is supplied.
+If a Website is provided in the LEAD PROFILE, render it as a Website section with the FULL URL on a single indented bullet — always include the https:// prefix (add it if the intake value doesn't have one) so mail clients auto-linkify it on paste. Strip any trailing slash. Do not invent a website if none is supplied.
 
 Within sections:
 - If you only have one number, put it on a single bullet line. Do not invent year-over-year splits.

@@ -66,9 +66,13 @@ function answerBullets(raw: string): string[] {
     .filter(Boolean)
 }
 
-/** Bare domain for snapshot display — strips http(s):// and any trailing slash. */
-function bareDomain(url: string | null | undefined): string {
-  return clean(url ?? '').replace(/^https?:\/\//i, '').replace(/\/+$/, '')
+/** Normalized website for the snapshot: ensures an https:// prefix so mail
+ *  clients (Outlook, Gmail) auto-linkify on paste. Strips trailing slash. */
+function normalizeWebsite(url: string | null | undefined): string {
+  const trimmed = clean(url ?? '').replace(/\/+$/, '')
+  if (!trimmed) return ''
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return `https://${trimmed}`
 }
 
 // ── Snapshot builder ──────────────────────────────────────────────────────
@@ -173,7 +177,7 @@ export function buildSnapshot({ lead, answers, questions }: SnapshotInput): stri
     snapshotSection('Job Profile',      jobProfileBits),
     snapshotSection('Project History',  projectBullets),
     snapshotSection('Geography',        [serviceArea]),
-    snapshotSection('Website',          [bareDomain(lead.website)]),
+    snapshotSection('Website',          [normalizeWebsite(lead.website)]),
     snapshotSection('Years in Operation', [years]),
     snapshotSection('Ownership',        ownershipBits),
     snapshotSection('Additional Notes', additional),
