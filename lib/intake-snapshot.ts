@@ -66,6 +66,11 @@ function answerBullets(raw: string): string[] {
     .filter(Boolean)
 }
 
+/** Bare domain for snapshot display — strips http(s):// and any trailing slash. */
+function bareDomain(url: string | null | undefined): string {
+  return clean(url ?? '').replace(/^https?:\/\//i, '').replace(/\/+$/, '')
+}
+
 // ── Snapshot builder ──────────────────────────────────────────────────────
 /**
  * Deterministic fallback in the SAME visual format the AI prompt asks for.
@@ -168,6 +173,7 @@ export function buildSnapshot({ lead, answers, questions }: SnapshotInput): stri
     snapshotSection('Job Profile',      jobProfileBits),
     snapshotSection('Project History',  projectBullets),
     snapshotSection('Geography',        [serviceArea]),
+    snapshotSection('Website',          [bareDomain(lead.website)]),
     snapshotSection('Years in Operation', [years]),
     snapshotSection('Ownership',        ownershipBits),
     snapshotSection('Additional Notes', additional),
