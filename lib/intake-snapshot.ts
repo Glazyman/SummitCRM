@@ -31,11 +31,10 @@ export interface SnapshotInput {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────
-const DIVIDER = '──────────────────────────────────'
 
-// Field IDs that the Questionnaire knows about by default — used to decide
-// which question goes into the structured Summit-Deals layout vs the
-// catch-all "Additional Notes" block.
+// Field IDs the Questionnaire knows about by default — used to decide
+// which question goes into the structured layout vs the "Additional Notes"
+// block at the end.
 const KNOWN_IDS = new Set([
   'employees', 'union', 'years_in_business', 'service_area',
   'residential_pct', 'commercial_pct',
@@ -50,151 +49,137 @@ function clean(v: string | undefined | null): string {
   return (v ?? '').trim()
 }
 
-function pad(label: string, width: number): string {
-  return label.length >= width ? label + ' ' : label + ' '.repeat(width - label.length)
-}
-
-function row(label: string, value: string, width = 22): string | null {
-  if (!clean(value)) return null
-  return `  ${pad(label + ':', width)}${clean(value)}`
-}
-
-function section(title: string, rows: Array<string | null>): string | null {
-  const filled = rows.filter((r): r is string => Boolean(r))
+/** A "Section: \n  bullet\n  bullet" block, omitted entirely if no bullets. */
+function snapshotSection(label: string, bullets: Array<string | null | undefined>): string | null {
+  const filled = bullets
+    .map((b) => clean(b ?? ''))
+    .filter(Boolean)
   if (filled.length === 0) return null
-  return [title, ...filled].join('\n')
+  return `${label}:\n${filled.map((b) => `  ${b}`).join('\n')}`
 }
 
-function bulletsFromLines(raw: string): string | null {
-  const lines = raw.split('\n').map((l) => l.replace(/^[\s•\-\*]+/, '').trim()).filter(Boolean)
-  if (lines.length === 0) return null
-  return lines.map((l) => `  - ${l}`).join('\n')
-}
-
-function indentBlock(raw: string): string | null {
-  const cleaned = clean(raw)
-  if (!cleaned) return null
-  return cleaned.split('\n').map((l) => `  ${l.trim()}`).filter((l) => l.trim()).join('\n')
-}
-
-function textBlock(title: string, raw: string): string | null {
-  const body = bulletsFromLines(raw) ?? indentBlock(raw)
-  if (!body) return null
-  return `${title}\n${body}`
-}
-
-function stripScheme(url: string): string {
-  return url.replace(/^https?:\/\//i, '').replace(/\/+$/, '')
+/** Split a free-form textarea answer into bullets. Strips bullet glyphs. */
+function answerBullets(raw: string): string[] {
+  return clean(raw)
+    .split('\n')
+    .map((l) => l.replace(/^[\s•\-\*]+/, '').trim())
+    .filter(Boolean)
 }
 
 // ── Snapshot builder ──────────────────────────────────────────────────────
+/**
+ * Deterministic fallback in the SAME visual format the AI prompt asks for.
+ * The shape mirrors lib/ai/prompts.ts STYLE_EXAMPLE — a deal-teaser email
+ * with "Hi,", a short pitch line, a 2-3 sentence narrative, then a
+ * "Company Snapshot" block with Title Case section labels and indented
+ * bullets (two spaces, no dash glyph).
+ */
 export function buildSnapshot({ lead, answers, questions }: SnapshotInput): string {
   const get = (id: string) => clean(answers[id])
 
-  // Header --------------------------------------------------------------
-  const companyName = clean(lead.company) || '(Company name)'
-  const mainService = get('main_service')
+  const company     = clean(lead.company)
+  const mainService = get('main_service').split('\n')[0]
   const serviceArea = get('service_area')
-  const website     = clean(lead.website)
-
-  const header: string[] = [companyName.toUpperCase()]
-  if (mainService) header.push(mainService.split('\n')[0])
-  const locWeb = [serviceArea, website ? stripScheme(website) : '']
-    .filter(Boolean)
-    .join(' | ')
-  if (locWeb) header.push(locWeb)
-
-  // Financial overview --------------------------------------------------
-  const financial = section('FINANCIAL OVERVIEW', [
-    row('Revenue',      get('revenue')),
-    row('EBITDA',       get('ebitda')),
-    row('Average Job',  get('avg_job_size')),
-  ])
-
-  // Operations ----------------------------------------------------------
-  const employees = get('employees')
-  const union     = get('union').toLowerCase()
-  const unionTag  = union === 'yes' ? 'Union' : union === 'no' ? 'Non-Union' : ''
-  const employeesLine = employees
-    ? unionTag ? `${employees} (${unionTag})` : employees
-    : ''
-
+  const years       = get('years_in_business')
   const residential = get('residential_pct')
   const commercial  = get('commercial_pct')
-  const marketFocus = [
-    residential ? `${residential} Residential` : '',
-    commercial  ? `${commercial} Commercial`   : '',
-  ].filter(Boolean).join(' / ')
 
-  const operations = section('OPERATIONS', [
-    row('Employees',         employeesLine),
-    row('Service Area',      serviceArea),
-    row('Years in Business', get('years_in_business')),
-    row('Market Focus',      marketFocus),
-  ])
+  // ── Opener + narrative ──────────────────────────────────────────────
+  // Summit Mergers is an HVAC-focused advisory, so the fallback assumes
+  // HVAC. The admin can adjust before sending if the lead is a different
+  // trade. (The AI version reads main_service and adjusts on its own.)
+  const pitch = 'We have an HVAC opportunity that may be a fit for your platform.'
 
-  // Service mix ---------------------------------------------------------
-  const serviceMix = section('SERVICE MIX', [
-    row('Install',                get('install_pct')),
-    row('Retrofit',               get('retrofit_pct')),
-    row('Service & Maintenance',  get('service_maint_pct')),
-  ])
+  const narrativeBits: string[] = []
+  const descriptor = company ? `${company} is` : 'Business is'
+  const geoPart    = serviceArea ? ` based in ${serviceArea}` : ''
+  let leadSentence = `${descriptor} a well-established HVAC contractor${geoPart}`
+  if (years) leadSentence += ` with ${years} of operating history`
+  leadSentence += '.'
+  narrativeBits.push(leadSentence)
+  if (mainService) narrativeBits.push(`Primary offering: ${mainService}.`)
 
-  // Free-text narrative blocks -----------------------------------------
-  const serviceBreakdown = textBlock('SERVICE BREAKDOWN', get('service_breakdown'))
-  const largestProject   = textBlock('LARGEST PROJECT',   get('largest_project'))
+  if (residential || commercial) {
+    const mixLabel = residential && commercial
+      ? `${residential} residential and ${commercial} commercial`
+      : residential
+        ? `predominantly residential (~${residential})`
+        : `predominantly commercial (~${commercial})`
+    narrativeBits.push(`Revenue mix is ${mixLabel}.`)
+  }
+  const narrative = narrativeBits.join(' ')
 
-  const keyEmployees     = get('key_employees')
-  const ownerPlans       = get('owner_plans')
-  const ownershipRows: Array<string | null> = []
-  if (keyEmployees) ownershipRows.push(`  Key Employees: ${keyEmployees.replace(/\n+/g, ' / ')}`)
-  if (ownerPlans)   ownershipRows.push(`  Owner Plans:   ${ownerPlans.replace(/\n+/g, ' / ')}`)
-  const ownership = ownershipRows.length
-    ? ['OWNERSHIP & TRANSITION', ...ownershipRows].join('\n')
-    : null
+  // ── Snapshot sections (only render if data is present) ──────────────
+  const revenue = get('revenue')
+  const ebitda  = get('ebitda')
+  const employees = get('employees')
+  const union     = get('union').toLowerCase()
+  const teamBits: string[] = []
+  if (employees) teamBits.push(`${employees} employees`)
+  if (union === 'yes')      teamBits.push('Union')
+  else if (union === 'no')  teamBits.push('Non-union')
 
-  // Custom / additional questions --------------------------------------
+  const marketBits: string[] = []
+  if (residential && commercial) {
+    marketBits.push(`${residential} residential / ${commercial} commercial`)
+  } else if (residential) {
+    marketBits.push(`Predominantly residential (~${residential})`)
+  } else if (commercial) {
+    marketBits.push(`Predominantly commercial (~${commercial})`)
+  }
+
+  const serviceMixBits: string[] = []
+  const install = get('install_pct')
+  const retro   = get('retrofit_pct')
+  const maint   = get('service_maint_pct')
+  if (install) serviceMixBits.push(`${install} installation`)
+  if (retro)   serviceMixBits.push(`${retro} retrofit`)
+  if (maint)   serviceMixBits.push(`${maint} service & maintenance`)
+  // Free-form service breakdown — supplemental, one bullet per line.
+  for (const b of answerBullets(get('service_breakdown'))) serviceMixBits.push(b)
+
+  const jobProfileBits: string[] = []
+  if (get('avg_job_size')) jobProfileBits.push(`Average job size: ${get('avg_job_size')}`)
+
+  const projectBullets = answerBullets(get('largest_project'))
+
+  const ownershipBits: string[] = []
+  for (const b of answerBullets(get('key_employees'))) ownershipBits.push(b)
+  for (const b of answerBullets(get('owner_plans')))   ownershipBits.push(b)
+
+  // Custom/extra questions land at the end as Additional Notes.
   const additional = questions
     .filter((q) => q.custom || !KNOWN_IDS.has(q.id))
     .map((q) => {
       const v = get(q.id)
       if (!v) return null
       return q.type === 'textarea'
-        ? `  ${q.label}:\n${indentBlock(v) ?? ''}`
-        : `  ${q.label}: ${v}`
+        ? `${q.label}: ${v.replace(/\n+/g, ' / ')}`
+        : `${q.label}: ${v}`
     })
     .filter((r): r is string => Boolean(r))
-  const additionalBlock = additional.length
-    ? ['ADDITIONAL NOTES', ...additional].join('\n')
-    : null
 
-  // Contact -------------------------------------------------------------
-  const contactLines = [
-    [lead.first_name, lead.last_name].filter(Boolean).join(' ').trim(),
-    clean(lead.phone),
-    clean(lead.email),
-  ].filter(Boolean)
-  const contact = contactLines.length
-    ? `CONTACT\n${contactLines.map((l) => `  ${l}`).join('\n')}`
-    : null
+  const sections: Array<string | null> = [
+    snapshotSection('Revenue',          [revenue]),
+    snapshotSection('EBITDA',           [ebitda]),
+    snapshotSection('Team',             teamBits),
+    snapshotSection('Market Mix',       marketBits),
+    snapshotSection('Service Mix',      serviceMixBits),
+    snapshotSection('Job Profile',      jobProfileBits),
+    snapshotSection('Project History',  projectBullets),
+    snapshotSection('Geography',        [serviceArea]),
+    snapshotSection('Years in Operation', [years]),
+    snapshotSection('Ownership',        ownershipBits),
+    snapshotSection('Additional Notes', additional),
+  ]
+  const snapshotBlock = sections.filter((s): s is string => Boolean(s)).join('\n\n')
 
-  // Assemble ------------------------------------------------------------
-  const middle = [financial, operations, serviceMix]
-    .filter((s): s is string => Boolean(s))
-    .join('\n\n')
+  // ── Assemble ────────────────────────────────────────────────────────
+  const parts: string[] = ['Hi,', '', pitch, '', narrative, '', 'Company Snapshot']
+  if (snapshotBlock) parts.push('', snapshotBlock)
+  parts.push('', 'Please let me know if this is of interest and I would be happy to coordinate a direct conversation with the owners.')
 
-  const narrative = [serviceBreakdown, largestProject, ownership, additionalBlock]
-    .filter((s): s is string => Boolean(s))
-    .join('\n\n')
-
-  const parts: string[] = []
-  parts.push(header.join('\n'))
-  parts.push(DIVIDER)
-  if (middle)    { parts.push(middle);    parts.push(DIVIDER) }
-  if (narrative) { parts.push(narrative); parts.push(DIVIDER) }
-  if (contact) parts.push(contact)
-
-  return parts.join('\n\n') + '\n'
+  return parts.join('\n')
 }
 
 // ── Visual bold for plain-text email ──────────────────────────────────────
