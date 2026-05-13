@@ -1,6 +1,6 @@
-# Session handoff — 2026-05-12 (afternoon → evening)
+# Session handoff — 2026-05-12 → 2026-05-13
 
-Picks up from `docs/HANDOFF-2026-05-12.md`. Covers ~30 commits across three big themes: the 6 open items from §14 of the prior handoff (all shipped), a UX/side-panel pass, and a perf+notifications cleanup. 14 production DB migrations applied via Supabase MCP (project `nmcyxulluascofmsgkxr`).
+Picks up from `docs/HANDOFF-2026-05-12.md`. Covers ~35 commits across four themes: the 6 open items from §14 of the prior handoff (all shipped), a UX/side-panel pass, a perf+notifications cleanup, and a final email/snapshot polish round. 14 production DB migrations applied via Supabase MCP (project `nmcyxulluascofmsgkxr`).
 
 - Project: **SummitCRM** at `/Users/glazy/.dev-houston/workspaces/Glazy/Summit/SummitCRM/`
 - Branch: `main`, all commits pushed to `origin/main` (`Glazyman/SummitCRM`)
@@ -27,6 +27,8 @@ Picks up from `docs/HANDOFF-2026-05-12.md`. Covers ~30 commits across three big 
 16. [Notifications system overhaul (portal z-index, realtime, unified bell, settings page)](#16-notifications-overhaul)
 17. [Quirks worth remembering](#17-quirks-worth-remembering)
 18. [Open items / future work](#18-open-items--future-work)
+19. [Email snapshot polish (Outlook switch, fallback rewrite, copy button, AI fallback badge)](#19-email-snapshot-polish)
+20. [Notes: multi-assign + intake-form Save anchored at bottom](#20-notes-multi-assign--intake-save)
 
 ---
 
@@ -483,3 +485,106 @@ Several times this session the Claude Code auto-mode classifier rejected `apply_
 13. `20260512000014_notifications_realtime.sql`
 
 13 migrations / 30 commits / 0 production migrations applied without explicit user authorization.
+
+---
+
+## 19. Email snapshot polish
+
+Five small commits that ended a thread starting from "the snapshot output looks wrong":
+
+### 19a. `058b744` — Switch Gmail → Outlook
+
+`buildGmailComposeUrl` → `buildOutlookComposeUrl`. Generated URL now points at `https://outlook.office.com/mail/deeplink/compose?subject=…&body=…`. Personal `outlook.com` accounts are auto-redirected by Microsoft. The Unicode-bold trick (mathematical sans-serif bold glyphs for `Revenue:`, `Company Snapshot`, etc.) still renders bold in Outlook so no visual regression.
+
+UI text flipped in `components/leads/detail/questionnaire.tsx`:
+- Button label `"Open Gmail draft"` → `"Open Outlook draft"`
+- Tooltip on the AI-generate button updated
+- Tooltip on the ready anchor updated
+
+### 19b. `714842d` — Rewrite the fallback template to match the AI's "Company Snapshot" format
+
+User saw two side-by-side outputs: one in ugly ALL-CAPS sections with box-drawing dividers (`FINANCIAL OVERVIEW / OPERATIONS / SERVICE MIX`), one in clean `Company Snapshot / Revenue: / Team:` sentence-case bullets. The first was the deterministic fallback in `lib/intake-snapshot.ts buildSnapshot()`. The second was the AI output. Same input, two formats — happened whenever the AI call failed for any reason.
+
+Rewrote `buildSnapshot()` to mirror the AI prompt's `STYLE_EXAMPLE`:
+
+- `"Hi,"` opener
+- `"We have an HVAC opportunity that may be a fit for your platform."` pitch
+- 1–2 sentence narrative (company name, geography, years, primary offering)
+- `"Company Snapshot"` heading
+- Title Case section labels with colons (Revenue, EBITDA, Team, Market Mix, Service Mix, Job Profile, Project History, Geography, Years in Operation, Ownership, Additional Notes)
+- Indented bullets (two spaces, no dash glyph)
+- Polite sign-off line
+
+Sections with no data are skipped entirely.
+
+### 19c. `fc84cd4` — Copy snapshot button (the `fc84cd4` commit also covers the multi-assign work; see §20)
+
+`prepareSnapshotEmail` now returns `{ url, body, subject }` instead of just `url`. After "Email Snapshot" finishes loading, two buttons render side by side:
+
+- Emerald **Open Outlook draft** anchor (existing)
+- Neutral **Copy snapshot** button — copies the styled body to clipboard, flips to "Copied" (emerald) for 1.8 s, falls back to `window.prompt()` if the clipboard API is blocked.
+
+Editing any intake field clears both URL and body so the user has to regenerate (otherwise a stale snapshot could ship with new data).
+
+### 19d. `a9c573a` — Save button anchored at the bottom (always)
+
+Earlier we'd moved Save out of the header to a row above "Add custom question". When the user expanded "Add question" the Save block ended up sandwiched in the middle of the form. Swapped so the order is: form fields → Add question → Save. Save is now always the very last block in the questionnaire body.
+
+### 19e. `32473f2` — Surface fallback-to-template state
+
+`ai_usage_logs` had only 2 rows at this point in the session, both from 2026-05-11. Snapshots generated 2026-05-12+ left no rows because `/api/ai/snapshot-email` was returning 503 in production (env vars not set) and the client was silently falling back to the offline template. From the user's perspective the snapshot button "worked" — they just kept seeing the older ugly format, and the `/settings/ai-usage` page stayed empty.
+
+Change makes the failure visible:
+
+- `prepareSnapshotEmail` return shape gained `source: 'ai' | 'template'` and `error: string | null`.
+- The questionnaire now shows an amber **"Template (AI down)"** badge next to the action buttons whenever the fallback ran, with the server's error message in the hover and in the inline error text. The hint reads: *"AI unavailable: <err>. Used offline template (not logged to /settings/ai-usage)."*
+
+**Action required to actually fix `/settings/ai-usage`:** set the two env vars in the production deployment (Vercel dashboard or wherever the app runs):
+
+```
+OPENAI_API_KEY=sk-...
+NEXT_PUBLIC_FEATURE_AI=true
+```
+
+Redeploy. Generate a snapshot. The amber badge should disappear and a fresh row should land in `ai_usage_logs` (~$0.01 per snapshot at gpt-4o pricing).
+
+---
+
+## 20. Notes multi-assign + intake Save
+
+`fc84cd4` bundled the multi-assign rewrite with the snapshot copy/save changes.
+
+### 20a. Multi-select recipient dropdown
+
+NoteEditor's "Assign to" went from a native `<select>` (single-select) to a `DropdownMenu` styled to match the other side-panel dropdowns (status pill / interest pill):
+
+- Outline pill button with chevron, popover content with checkable items
+- `e.preventDefault()` on item click → menu stays open while toggling multiple recipients
+- Trigger label adapts: `"Assign to…"` (none) → `"Daniel Glazy"` (one) → `"3 people"` (many)
+- Added "Clear selection" item when at least one recipient is picked
+
+### 20b. Server fan-out
+
+`POST /api/leads/:id/notes` schema widened: `assigned_to: string | string[] | null`. The route:
+
+1. Normalises to a deduped array.
+2. Validates every recipient (same role rules — reps → admins only; admins → other admins or the rep currently assigned to this lead).
+3. Inserts the note **once**, with the **first** recipient stored in `notes.assigned_to` for back-compat with the single-column schema.
+4. Fans out one `mention` notification per non-self recipient. Self-assignment is allowed but the notification insert skips that ID.
+
+`onSave` signature on the editor widened from `(content, string | null)` to `(content, string[])`. Both callers (`lead-full-panel`, `lead-detail-client`) updated.
+
+No DB migration was needed — the fan-out lives entirely in notification rows.
+
+---
+
+## What's still open after this session
+
+Mostly unchanged from §18, plus two new flags:
+
+- **AI env vars** — production needs `OPENAI_API_KEY` + `NEXT_PUBLIC_FEATURE_AI=true`. Without these the snapshot feature falls back to the template every time and `/settings/ai-usage` shows nothing. The amber badge in the UI is the user-visible indicator that this is happening.
+- **Multi-recipient denorm** — currently the note row only stores the *primary* (first) recipient in `notes.assigned_to`. If we later want to display "this note is assigned to A, B, C" on the lead, we'd need a `note_assignees(note_id, user_id)` join table. Today the multi-assign feature is notification-only.
+
+---
+
+**Updated migration tally:** still 13 migrations / now ~35 commits / 0 production migrations applied without explicit user authorization.
