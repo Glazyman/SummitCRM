@@ -19,7 +19,7 @@ interface Props {
 
 export function NotificationItem({ notification: n, onRead, onDismiss, onNavigate, compact }: Props) {
   const router = useRouter()
-  const meta   = NOTIFICATION_META[n.type] ?? NOTIFICATION_META.system
+  const meta   = NOTIFICATION_META[n.type]
 
   const timeAgo = (() => {
     try { return formatDistanceToNowStrict(new Date(n.created_at), { addSuffix: true }) }
