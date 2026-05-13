@@ -42,7 +42,6 @@ export async function GET() {
   const preferences = ALL_TYPES.map(type => saved.get(type) ?? {
     type,
     in_app: true,
-    email_digest: true,
   })
 
   return NextResponse.json({ preferences })
@@ -59,9 +58,8 @@ export async function PATCH(req: NextRequest) {
   // Validate body
   const prefUpdateSchema = z.array(
     z.object({
-      type:         z.string().min(1).max(60),
-      in_app:       z.boolean().optional(),
-      email_digest: z.boolean().optional(),
+      type:   z.string().min(1).max(60),
+      in_app: z.boolean().optional(),
     })
   )
 
@@ -83,8 +81,7 @@ export async function PATCH(req: NextRequest) {
           user_id:      user.id,
           workspace_id: workspaceId,
           type:         update.type,
-          ...(update.in_app      !== undefined && { in_app: update.in_app }),
-          ...(update.email_digest !== undefined && { email_digest: update.email_digest }),
+          ...(update.in_app !== undefined && { in_app: update.in_app }),
         },
         { onConflict: 'user_id,workspace_id,type' }
       )

@@ -68,6 +68,9 @@ export interface ActivityEntry {
   note_id?:     string
   note_content?: string
   note_editable?: boolean  // only true if current user is author
+  /** For note entries — the user this note is assigned to (the @mention recipient). */
+  note_assigned_to?:      string | null
+  note_assigned_to_name?: string | null
 }
 
 // ── Note ─────────────────────────────────────────────────────────────────

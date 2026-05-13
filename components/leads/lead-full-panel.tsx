@@ -183,18 +183,21 @@ export function LeadFullPanel({
       throw new Error(json?.error ?? 'Failed to save note')
     }
     const note = json.note
+    const primaryAssignee = note.assigned_to ?? (assignedTo[0] ?? null)
     const entry: ActivityEntry = {
-      id:            `note-${note.id}`,
-      source:        'note',
-      type:          'note_added',
-      user_id:       note.author_id,
-      user_name:     teamMembers.find((m) => m.id === note.author_id)?.name ?? 'You',
-      user_initials: null,
-      created_at:    note.created_at,
-      metadata:      {},
-      note_id:       note.id,
-      note_content:  note.content,
-      note_editable: true,
+      id:                    `note-${note.id}`,
+      source:                'note',
+      type:                  'note_added',
+      user_id:               note.author_id,
+      user_name:             teamMembers.find((m) => m.id === note.author_id)?.name ?? 'You',
+      user_initials:         null,
+      created_at:            note.created_at,
+      metadata:              {},
+      note_id:               note.id,
+      note_content:          note.content,
+      note_editable:         true,
+      note_assigned_to:      primaryAssignee,
+      note_assigned_to_name: primaryAssignee ? (teamMembers.find((m) => m.id === primaryAssignee)?.name ?? null) : null,
     }
     setData((d) => d ? { ...d, activity: [entry, ...d.activity] } : d)
     setActiveTab('activity')

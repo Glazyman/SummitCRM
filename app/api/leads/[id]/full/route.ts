@@ -37,7 +37,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         .single(),
       supabase.from('lead_batches').select('id, name').eq('workspace_id', workspaceId),
       supabase.from('activity_logs').select('id, user_id, type, metadata, created_at').eq('lead_id', id).order('created_at', { ascending: false }),
-      supabase.from('notes').select('id, author_id, content, created_at, updated_at').eq('lead_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
+      supabase.from('notes').select('id, author_id, content, assigned_to, created_at, updated_at').eq('lead_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
       supabase.from('emails').select('id, subject, body_html, sent_by, status, sent_at, opened_at, clicked_at, replied_at, bounced_at, created_at').eq('lead_id', id).order('created_at', { ascending: false }),
       supabase.from('follow_ups').select('id, title, notes, due_at, completed_at, assigned_to').eq('lead_id', id).order('due_at', { ascending: true }),
       supabase.from('call_logs').select('id, outcome, duration_sec, notes, called_at, logged_by').eq('lead_id', id).order('called_at', { ascending: false }),
@@ -79,19 +79,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
         metadata:      e.metadata ?? {},
       }))
 
-    const noteEntries = ((notesRes.data ?? []) as Array<{ id: string; author_id: string; content: string; created_at: string }>)
+    const noteEntries = ((notesRes.data ?? []) as Array<{ id: string; author_id: string; content: string; assigned_to: string | null; created_at: string }>)
       .map((n) => ({
-        id:            `note-${n.id}`,
-        source:        'note' as const,
-        type:          'note_added' as const,
-        user_id:       n.author_id,
-        user_name:     usersById.get(n.author_id) ?? null,
-        user_initials: null,
-        created_at:    n.created_at,
-        metadata:      {},
-        note_id:       n.id,
-        note_content:  n.content,
-        note_editable: n.author_id === currentUserId || isAdmin,
+        id:                    `note-${n.id}`,
+        source:                'note' as const,
+        type:                  'note_added' as const,
+        user_id:               n.author_id,
+        user_name:             usersById.get(n.author_id) ?? null,
+        user_initials:         null,
+        created_at:            n.created_at,
+        metadata:              {},
+        note_id:               n.id,
+        note_content:          n.content,
+        note_editable:         n.author_id === currentUserId || isAdmin,
+        note_assigned_to:      n.assigned_to,
+        note_assigned_to_name: n.assigned_to ? (usersById.get(n.assigned_to) ?? null) : null,
       }))
 
     const activity = [...activityEntries, ...noteEntries].sort((a, b) =>

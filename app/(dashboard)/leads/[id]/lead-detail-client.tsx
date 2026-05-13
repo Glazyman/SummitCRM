@@ -195,25 +195,28 @@ export default function LeadDetailClient({
 
   // ── Note mutations ─────────────────────────────────────────────────────
   async function handleAddNote(content: string, assignedTo: string[]) {
-    const data = await requestJson<{ note: { id: string; author_id: string; content: string; created_at: string } }>(
+    const data = await requestJson<{ note: { id: string; author_id: string; content: string; assigned_to: string | null; created_at: string } }>(
       `/api/leads/${lead.id}/notes`,
       {
         method: 'POST',
         body: JSON.stringify({ content, assigned_to: assignedTo }),
       }
     )
+    const primaryAssignee = data.note.assigned_to ?? (assignedTo[0] ?? null)
     const newEntry: ActivityEntry = {
-      id:           `note-${data.note.id}`,
-      source:       'note',
-      type:         'note_added',
-      user_id:      data.note.author_id,
-      user_name:    teamMembers.find((m) => m.id === data.note.author_id)?.name ?? 'You',
-      user_initials:initials(teamMembers.find((m) => m.id === data.note.author_id)?.name ?? ''),
-      created_at:   data.note.created_at,
-      metadata:     {},
-      note_id:      data.note.id,
-      note_content: data.note.content,
-      note_editable:true,
+      id:                    `note-${data.note.id}`,
+      source:                'note',
+      type:                  'note_added',
+      user_id:               data.note.author_id,
+      user_name:             teamMembers.find((m) => m.id === data.note.author_id)?.name ?? 'You',
+      user_initials:         initials(teamMembers.find((m) => m.id === data.note.author_id)?.name ?? ''),
+      created_at:            data.note.created_at,
+      metadata:              {},
+      note_id:               data.note.id,
+      note_content:          data.note.content,
+      note_editable:         true,
+      note_assigned_to:      primaryAssignee,
+      note_assigned_to_name: primaryAssignee ? (teamMembers.find((m) => m.id === primaryAssignee)?.name ?? null) : null,
     }
     setActivity((prev) => [newEntry, ...prev])
     setActiveTab('activity')

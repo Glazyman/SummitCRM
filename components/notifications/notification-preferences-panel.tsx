@@ -13,7 +13,7 @@ const ALL_TYPES: NotificationType[] = ACTIVE_NOTIFICATION_TYPES
 function normPrefs(raw: NotificationPreference[]): NotificationPreference[] {
   return ALL_TYPES.map((type) => {
     const existing = raw.find((p) => p.type === type)
-    return existing ?? { type, in_app: true, email_digest: true }
+    return existing ?? { type, in_app: true }
   })
 }
 
@@ -70,7 +70,7 @@ export function NotificationPreferencesPanel() {
       })
   }, [])
 
-  const update = (type: NotificationType, field: 'in_app' | 'email_digest', value: boolean) => {
+  const update = (type: NotificationType, field: 'in_app', value: boolean) => {
     setPrefs((prev) =>
       prev.map((p) => (p.type === type ? { ...p, [field]: value } : p))
     )
@@ -142,7 +142,7 @@ export function NotificationPreferencesPanel() {
       <div className="rounded-lg border overflow-hidden">
         {ALL_TYPES.map((type, i) => {
           const meta = NOTIFICATION_META[type]
-          const pref = prefs.find((p) => p.type === type) ?? { type, in_app: true, email_digest: false }
+          const pref = prefs.find((p) => p.type === type) ?? { type, in_app: true }
           return (
             <div
               key={type}

@@ -154,6 +154,14 @@ function TimelineEntry({
         {entry.user_name && (
           <p className="mt-0.5 text-xs text-muted-foreground">
             by {entry.user_name}
+            {entry.source === 'note' && entry.note_assigned_to_name && (
+              <>
+                {' → '}
+                <span className="inline-flex items-center rounded bg-violet-50 dark:bg-violet-950/40 px-1.5 py-0.5 font-medium text-violet-700 dark:text-violet-300">
+                  @{entry.note_assigned_to_name}
+                </span>
+              </>
+            )}
           </p>
         )}
 

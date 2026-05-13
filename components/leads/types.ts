@@ -73,7 +73,7 @@ export const DEFAULT_FILTERS: LeadFilters = {
   coldOnly:   false,
   dateFrom:   '',
   dateTo:     '',
-  sortBy:     'created_at',
+  sortBy:     'last_activity_at',
   sortDir:    'desc',
   page:       1,
   perPage:    50,

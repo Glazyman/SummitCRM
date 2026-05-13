@@ -31,9 +31,8 @@ export interface Notification {
 }
 
 export interface NotificationPreference {
-  type:         NotificationType
-  in_app:       boolean
-  email_digest: boolean
+  type:   NotificationType
+  in_app: boolean
 }
 
 export interface NotificationMeta {

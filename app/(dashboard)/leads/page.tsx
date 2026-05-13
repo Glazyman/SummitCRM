@@ -94,7 +94,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
           p_cold_only:           sParam('cold') === '1',
           p_date_from:           sParam('from') || null,
           p_date_to:             sParam('to')   || null,
-          p_sort_by:             sParam('sort') ?? 'created_at',
+          p_sort_by:             sParam('sort') ?? 'last_activity_at',
           p_sort_dir:            sParam('dir')  ?? 'desc',
           // perPage === 0 means "All". Use the hard cap so a runaway
           // workspace can't blow up the response, and skip offset.

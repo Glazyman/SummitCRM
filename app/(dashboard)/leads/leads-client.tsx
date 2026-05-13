@@ -86,7 +86,7 @@ export function LeadsClient({
       coldOnly:   p.get('cold') === '1',
       dateFrom:   p.get('from')       ?? '',
       dateTo:     p.get('to')         ?? '',
-      sortBy:     (p.get('sort')      ?? 'created_at') as LeadFilters['sortBy'],
+      sortBy:     (p.get('sort')      ?? 'last_activity_at') as LeadFilters['sortBy'],
       sortDir:    (p.get('dir')       ?? 'desc') as 'asc' | 'desc',
       page:       serverPage,
       perPage:    serverPerPage,
@@ -211,7 +211,7 @@ export function LeadsClient({
     if (filters.coldOnly)            params.set('cold',     '1')
     if (filters.dateFrom)            params.set('from',     filters.dateFrom)
     if (filters.dateTo)              params.set('to',       filters.dateTo)
-    if (filters.sortBy !== 'created_at') params.set('sort', filters.sortBy)
+    if (filters.sortBy !== 'last_activity_at') params.set('sort', filters.sortBy)
     if (filters.sortDir !== 'desc')      params.set('dir',  filters.sortDir)
     if (filters.page > 1)            params.set('page',     String(filters.page))
     if (filters.perPage !== 50)      params.set('per',      filters.perPage === 0 ? 'all' : String(filters.perPage))
