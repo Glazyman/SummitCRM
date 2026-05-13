@@ -642,3 +642,126 @@ Mostly unchanged from §18, plus two new flags:
 ---
 
 **Updated migration tally:** still 13 migrations / now ~35 commits / 0 production migrations applied without explicit user authorization.
+
+---
+
+## 22. Session 2026-05-13 pm — open-items cleanup + architecture map
+
+Picked up after §21 with a request to walk through everything still flagged in §18. Closed 7 of the 9 items, plus a couple of session-specific asks. 3 new production migrations applied via Supabase MCP (this time with explicit per-step authorization).
+
+### 22a. Snapshot includes company website (`e5c0a59`, `38dff90`, `b80e87c`)
+
+User asked to surface the company website on the AI snapshot. Three small commits:
+
+1. **`e5c0a59`** — added a `Website:` section to the snapshot block (after `Geography`) in both the AI prompt's section order + `STYLE_EXAMPLE` and `lib/intake-snapshot.ts`'s fallback. Initial rendering: bare domain (no protocol).
+2. **`38dff90`** — flipped to `https://`-prefixed URL after user reported the link wasn't auto-linkifying in Outlook.
+3. **`b80e87c`** — reverted to bare domain after user reported it *still* wasn't clickable in Outlook even with the prefix. Live conclusion: Outlook's compose deeplink body doesn't auto-linkify pasted plain-text URLs reliably. A truly clickable link would need a rich-HTML clipboard write from the **Copy snapshot** button (separate change, not done this session — the Outlook deeplink body itself is plain-text-only and can't carry HTML).
+
+`normalizeWebsite()` helper from `38dff90` was reverted to the original `bareDomain()`.
+
+### 22b. Legacy notification types dropped (§18 #5 + #6) — `c57cd16`
+
+Migration `20260513000001_drop_legacy_notification_types.sql`. Applied via Supabase MCP. Before applying we verified prod state: 1 active `mention` row, 0 preference rows — clean cut. The swap-enum dance was required because Postgres has no `ALTER TYPE ... DROP VALUE`:
+
+1. `DELETE FROM notifications / notification_preferences WHERE type NOT IN (active types)`.
+2. `CREATE TYPE notification_type_new AS ENUM ('mention', 'follow_up_due', 'lead_assigned')`.
+3. `ALTER TABLE ... ALTER COLUMN type TYPE notification_type_new USING type::text::notification_type_new` on both tables.
+4. `DROP TYPE notification_type; ALTER TYPE notification_type_new RENAME TO notification_type`.
+
+`components/notifications/types.ts` was trimmed in the same commit: 9 values → 3 in the `NotificationType` union and `NOTIFICATION_META` map. `notification-item.tsx:22` dropped a `?? NOTIFICATION_META.system` fallback that was now dead code.
+
+**Bonus:** discovered `lib/notifications/create.ts` exports `createNotification` + `notifyAdmins` with **zero callers** anywhere in src. Logged as a candidate for deletion in §22h (the architecture map's roadmap badges).
+
+### 22c. FollowUpBell deleted (§18 #9) — `c57cd16`
+
+`components/notifications/followup-bell.tsx` (214 lines) was unimported since the unified bell shipped in `715f77b`. Deleted in the same commit as the notification cleanup above.
+
+### 22d. Default sort = last_activity_at on `/leads` (§18 #7) — `f8afc04`
+
+Four spots flipped: server default in `app/(dashboard)/leads/page.tsx:97`, client URL-parse default in `leads-client.tsx:89`, URL-serializer condition in `leads-client.tsx:214` (so the default doesn't show up in `?sort=` query params), and `DEFAULT_FILTERS.sortBy` in `components/leads/types.ts:76`. Most-recently-active leads now show first when landing on `/leads` with no sort selected.
+
+### 22e. @mention badge on notes — `f8afc04`
+
+User scope clarification: they explicitly did **not** want the multi-recipient denorm (§18 / `note_assignees` join table) — single primary recipient in `notes.assigned_to` is fine. But they wanted a visible `@Name` indicator on the displayed note so it's clear who it's directed at.
+
+Implementation:
+
+- `app/api/leads/[id]/full/route.ts:40` now selects `notes.assigned_to`, and the per-note entry mapper at line 82 resolves the name via the existing `usersById` map. New fields on the entry: `note_assigned_to` + `note_assigned_to_name`.
+- `components/leads/detail/types.ts` — added both optional fields to `ActivityEntry`.
+- `components/leads/detail/activity-timeline.tsx` — under the "by [author]" line, renders a small violet chip `→ @Name` when the note has an assignee. Only shown when present.
+- Optimistic add paths in `lead-full-panel.tsx:186` and `lead-detail-client.tsx:205` populate the assignee name from `teamMembers` so the `@mention` appears instantly without waiting for a refresh.
+
+### 22f. email_digest column dropped (§18 #8) — `f8afc04`
+
+Migration `20260513000002_drop_email_digest_column.sql` — single line: `ALTER TABLE notification_preferences DROP COLUMN email_digest`. Applied via Supabase MCP.
+
+Code cleanup in the same commit:
+
+- `components/notifications/types.ts` — removed `email_digest` from `NotificationPreference`.
+- `components/notifications/notification-preferences-panel.tsx` — three spots (default fallbacks + `update()` field type) trimmed.
+- `app/api/notifications/preferences/route.ts` — three spots: GET default response, PATCH zod schema, and upsert object. The whitelist `ALL_TYPES` was already trimmed last session.
+
+Settings UI is unchanged — the digest toggle was already removed from rendering in `6687204` last session; this just closes the loop on the schema.
+
+### 22g. `get_workspace_leads_json` RPC backfilled (§18 #4) — `a5c3bac`
+
+Pulled the current definition out of prod via `pg_get_functiondef`, saved as `supabase/migrations/20260513000003_declare_get_workspace_leads_json.sql`. Applied via Supabase MCP (no-op against the existing function due to `CREATE OR REPLACE`, but registers the migration in the database's history).
+
+Function returns 21 columns now, including `last_contacted_at`, `last_call_outcome`, and `last_activity_at` — these were added in 20260512000004 and 20260512000007 last session via direct edits without a corresponding migration. Smoke-tested by calling the function and confirming 3,008 leads returned.
+
+Grants: `EXECUTE` to `anon, authenticated, service_role`.
+
+### 22h. Architecture map — `architecture-map.html`
+
+User asked to build a one-shot interactive HTML architecture map (spec from `~/Downloads/architecture-map.md`). Produced `architecture-map.html` at repo root: 1,200 lines, 72KB, fully self-contained (no build, no external assets).
+
+**Layout:**
+- 6 column-clusters: Client (browser) · Server entry · API routes · Services / libs · Data (Postgres) · External services
+- 58 nodes, hand-positioned
+- ~80 edges, color-coded by kind (`critical` red · `api` orange · `db` amber · `mount` blue · `normal` grey)
+- Filter chips: Overview (default), Snapshot, Leads, Pipeline, Notes, Notifications, Analytics, Admin, Import, Dead code, Show all wires, Roadmap & bugs
+- Sidebar: hover or click any node → role, plain-English description, `path:line`, notes, incoming/outgoing edges, fixes
+
+**Critical path:** the AI snapshot flow, 10 numbered red edges from `questionnaire.tsx` → `intake-snapshot.ts` → `/api/ai/snapshot-email` → `ai-tasks.ts` → OpenAI → `ai-usage.ts` → `ai_usage_logs` table, with a parallel branch to the Outlook compose deeplink.
+
+**Roadmap badges (green circles, per node):** open fix counts on `leads-client` (CSV export streaming), `leads-list-route` (export endpoint), `rpc-leads-page` (dynamic-sort indexing risk), `notif-create-dead` (delete the dead file), and `rate-limit` (wire it to the AI route if usage scales).
+
+**Two bugs fixed during the build:**
+1. Initial render was a blank canvas — line 643 of the data block had a double-quoted string with unescaped double quotes (`"last contacted"` nested inside `"..."`). Parser aborted before any nodes/edges drew. Swapped to single quotes + curly apostrophe.
+2. Pan/zoom-only navigation was hard to use — restructured the layout so the canvas lives inside `#scroll-area` (overflow:auto) at the SVG's natural `1720×1480` size. Native scroll bars now work; Cmd/Ctrl+wheel zooms (cursor-anchored), plain wheel scrolls.
+
+**How to open:** double-click `/Users/glazy/Desktop/SummitCRM/architecture-map.html` or `python3 -m http.server 4747` and visit `http://localhost:4747/architecture-map.html`.
+
+### 22i. Discussion-only items (no code)
+
+- **AI env vars in prod.** Pre-session the amber "Template (AI down)" badge was firing in production despite the user's claim that both env vars were set in Vercel. User confirmed mid-session: after a redeploy the badge went away and `ai_usage_logs` started receiving rows again. Most likely the vars were added *after* the previous build → `NEXT_PUBLIC_FEATURE_AI` was baked into the old bundle as `undefined`. Resolved without code changes.
+- **Rate limiting + specific error messages.** User asked what these are and whether they need them. Walked through where rate limits would matter (AI snapshot endpoint cost protection, bulk upload, login — Supabase already does login). User opted not to enable any. `lib/security/rate-limit.ts` already exists with constants — wired into zero routes today. Reserved as future work.
+
+### 22j. Session tally — closed §18 items
+
+| §18 item | Status after this session |
+|---|---|
+| #1 AI env vars in prod | ✅ Self-resolved via redeploy (no code change) |
+| #2 CSV export all-matching | 📋 **Still open** — needs streaming endpoint |
+| #3 Multi-recipient note denorm | ✅ Scope dropped (user decided single recipient is fine); `@mention` display shipped instead |
+| #4 `get_workspace_leads_json` RPC drift | ✅ Backfilled (`a5c3bac`) |
+| #5 Legacy notification types | ✅ Dropped (`c57cd16`) |
+| #6 Inert notification_preferences rows | ✅ Dropped (`c57cd16`, same migration) |
+| #7 `last_activity_at` default sort | ✅ Shipped (`f8afc04`) |
+| #8 Drop `email_digest` column | ✅ Shipped (`f8afc04`) |
+| #9 Delete FollowUpBell | ✅ Shipped (`c57cd16`) |
+
+**Open carry-overs:** #2 only.
+
+### 22k. New items discovered
+
+- **`lib/notifications/create.ts` is dead code** — `createNotification` + `notifyAdmins` have zero callers in src. ~110 lines. Safe to delete the file outright. Flagged in the architecture map's roadmap badges.
+- **Outlook auto-linkify doesn't fire on plain-text URLs in the compose deeplink** — even with the `https://` prefix. If a clickable website link in the snapshot becomes important, we need a rich-HTML clipboard write on the **Copy snapshot** button (the Outlook deeplink body is plain-text-only and can't help).
+
+### 22l. Migrations applied this session (via Supabase MCP)
+
+1. `20260513000001_drop_legacy_notification_types.sql` — enum swap from 9 → 3 active types.
+2. `20260513000002_drop_email_digest_column.sql` — single `ALTER TABLE DROP COLUMN`.
+3. `20260513000003_declare_get_workspace_leads_json.sql` — `CREATE OR REPLACE` of the existing prod function (no-op against the live function, registers in migrations history).
+
+**Updated migration tally:** 16 migrations total / ~42 commits / 3 production migrations applied this session, each with explicit user authorization via Supabase MCP OAuth.

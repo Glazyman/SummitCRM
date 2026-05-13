@@ -1,0 +1,1198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SummitCRM — Architecture Map</title>
+<style>
+  :root {
+    --bg: #0F0F0F;
+    --panel: #161616;
+    --panel-2: #1c1c1c;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --muted: #8a8a8a;
+    --client: #4ea1ff;
+    --route: #7bd389;
+    --service: #c792ea;
+    --db: #ffb86b;
+    --external: #ff6b9d;
+    --critical: #ff3860;
+    --accent: #f5b942;
+    --accent-2: #ff7a45;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+  #app { display: grid; grid-template-columns: 1fr 400px; height: 100vh; }
+  #canvas-wrap { position: relative; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
+  #header {
+    flex-shrink: 0;
+    padding: 12px 16px; background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+  }
+  #scroll-area {
+    flex: 1; overflow: auto; position: relative;
+    background: var(--bg);
+  }
+  h1 { margin: 0 0 10px 0; font-size: 14px; font-weight: 600; letter-spacing: 0.2px; }
+  h1 .muted { color: var(--muted); font-weight: 400; margin-left: 8px; }
+  #chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+    padding: 4px 10px; border-radius: 999px; font-size: 11px; cursor: pointer;
+    transition: all .12s ease;
+    user-select: none;
+  }
+  .chip:hover { color: var(--text); border-color: #444; }
+  .chip.active { background: var(--accent); color: #1a1300; border-color: var(--accent); }
+  #controls {
+    position: absolute; bottom: 16px; left: 16px; z-index: 10;
+    display: flex; gap: 6px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 4px;
+  }
+  .btn {
+    background: transparent; color: var(--text);
+    border: none; padding: 5px 10px; cursor: pointer;
+    font: inherit; border-radius: 6px;
+  }
+  .btn:hover { background: var(--panel-2); }
+  #legend {
+    position: absolute; bottom: 16px; right: 16px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 11px; color: var(--muted);
+    display: flex; gap: 12px; align-items: center;
+  }
+  .legend-swatch {
+    display: inline-block; width: 16px; height: 3px; border-radius: 2px;
+    vertical-align: middle; margin-right: 4px;
+  }
+  svg#graph { display: block; background: var(--bg); }
+  svg#graph .cluster-rect { fill: rgba(255,255,255,0.015); stroke: var(--border); stroke-width: 1; rx: 12; }
+  svg#graph .cluster-label { fill: var(--muted); font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; }
+  svg#graph .node-rect { fill: var(--panel); stroke-width: 1.4; rx: 8; cursor: pointer; transition: filter .15s ease; }
+  svg#graph .node-rect:hover { filter: brightness(1.4); }
+  svg#graph .node-rect.dimmed { opacity: 0.2; }
+  svg#graph .node-rect.selected { stroke-width: 3; }
+  svg#graph .node-rect.critical { stroke-width: 2.2; }
+  svg#graph .node-label { fill: var(--text); font-size: 12px; font-weight: 500; pointer-events: none; }
+  svg#graph .node-sub { fill: var(--muted); font-size: 10px; pointer-events: none; }
+  svg#graph .node-sub.dead { fill: var(--critical); font-style: italic; }
+  svg#graph .edge { fill: none; stroke-width: 1.4; opacity: 0.55; transition: opacity .15s ease; }
+  svg#graph .edge.dimmed { opacity: 0.05; }
+  svg#graph .edge.highlight { opacity: 1; stroke-width: 2.2; }
+  svg#graph .edge.critical { stroke: var(--critical); stroke-width: 2.2; opacity: 0.9; }
+  svg#graph .edge.api { stroke: var(--accent-2); }
+  svg#graph .edge.db { stroke: var(--db); }
+  svg#graph .edge.mount { stroke: var(--client); }
+  svg#graph .edge.normal { stroke: #555; }
+  svg#graph .edge-label {
+    fill: var(--muted); font-size: 9.5px; pointer-events: none;
+    paint-order: stroke fill; stroke: var(--bg); stroke-width: 3; stroke-linejoin: round;
+  }
+  svg#graph .edge-label.dimmed { opacity: 0.15; }
+  svg#graph .badge-fix { fill: #2d8c5a; }
+  svg#graph .badge-bug { fill: var(--critical); }
+  svg#graph .badge-text { fill: white; font-size: 9.5px; font-weight: 600; pointer-events: none; }
+  #sidebar {
+    background: var(--panel); border-left: 1px solid var(--border);
+    overflow-y: auto; padding: 18px 18px 28px 18px;
+  }
+  #sidebar h2 { font-size: 14px; margin: 0 0 4px 0; font-weight: 600; }
+  #sidebar .path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); word-break: break-all; }
+  #sidebar .section-title { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin: 18px 0 6px 0; }
+  #sidebar p.role { color: var(--text); margin: 8px 0 4px 0; font-size: 12.5px; }
+  #sidebar p.plain { color: #c8c8c8; margin: 6px 0 0 0; font-size: 12.5px; line-height: 1.55; }
+  #sidebar ul { margin: 4px 0 0 0; padding-left: 18px; }
+  #sidebar li { font-size: 12px; margin: 3px 0; color: #d4d4d4; }
+  #sidebar .tag-row { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px; }
+  #sidebar .tag {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+    padding: 2px 8px; border-radius: 4px; font-size: 10px;
+  }
+  #sidebar .edge-line { font-size: 12px; margin: 3px 0; color: #d4d4d4; }
+  #sidebar .edge-line .arr { color: var(--muted); margin: 0 4px; }
+  #sidebar .edge-line .what { color: var(--accent); font-family: ui-monospace, monospace; font-size: 11px; }
+  #sidebar .fix { background: rgba(45, 140, 90, 0.12); border-left: 3px solid #2d8c5a; padding: 6px 8px; margin: 4px 0; font-size: 11.5px; border-radius: 4px; }
+  #sidebar .bug { background: rgba(255, 56, 96, 0.10); border-left: 3px solid var(--critical); padding: 6px 8px; margin: 4px 0; font-size: 11.5px; border-radius: 4px; }
+  #sidebar .bug .sev { font-weight: 600; text-transform: uppercase; font-size: 10px; margin-right: 6px; color: var(--critical); }
+  #sidebar .empty { color: var(--muted); font-size: 11.5px; font-style: italic; }
+  #findings { background: var(--panel-2); border-radius: 8px; padding: 12px; margin-top: 14px; border: 1px solid var(--border); }
+  #findings .section-title { margin-top: 0; }
+  #findings li { font-size: 12px; line-height: 1.55; margin: 6px 0; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="canvas-wrap">
+    <div id="header">
+      <h1>SummitCRM <span class="muted">— architecture map · 58 nodes · hover or click any node</span></h1>
+      <div id="chips"></div>
+    </div>
+    <div id="scroll-area">
+      <svg id="graph" width="1720" height="1480" viewBox="0 0 1720 1480" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g id="root"></g>
+      </svg>
+    </div>
+    <div id="controls">
+      <button class="btn" id="fit-btn">Fit</button>
+      <button class="btn" id="zoom-in">+</button>
+      <button class="btn" id="zoom-out">−</button>
+      <button class="btn" id="reset">Reset</button>
+    </div>
+    <div id="legend">
+      <span><span class="legend-swatch" style="background:var(--critical)"></span>critical</span>
+      <span><span class="legend-swatch" style="background:var(--accent-2)"></span>external</span>
+      <span><span class="legend-swatch" style="background:var(--db)"></span>db</span>
+      <span><span class="legend-swatch" style="background:var(--client)"></span>mount</span>
+      <span><span class="legend-swatch" style="background:#555"></span>normal</span>
+    </div>
+  </div>
+  <aside id="sidebar"></aside>
+</div>
+
+<script>
+// ── Cluster columns ─────────────────────────────────────────────────────────
+const clusters = [
+  { id: 'client',   label: 'Client (browser)',  color: 'client',  x: 20,   y: 50,  w: 260, h: 1400 },
+  { id: 'entry',    label: 'Server entry',      color: 'service', x: 300,  y: 50,  w: 200, h: 1400 },
+  { id: 'routes',   label: 'API routes',        color: 'route',   x: 520,  y: 50,  w: 260, h: 1400 },
+  { id: 'services', label: 'Services / libs',   color: 'service', x: 800,  y: 50,  w: 240, h: 1400 },
+  { id: 'data',     label: 'Data (Postgres)',   color: 'db',      x: 1060, y: 50,  w: 240, h: 1400 },
+  { id: 'external', label: 'External services', color: 'external',x: 1320, y: 50,  w: 200, h: 1400 },
+];
+
+// ── Node factory ────────────────────────────────────────────────────────────
+const N = (id, cluster, label, sub, x, y, w, h, color, opts = {}) => ({
+  id, cluster, label, sub, x, y, w, h, color, ...opts
+});
+
+// ── Nodes ───────────────────────────────────────────────────────────────────
+const nodes = [
+  // ── CLIENT ────────────────────────────────────────────────────────────────
+  N('root-layout', 'client', 'app/layout.tsx', 'root shell', 40, 90, 220, 60, 'client', {
+    role: 'Root Next.js layout: fonts, theme provider, global CSS.',
+    plain: "The outermost wrapper every page in the app sits inside. Loads the design fonts and the dark/light theme.",
+    path: 'app/layout.tsx',
+    notes: ['Wraps every route in app/', 'Loads global Tailwind styles', 'Theme is dark by default'],
+    tag: ['overview','all'],
+  }),
+  N('dashboard-layout', 'client', 'app/(dashboard)/layout.tsx', 'sidebar + header', 40, 170, 220, 60, 'client', {
+    role: 'Authenticated app shell: sidebar nav, header, notification bell, theme toggle.',
+    plain: 'The frame you see after logging in — the left nav and top bar. Wraps every screen inside the app.',
+    path: 'app/(dashboard)/layout.tsx',
+    notes: ['Mounts NotificationProvider → realtime channel', 'Renders <Sidebar /> + <Header />', 'Gates non-auth users'],
+    tag: ['overview','all'],
+  }),
+  N('leads-page', 'client', 'app/(dashboard)/leads/page.tsx', 'SSR /leads', 40, 250, 220, 60, 'client', {
+    role: 'Server component that reads URL filters, calls the page RPC, and hands rows to the client.',
+    plain: "The leads list screen. Reads what you filtered/sorted from the URL, asks the database for that exact page of leads, and gives them to the browser to draw.",
+    path: 'app/(dashboard)/leads/page.tsx:97',
+    notes: [
+      'line 97: default sort flipped to last_activity_at',
+      'Calls RPC get_workspace_leads_page',
+      'Returns 25/50/100/all per page',
+    ],
+    tag: ['overview','leads','all'],
+  }),
+  N('leads-client', 'client', 'app/(dashboard)/leads/leads-client.tsx', 'browser table', 40, 330, 220, 60, 'client', {
+    role: 'Client component: bulk select, filters, status pills, sortable table, URL-state push.',
+    plain: 'The interactive bits of the leads page — filters, bulk select, status buttons, the sortable columns.',
+    path: 'app/(dashboard)/leads/leads-client.tsx',
+    notes: [
+      'line 89: default sort = last_activity_at',
+      'Select-All-Matching sends filter spec, not IDs',
+      'router.push on filter change to re-fetch',
+    ],
+    tag: ['overview','leads','all'],
+  }),
+  N('lead-detail', 'client', 'leads/[id]/lead-detail-client.tsx', 'full lead page', 40, 410, 220, 60, 'client', {
+    role: 'Lead detail page client: profile, activity timeline, notes, calls, follow-ups.',
+    plain: 'The big detail view when you click into one lead. Shows everything about that lead in tabs.',
+    path: 'app/(dashboard)/leads/[id]/lead-detail-client.tsx',
+    notes: ['Activity timeline shows notes with @mention chips', 'Inline edit for status / interest / state', 'Hosts the questionnaire'],
+    tag: ['leads','notes','all'],
+  }),
+  N('lead-side-panel', 'client', 'lead-full-panel.tsx', 'side drawer', 40, 490, 220, 60, 'client', {
+    role: 'Slide-out side panel: lighter version of the full lead detail page.',
+    plain: 'The slide-out drawer that pops in from the right when you click a row on the leads list — same info as the full page, just floating.',
+    path: 'components/leads/lead-full-panel.tsx',
+    notes: ['z-index 50, portal-mounted', 'Fetches /api/leads/[id]/full', 'Shares NoteEditor + ActivityTimeline with detail page'],
+    tag: ['leads','notes','all'],
+  }),
+  N('questionnaire-ui', 'client', 'detail/questionnaire.tsx', 'intake form + snapshot trigger', 40, 570, 220, 70, 'client', {
+    role: 'Intake form for company details plus the "Email Snapshot" / "Open Outlook draft" / "Copy snapshot" buttons.',
+    plain: 'The intake form on each lead where you answer questions about the company. The button that builds the AI snapshot email lives here.',
+    path: 'components/leads/detail/questionnaire.tsx',
+    notes: [
+      'Click "Email Snapshot" → prepareSnapshotEmail (lib/intake-snapshot.ts)',
+      'Shows amber "Template (AI down)" badge when AI fallback fired',
+      'Save button anchored at the bottom of the form',
+    ],
+    tag: ['snapshot','overview','all'],
+    critical: true,
+  }),
+  N('pipeline-page', 'client', 'pipeline/page.tsx', 'kanban board', 40, 660, 220, 60, 'client', {
+    role: 'Kanban-style pipeline view: stages as columns, drag-drop to reassign.',
+    plain: 'Sales pipeline. Each column is a stage; you drag leads between columns.',
+    path: 'app/(dashboard)/pipeline/page.tsx',
+    notes: ['Top N per stage from RPC get_pipeline_leads_json', '"+ N more" button per overflowing stage', 'Debounced server search'],
+    tag: ['pipeline','all'],
+  }),
+  N('dashboard-page', 'client', 'dashboard/page.tsx', 'metrics + activity', 40, 740, 220, 60, 'client', {
+    role: 'Home dashboard: KPI cards, calls today, overdue follow-ups, rep performance.',
+    plain: 'The home screen with the big numbers — leads called today, conversions, calls vs target.',
+    path: 'app/(dashboard)/dashboard/page.tsx',
+    notes: ['8 metrics in one Promise.all', '<DashboardStats /> streams via Suspense', '"Leads Called Today" uses unique-lead RPC'],
+    tag: ['overview','all'],
+  }),
+  N('analytics-page', 'client', 'analytics/page.tsx', '4 charts', 40, 820, 220, 60, 'client', {
+    role: 'Analytics view: funnel, email metrics, time-series, rep performance.',
+    plain: 'The reports screen with charts: who is converting, calls over time, per-rep stats.',
+    path: 'app/(dashboard)/analytics/page.tsx',
+    notes: ['Pulls from 4 aggregate RPCs', 'Day / Week / Month period toggle', 'Date stepper for historical views'],
+    tag: ['analytics','all'],
+  }),
+  N('admin-page', 'client', 'admin/page.tsx', 'admin dashboard', 40, 900, 220, 60, 'client', {
+    role: 'Admin overview: team stats, rep performance, AI usage, account health.',
+    plain: 'Admin-only screen with team-wide stats and the AI cost log.',
+    path: 'app/(dashboard)/admin/page.tsx',
+    notes: ['Admin-gated (workspace_members.role check)', 'AI usage card shows MTD cost', 'Rep performance with Day/Week/Month nav'],
+    tag: ['admin','all'],
+  }),
+  N('notif-bell', 'client', 'notification-bell.tsx', 'unified bell', 40, 980, 220, 60, 'client', {
+    role: 'Header bell: activities at top (overdue / today / upcoming) + notifications below.',
+    plain: 'The bell icon in the top bar. Shows overdue follow-ups, today\'s due items, and notifications like "@you on a note".',
+    path: 'components/notifications/notification-bell.tsx',
+    notes: ['Portal-rendered (escapes sticky header z-index)', 'One bell for reps + admins', 'FollowUpBell was deleted in this session'],
+    tag: ['notifications','all'],
+  }),
+  N('notif-context', 'client', 'notification-context.tsx', 'realtime channel', 40, 1060, 220, 60, 'client', {
+    role: 'React context: subscribes to Supabase realtime INSERTs on the notifications table.',
+    plain: 'The piece that listens for new notifications and updates the bell instantly without needing a page refresh.',
+    path: 'components/notifications/notification-context.tsx',
+    notes: ['Channel filtered by user_id = auth.uid', 'Requires notifications table in supabase_realtime publication', 'Migration 20260512000014 enabled it'],
+    tag: ['notifications','all'],
+  }),
+  N('import-wizard', 'client', 'leads/import/page.tsx', 'CSV upload wizard', 40, 1140, 220, 60, 'client', {
+    role: 'Multi-step CSV import: upload → map columns → options → progress.',
+    plain: 'The bulk-import wizard for uploading a CSV of leads.',
+    path: 'app/(dashboard)/leads/import/page.tsx',
+    notes: ['Drag-drop upload zone', 'Column → field mapping', 'Shows per-row errors after import'],
+    tag: ['import','all'],
+  }),
+
+  // ── SERVER ENTRY ──────────────────────────────────────────────────────────
+  N('middleware', 'entry', 'middleware.ts', 'auth gate + headers', 320, 90, 160, 60, 'service', {
+    role: 'Next.js middleware: refresh Supabase session cookies, redirect unauth users, set security headers.',
+    plain: 'A bouncer that runs on every request before it reaches the page. Confirms you\'re logged in and renews your session.',
+    path: 'middleware.ts',
+    notes: ['Wraps every /(dashboard) request', 'Calls lib/supabase/middleware.updateSession', 'Adds CSP + frame-options headers'],
+    tag: ['overview','all'],
+  }),
+  N('supabase-server', 'entry', 'supabase/server.ts', 'createServerClient / Admin', 320, 170, 160, 60, 'service', {
+    role: 'Server-side Supabase factories: createServerClient (RLS) + createAdminClient (service role).',
+    plain: 'Two ways to talk to the database from the server: one that respects the logged-in user\'s permissions, and an admin one that can do anything.',
+    path: 'lib/supabase/server.ts',
+    notes: ['Used by every API route', 'Admin client bypasses RLS — handle with care', 'Reads SUPABASE_SERVICE_ROLE_KEY'],
+    tag: ['overview','all'],
+  }),
+  N('supabase-mw', 'entry', 'supabase/middleware.ts', 'session refresher', 320, 250, 160, 60, 'service', {
+    role: 'updateSession: refreshes auth cookies, returns next-response with cookies set.',
+    plain: 'Helper used by the bouncer above — refreshes the cookie that keeps you logged in.',
+    path: 'lib/supabase/middleware.ts',
+    notes: ['Reads + rewrites sb-* cookies', 'Returns NextResponse with cookie deltas'],
+    tag: ['overview','all'],
+  }),
+  N('supabase-client', 'entry', 'supabase/client.ts', 'browser client', 320, 330, 160, 60, 'service', {
+    role: 'Browser-side Supabase client (RLS-aware, used by realtime + a few client mutations).',
+    plain: 'The browser\'s connection to the database — used for live notifications and small updates from the page.',
+    path: 'lib/supabase/client.ts',
+    notes: ['Public anon key only', 'Used by notification-context realtime channel'],
+    tag: ['overview','all'],
+  }),
+
+  // ── ROUTES ────────────────────────────────────────────────────────────────
+  N('snapshot-route', 'routes', 'POST /api/ai/snapshot-email', 'admin-only · AI gen', 540, 90, 220, 70, 'route', {
+    role: 'Auth + admin check, zod validate, call generateSnapshotEmail, await logUsage, return { subject, body }.',
+    plain: 'The server endpoint that builds the AI version of the company snapshot when you click "Email Snapshot".',
+    path: 'app/api/ai/snapshot-email/route.ts',
+    notes: [
+      'line 37: isAiEnabled() gate → 503 if envs missing',
+      'line 57: admin role required',
+      'line 66: generateSnapshotEmail → gpt-4o',
+      'line 70: await logUsage (~50ms cost)',
+    ],
+    tag: ['snapshot','overview','all'],
+    critical: true,
+  }),
+  N('leads-list-route', 'routes', '/api/leads', 'GET list · POST create', 540, 180, 220, 60, 'route', {
+    role: 'List + create leads. Server-paginated via get_workspace_leads_page.',
+    plain: 'The endpoint that fetches a page of leads, or creates a new one when you fill out the "new lead" form.',
+    path: 'app/api/leads/route.ts',
+    notes: ['Uses same RPC as the leads page', 'POST inserts + writes lead_created activity', 'Workspace-scoped via member lookup'],
+    tag: ['leads','all'],
+  }),
+  N('lead-id-route', 'routes', '/api/leads/[id]', 'GET / PATCH / DELETE', 540, 260, 220, 60, 'route', {
+    role: 'Single-lead CRUD. PATCH triggers status sync + activity log.',
+    plain: 'The endpoint for one specific lead — used when you edit status, assign a rep, or delete a lead.',
+    path: 'app/api/leads/[id]/route.ts',
+    notes: ['BEFORE-UPDATE trigger may auto-log calls', 'contact_state / company_state merged into custom_fields', 'Soft-deletes via deleted_at'],
+    tag: ['leads','all'],
+  }),
+  N('lead-full-route', 'routes', '/api/leads/[id]/full', 'aggregated detail', 540, 340, 220, 60, 'route', {
+    role: 'Fetch lead + activities + notes + emails + follow-ups + calls + team in one parallel call.',
+    plain: 'The endpoint that loads EVERYTHING about a single lead in one go, used by the side panel and the detail page.',
+    path: 'app/api/leads/[id]/full/route.ts',
+    notes: [
+      'Returns 8 parallel result sets',
+      'Notes now include assigned_to → @mention name',
+      'Activities sorted newest-first',
+    ],
+    tag: ['leads','notes','all'],
+  }),
+  N('lead-notes-route', 'routes', '/api/leads/[id]/notes', 'POST · multi-assign', 540, 420, 220, 60, 'route', {
+    role: 'Insert a note + fan out one mention notification per recipient. Role rules enforced.',
+    plain: 'The endpoint for adding a note. If you @assign teammates, this is what sends them the bell notification.',
+    path: 'app/api/leads/[id]/notes/route.ts',
+    notes: [
+      'Reps can only ping admins · admins can ping other admins + the assigned rep',
+      'assigned_to accepts string | string[]',
+      'Stores primary recipient in notes.assigned_to',
+    ],
+    tag: ['notes','all'],
+  }),
+  N('lead-calls-route', 'routes', '/api/leads/[id]/calls', 'POST log · sync status', 540, 500, 220, 60, 'route', {
+    role: 'Insert a call_log + write activity + map outcome → lead status (called / voicemail / etc).',
+    plain: 'The endpoint that records a phone call you logged. Also bumps the lead\'s status based on the outcome.',
+    path: 'app/api/leads/[id]/calls/route.ts',
+    notes: ['OUTCOME_TO_STATUS map mirrors the inverse', 'metadata.auto_from_call: true', 'Triggers last_contacted_at denorm'],
+    tag: ['leads','all'],
+  }),
+  N('lead-q-route', 'routes', '/api/leads/[id]/questionnaire', 'GET / POST answers', 540, 580, 220, 60, 'route', {
+    role: 'Read + write the intake form answers (custom_fields jsonb on leads).',
+    plain: 'Saves your answers to the company intake questions on a lead.',
+    path: 'app/api/leads/[id]/questionnaire/route.ts',
+    notes: ['Answers stored in leads.custom_fields jsonb', 'Custom questions go through unchanged'],
+    tag: ['snapshot','all'],
+  }),
+  N('bulk-route', 'routes', '/api/leads/bulk', 'PATCH / DELETE many', 540, 660, 220, 60, 'route', {
+    role: 'Bulk update or delete — accepts { ids: [] } or { scope: "all_matching", filter: {} }.',
+    plain: 'The endpoint used when you select many leads at once and reassign or delete them in one click.',
+    path: 'app/api/leads/bulk/route.ts',
+    notes: ['"Select All Matching" sends filter spec, not IDs', 'Activity log inserts chunked at 200 rows', 'RPC bulk_update / bulk_delete on backend'],
+    tag: ['leads','all'],
+  }),
+  N('pipeline-search-route', 'routes', '/api/pipeline/search', 'debounced search', 540, 740, 220, 60, 'route', {
+    role: 'Server-side pipeline search (q param). Excludes terminal statuses.',
+    plain: 'The search box on the pipeline screen — looks across all stages.',
+    path: 'app/api/pipeline/search/route.ts',
+    notes: ['Returns same shape as the trimmed RPC', '300ms debounce on client'],
+    tag: ['pipeline','all'],
+  }),
+  N('analytics-funnel-route', 'routes', '/api/analytics/funnel', 'lead → conversion', 540, 820, 220, 60, 'route', {
+    role: 'Lead funnel counts. Admin branch uses get_batch_analytics; rep branch uses leads_status_counts_for_rep.',
+    plain: 'Powers the funnel chart on the analytics page — new → contacted → interested → converted.',
+    path: 'app/api/analytics/funnel/route.ts',
+    notes: ['Rep-scoped via SECURITY DEFINER RPC', 'Admin sees workspace-wide'],
+    tag: ['analytics','all'],
+  }),
+  N('analytics-ts-route', 'routes', '/api/analytics/time-series', 'volume over time', 540, 900, 220, 60, 'route', {
+    role: 'Daily/weekly/monthly time-series via get_time_series_analytics (gap-filled).',
+    plain: 'Powers the line chart on the analytics page.',
+    path: 'app/api/analytics/time-series/route.ts',
+    notes: ['generate_series() gap-fills empty buckets', 'Replaces a band-aid .range(0, 99999)'],
+    tag: ['analytics','all'],
+  }),
+  N('admin-overview-route', 'routes', '/api/admin/overview', 'admin KPIs', 540, 980, 220, 60, 'route', {
+    role: 'Workspace-wide KPIs: leads, calls, conversions, AI usage MTD.',
+    plain: 'Server endpoint that feeds the admin dashboard\'s big-number cards.',
+    path: 'app/api/admin/overview/route.ts',
+    notes: ['MTD AI cost via ai_usage_logs query (cached column drift fixed last session)'],
+    tag: ['admin','all'],
+  }),
+  N('notif-list-route', 'routes', '/api/notifications', 'GET history · PATCH', 540, 1060, 220, 60, 'route', {
+    role: 'List notifications, mark read, dismiss.',
+    plain: 'Reads the user\'s notification list. The realtime channel pushes new ones to the bell directly.',
+    path: 'app/api/notifications/route.ts',
+    notes: ['Filtered by user_id = auth.uid', 'Pagination by created_at'],
+    tag: ['notifications','all'],
+  }),
+  N('notif-prefs-route', 'routes', '/api/notifications/preferences', 'GET · PATCH per-type', 540, 1140, 220, 60, 'route', {
+    role: 'Read + upsert per-type in_app preference. email_digest column dropped this session.',
+    plain: 'The "what kinds of notifications do I want?" toggles in settings.',
+    path: 'app/api/notifications/preferences/route.ts',
+    notes: ['Whitelist trimmed to 3 active types', 'email_digest removed (migration 20260513000002)'],
+    tag: ['notifications','all'],
+  }),
+  N('activities-due-route', 'routes', '/api/activities/due', 'overdue + today + upcoming', 540, 1220, 220, 60, 'route', {
+    role: 'Returns the bell-feed payload: { overdue, dueToday, upcoming, count }.',
+    plain: 'The endpoint the bell uses to show overdue and due-today follow-ups.',
+    path: 'app/api/activities/due/route.ts',
+    notes: ['upcoming = (today, today+7], capped at 50', 'Badge count = overdue + today'],
+    tag: ['notifications','all'],
+  }),
+  N('import-start-route', 'routes', '/api/leads/import/start', 'CSV import', 540, 1300, 220, 60, 'route', {
+    role: 'Validate + dedupe + insert a CSV batch of leads. Writes audit log.',
+    plain: 'The endpoint the import wizard calls after you finish mapping columns.',
+    path: 'app/api/leads/import/start/route.ts',
+    notes: ['Calls lib/import/* pipeline', 'Audit-log entry per import', 'Returns per-row errors'],
+    tag: ['import','all'],
+  }),
+
+  // ── SERVICES ──────────────────────────────────────────────────────────────
+  N('intake-snapshot', 'services', 'lib/intake-snapshot.ts', 'snapshot orchestrator', 820, 90, 200, 70, 'service', {
+    role: 'prepareSnapshotEmail: tries AI route, falls back to buildSnapshot (offline template), returns { url, body, subject, source, error }.',
+    plain: 'The brain behind the snapshot button. Tries the AI version first. If the AI is down, it makes a less-fancy version itself with no AI. Either way, it builds the Outlook draft link.',
+    path: 'lib/intake-snapshot.ts:268',
+    notes: [
+      'line 77: buildSnapshot (deterministic fallback)',
+      'line 230: buildOutlookComposeUrl',
+      'line 207: styleSnapshotBody (Unicode bold for headers)',
+    ],
+    tag: ['snapshot','overview','all'],
+    critical: true,
+  }),
+  N('ai-tasks', 'services', 'lib/ai/tasks.ts', 'generateSnapshotEmail', 820, 180, 200, 60, 'service', {
+    role: 'Build prompt → call OpenAI chat completion (gpt-4o, temp 0.4, max 1100) → strip code fences → return { subject, body, usage }.',
+    plain: "The function that actually talks to ChatGPT. Hands it the prompt, gets back the polished snapshot.",
+    path: 'lib/ai/tasks.ts:23',
+    notes: [
+      'line 19: MODEL = "gpt-4o"',
+      'line 42: strips ```...``` fences if model adds them',
+      'line 45: subject auto-built from company name',
+    ],
+    tag: ['snapshot','all'],
+    critical: true,
+  }),
+  N('ai-prompts', 'services', 'lib/ai/prompts.ts', 'buildSnapshotPrompt', 820, 260, 200, 60, 'service', {
+    role: 'Build system + user prompt, embedding lead profile + intake answers + a STYLE_EXAMPLE.',
+    plain: 'The recipe that tells ChatGPT how the snapshot email should look. Includes a sample so the format stays consistent.',
+    path: 'lib/ai/prompts.ts:84',
+    notes: [
+      'line 33: STYLE_EXAMPLE — the format target',
+      'Website section instructs "bare domain" (no http://)',
+      'Section order: Revenue · Team · Geography · Website · …',
+    ],
+    tag: ['snapshot','all'],
+    critical: true,
+  }),
+  N('ai-client', 'services', 'lib/ai/client.ts', 'OpenAI client + flag', 820, 340, 200, 60, 'service', {
+    role: 'getOpenAIClient (lazy singleton, 30s timeout) + isAiEnabled feature flag.',
+    plain: 'Sets up the connection to ChatGPT and the on/off switch (NEXT_PUBLIC_FEATURE_AI).',
+    path: 'lib/ai/client.ts:17',
+    notes: [
+      'line 17: getOpenAIClient (singleton)',
+      'line 39: isAiEnabled (env flag + key)',
+      'Timeout 30s · retries 2',
+    ],
+    tag: ['snapshot','all'],
+    critical: true,
+  }),
+  N('ai-usage', 'services', 'lib/ai/usage.ts', 'logUsage + cost calc', 820, 420, 200, 60, 'service', {
+    role: 'calcCostUsd (gpt-4o: $2.50/$10 per 1M tokens) + logUsage (insert into ai_usage_logs).',
+    plain: 'Records how many tokens each AI call used and what it cost. Powers the AI usage page.',
+    path: 'lib/ai/usage.ts:35',
+    notes: [
+      'line 18: calcCostUsd',
+      'line 35: logUsage (errors swallowed → never blocks user)',
+      'Writes to ai_usage_logs table',
+    ],
+    tag: ['snapshot','admin','all'],
+    critical: true,
+  }),
+  N('users-lookup', 'services', 'lib/users.ts', 'workspace-scoped user fetch', 820, 500, 200, 60, 'service', {
+    role: 'getUsersById / getUsersByIdsFull / findUserByEmail — wraps two SECURITY DEFINER RPCs.',
+    plain: 'Looks up display names + emails for a batch of user IDs. Replaced a slower full-project scan.',
+    path: 'lib/users.ts',
+    notes: [
+      'Uses get_users_by_ids RPC (workspace-scoped)',
+      'findUserByEmail is service-role only (anti-enumeration)',
+      'Replaced lib/users-cache.ts (deleted last session)',
+    ],
+    tag: ['all'],
+  }),
+  N('import-processor', 'services', 'lib/import/processor.ts', 'CSV row-by-row', 820, 580, 200, 60, 'service', {
+    role: 'Walks the parsed CSV one row at a time and produces validated lead rows.',
+    plain: 'The first stage of the bulk import — checks each row of your CSV.',
+    path: 'lib/import/processor.ts',
+    notes: ['Coordinates validator + mapper + deduplicator', 'Returns rows + per-row errors'],
+    tag: ['import','all'],
+  }),
+  N('import-validator', 'services', 'lib/import/validator.ts', 'field checks', 820, 660, 200, 60, 'service', {
+    role: 'Validates required fields, email/phone formats, and column-mapping coverage.',
+    plain: 'Catches bad rows in your CSV (missing emails, malformed phones) before they reach the database.',
+    path: 'lib/import/validator.ts',
+    notes: ['Email + phone regex', 'Returns structured errors per row'],
+    tag: ['import','all'],
+  }),
+  N('import-dedup', 'services', 'lib/import/deduplicator.ts', 'email/phone match', 820, 740, 200, 60, 'service', {
+    role: 'Detects existing leads by email or phone match.',
+    plain: 'Finds rows in your CSV that are duplicates of leads already in the database.',
+    path: 'lib/import/deduplicator.ts',
+    notes: ['Workspace-scoped lookup', 'Decision (skip/update/insert) deferred to options step'],
+    tag: ['import','all'],
+  }),
+  N('import-inserter', 'services', 'lib/import/inserter.ts', 'batch insert', 820, 820, 200, 60, 'service', {
+    role: 'Batched insert / upsert of accepted CSV rows.',
+    plain: 'The final import stage — actually writes the new leads into the database.',
+    path: 'lib/import/inserter.ts',
+    notes: ['Chunked writes for large batches', 'Returns inserted IDs for audit log'],
+    tag: ['import','all'],
+  }),
+  N('audit-log', 'services', 'lib/security/audit.ts', 'auditLog()', 820, 900, 200, 60, 'service', {
+    role: 'Writes an audit_log row for sensitive operations (today: import).',
+    plain: 'A paper trail. Records who did what important things (currently mostly: who imported what CSV).',
+    path: 'lib/security/audit.ts',
+    notes: ['Single caller today: import start route', 'Writes to audit_log table'],
+    tag: ['import','all'],
+  }),
+  N('rate-limit', 'services', 'lib/security/rate-limit.ts', 'AUTH_LIMIT / AI_LIMIT / …', 820, 980, 200, 60, 'service', {
+    role: 'Rate-limit middleware + response helpers. Constants exist; user opted not to enable.',
+    plain: 'A cap on how often an endpoint can be hit. The code is here but currently not wired up.',
+    path: 'lib/security/rate-limit.ts',
+    notes: ['User declined to enable in this session', 'Exists for future "throttle the AI endpoint" work'],
+    tag: ['all'],
+  }),
+  N('notif-create-dead', 'services', 'lib/notifications/create.ts', 'createNotification', 820, 1060, 200, 70, 'service', {
+    role: 'createNotification + notifyAdmins helpers — DEAD CODE, zero callers in src.',
+    plain: 'Two unused helper functions that were meant to fan out notifications, but every real notification insert in the codebase is inline. Safe to delete the file.',
+    path: 'lib/notifications/create.ts',
+    notes: [
+      'Verified zero callers via grep',
+      'Carries an outdated NotificationType union (includes ai_budget_warning, etc.)',
+      'Candidate for deletion',
+    ],
+    tag: ['notifications','dead','all'],
+  }),
+
+  // ── DATA ──────────────────────────────────────────────────────────────────
+  N('rpc-leads-page', 'data', 'fn get_workspace_leads_page', 'paginated leads + counts', 1080, 90, 200, 70, 'db', {
+    role: 'VOLATILE function: builds a TEMP TABLE of matching leads, returns { rows, total_count, status_counts } jsonb.',
+    plain: 'The recipe that powers the leads list. Filters, sorts, paginates, AND returns the status counts in one go.',
+    path: 'supabase/migrations/20260512000009_leads_page_rpcs.sql',
+    notes: [
+      'Marked VOLATILE because of CREATE TEMP TABLE',
+      'Dynamic ORDER BY via format() + EXECUTE',
+      'status_counts ignores the statuses filter for accurate totals',
+    ],
+    tag: ['leads','overview','all'],
+    critical: true,
+  }),
+  N('rpc-leads-json', 'data', 'fn get_workspace_leads_json', 'used by /pipeline + /leads RPC', 1080, 180, 200, 60, 'db', {
+    role: 'SECURITY DEFINER · returns workspace leads as a JSON array (no pagination).',
+    plain: 'Older recipe — wider but unpaginated. Used by the pipeline + still referenced internally.',
+    path: 'supabase/migrations/20260513000003_declare_get_workspace_leads_json.sql',
+    notes: [
+      'Backfilled into migrations this session',
+      'Returns 21 fields including last_activity_at',
+      'Smoke-tested: 3,008 leads for Summit workspace',
+    ],
+    tag: ['leads','pipeline','all'],
+  }),
+  N('rpc-pipeline', 'data', 'fn get_pipeline_leads_json', 'top-N per stage', 1080, 260, 200, 60, 'db', {
+    role: 'Returns { leads, counts, totals } trimmed to top-N per pipeline stage.',
+    plain: 'The recipe behind the kanban board — fetches the top few leads per stage instead of all 3,000.',
+    path: 'supabase/migrations/20260512000008_pipeline_trim_rpcs.sql',
+    notes: ['ROW_NUMBER() partitioned by stage', 'Excludes do_not_contact / unsubscribed', 'Companion: get_pipeline_stage_overflow'],
+    tag: ['pipeline','all'],
+  }),
+  N('rpc-analytics', 'data', 'fns get_*_analytics', '4 aggregate funcs', 1080, 340, 200, 60, 'db', {
+    role: 'time_series / email_metrics / leads_status_counts_for_rep / reps — all jsonb aggregates.',
+    plain: 'Recipes for the analytics charts — each chart has its own one-shot function.',
+    path: 'supabase/migrations/20260512000005_analytics_aggregate_rpcs.sql',
+    notes: ['Replaced .range(0, 99999) band-aids', 'No new indexes needed — covering indexes already existed'],
+    tag: ['analytics','all'],
+  }),
+  N('rpc-users', 'data', 'fn get_users_by_ids', 'name+email batch', 1080, 420, 200, 60, 'db', {
+    role: 'SECURITY DEFINER · inner-join workspace_members → auth.users for a batch of IDs.',
+    plain: 'The recipe used by lib/users.ts. Returns names + emails for a batch of user IDs.',
+    path: 'supabase/migrations/20260512000003_users_lookup_rpcs.sql',
+    notes: ['Replaced lib/users-cache.ts (30s in-memory cache)', 'Service-role companion: get_user_by_email'],
+    tag: ['all'],
+  }),
+  N('rpc-unique-calls', 'data', 'fn get_unique_leads_called*', 'count DISTINCT lead_id', 1080, 500, 200, 60, 'db', {
+    role: 'Two RPCs: workspace-scoped, range-bounded variant. Powers "Leads Called Today" + rep performance.',
+    plain: 'Recipe behind "Leads Called Today" on the dashboard. Counts unique leads (not duplicate dials).',
+    path: 'supabase/migrations/20260512000010_unique_leads_called.sql',
+    notes: ['Dashboard shows X unique vs target', 'Range variant: get_unique_leads_called_by_rep_range'],
+    tag: ['overview','admin','all'],
+  }),
+  N('tbl-leads', 'data', 'table leads', '3,008 rows · 21 cols', 1080, 580, 200, 60, 'db', {
+    role: 'Core lead table. Denormalized last_contacted_at + last_activity_at + last_call_outcome.',
+    plain: 'The main database table where every lead lives.',
+    path: 'supabase/migrations/20260507000003_core_tables.sql',
+    notes: ['Soft-deletes via deleted_at', 'BEFORE-UPDATE trigger syncs unsubscribes', 'Index on (workspace, last_activity_at) for sort'],
+    tag: ['leads','overview','all'],
+  }),
+  N('tbl-notes', 'data', 'table notes', 'assigned_to → user', 1080, 660, 200, 60, 'db', {
+    role: 'Notes with assigned_to (primary recipient). Multi-assign fans out notifications but stores only primary here.',
+    plain: 'Where notes are stored. Each note can be assigned to one teammate; multi-assign sends notifications but only saves the first as the "official" recipient.',
+    path: 'supabase/migrations/20260512000013_notes_assigned_to.sql',
+    notes: ['Partial index for "notes assigned to me"', 'Soft-deleted via deleted_at'],
+    tag: ['notes','all'],
+  }),
+  N('tbl-call-logs', 'data', 'table call_logs', 'outcome + duration', 1080, 740, 200, 60, 'db', {
+    role: 'Call history. Trigger syncs leads.last_contacted_at + last_call_outcome.',
+    plain: 'Every logged phone call. Inserting / deleting one updates the parent lead’s "last contacted" fields automatically.',
+    path: 'supabase/migrations/20260512000004_denormalize_last_contacted.sql',
+    notes: ['Auto-resets lead status to "new" when last call deleted', 'Cascade-deleted when parent activity is removed'],
+    tag: ['leads','all'],
+  }),
+  N('tbl-emails', 'data', 'table emails', 'sent / opened / replied', 1080, 820, 200, 60, 'db', {
+    role: 'Email history per lead. Used by analytics aggregates + email-history widget.',
+    plain: 'Record of emails sent to leads (legacy from when this app sent campaigns).',
+    path: 'supabase/migrations/20260507000005_emails_table.sql',
+    notes: ['idx_emails_analytics covers analytics queries', 'Active sending paused this era'],
+    tag: ['analytics','all'],
+  }),
+  N('tbl-activity-logs', 'data', 'table activity_logs', 'timeline events', 1080, 900, 200, 60, 'db', {
+    role: 'Immutable event log per lead. Stores metadata.call_log_id for cascade deletes.',
+    plain: "The lead's timeline — every status change, note added, call logged, etc.",
+    path: 'supabase/migrations/20260508000002_activities_and_pipeline.sql',
+    notes: ['DELETE cascades to call_logs when type=call_logged', 'metadata jsonb carries link IDs'],
+    tag: ['leads','all'],
+  }),
+  N('tbl-notifications', 'data', 'table notifications', 'realtime publication', 1080, 980, 200, 60, 'db', {
+    role: '3-type enum (mention · follow_up_due · lead_assigned). In supabase_realtime publication.',
+    plain: 'Where in-app notifications live. Trimmed this session from 9 types to 3.',
+    path: 'supabase/migrations/20260513000001_drop_legacy_notification_types.sql',
+    notes: [
+      'Migration this session: dropped 6 legacy enum values',
+      'INSERTs stream to browser via realtime channel',
+      'Only 1 row in prod at session start',
+    ],
+    tag: ['notifications','all'],
+  }),
+  N('tbl-notif-prefs', 'data', 'table notification_preferences', 'in_app only', 1080, 1060, 200, 60, 'db', {
+    role: 'Per-user, per-type in_app boolean. email_digest column dropped this session.',
+    plain: 'Where each user\'s "what kinds of notifications do I want" toggles are saved.',
+    path: 'supabase/migrations/20260513000002_drop_email_digest_column.sql',
+    notes: ['email_digest column gone', 'Unique on (user_id, workspace_id, type)'],
+    tag: ['notifications','all'],
+  }),
+  N('tbl-ai-usage', 'data', 'table ai_usage_logs', 'tokens + cost', 1080, 1140, 200, 70, 'db', {
+    role: 'Append-only log: workspace_id, user_id, lead_id, model, task, tokens, cost_usd.',
+    plain: 'Every AI snapshot call gets a row here so the admin can see how much OpenAI spend has accrued.',
+    path: 'supabase/migrations/20260507000014_ai_tables.sql',
+    notes: [
+      'Reads at /settings/ai-usage + /admin overview',
+      'cached column drift was fixed last session',
+      'gpt-4o pricing baked into lib/ai/usage.ts',
+    ],
+    tag: ['snapshot','admin','all'],
+    critical: true,
+  }),
+  N('tbl-workspace-members', 'data', 'table workspace_members', 'role + is_active', 1080, 1230, 200, 60, 'db', {
+    role: 'Membership table. role ∈ {rep, admin, super_admin}. Scoped by workspace_id.',
+    plain: 'Maps each user to a workspace + role (rep, admin, super_admin).',
+    path: 'supabase/migrations/20260507000004_workspaces.sql',
+    notes: ['Every API route resolves workspace via this lookup', 'is_active gates dormant invites'],
+    tag: ['all'],
+  }),
+
+  // ── EXTERNAL ──────────────────────────────────────────────────────────────
+  N('openai', 'external', 'OpenAI API', 'gpt-4o · chat.completions', 1340, 90, 160, 70, 'external', {
+    role: 'POST https://api.openai.com/v1/chat/completions · model=gpt-4o · temp=0.4 · max=1100.',
+    plain: 'ChatGPT. The actual AI that writes the polished snapshot.',
+    path: '(external service)',
+    notes: [
+      'OPENAI_API_KEY in Vercel env',
+      'NEXT_PUBLIC_FEATURE_AI=true gates it',
+      '~$0.01 per snapshot at gpt-4o pricing',
+    ],
+    tag: ['snapshot','overview','all'],
+    critical: true,
+  }),
+  N('outlook', 'external', 'Outlook compose', 'office.com/mail/deeplink', 1340, 180, 160, 70, 'external', {
+    role: 'https://outlook.office.com/mail/deeplink/compose?subject=…&body=… · plain-text body only.',
+    plain: 'Microsoft Outlook. The snapshot button opens a new draft email in your Outlook with the AI body pre-filled.',
+    path: '(external service)',
+    notes: [
+      'Built by buildOutlookComposeUrl',
+      'Plain-text only · no HTML body',
+      'Auto-linkifies https:// URLs in the body',
+    ],
+    tag: ['snapshot','overview','all'],
+    critical: true,
+  }),
+  N('supabase-auth', 'external', 'Supabase Auth', 'email/password + invites', 1340, 270, 160, 60, 'external', {
+    role: 'OAuth-style auth: signup, login, reset, accept invite. Cookie-based sessions.',
+    plain: 'The login system. Provided by Supabase.',
+    path: '(external service)',
+    notes: ['Built-in brute-force protection', 'Session refresh in middleware', 'Email magic-link templates managed in Supabase dashboard'],
+    tag: ['all'],
+  }),
+  N('supabase-realtime', 'external', 'Supabase Realtime', 'postgres_changes channel', 1340, 350, 160, 60, 'external', {
+    role: 'WebSocket channel: streams INSERTs on notifications to subscribed browsers.',
+    plain: 'The pipe Supabase uses to push new notifications to your browser without a refresh.',
+    path: '(external service)',
+    notes: ['Requires table to be in supabase_realtime publication', 'Filter: user_id=auth.uid', 'Migration 20260512000014 added notifications to the publication'],
+    tag: ['notifications','all'],
+  }),
+];
+
+// ── Edges ───────────────────────────────────────────────────────────────────
+const edges = [
+  // CRITICAL SPINE: snapshot flow
+  { from: 'questionnaire-ui', to: 'intake-snapshot', kind: 'critical', label: '1 · click Email Snapshot', tag: ['snapshot','overview','all'] },
+  { from: 'intake-snapshot', to: 'snapshot-route',  kind: 'critical', label: '2 · POST /api/ai/snapshot-email', tag: ['snapshot','overview','all'] },
+  { from: 'snapshot-route', to: 'ai-client',        kind: 'critical', label: '3 · isAiEnabled() gate', tag: ['snapshot','overview','all'] },
+  { from: 'snapshot-route', to: 'ai-tasks',         kind: 'critical', label: '4 · generateSnapshotEmail', tag: ['snapshot','overview','all'] },
+  { from: 'ai-tasks', to: 'ai-prompts',             kind: 'critical', label: '5 · buildSnapshotPrompt', tag: ['snapshot','overview','all'] },
+  { from: 'ai-tasks', to: 'ai-client',              kind: 'critical', label: '6 · getOpenAIClient', tag: ['snapshot','overview','all'] },
+  { from: 'ai-client', to: 'openai',                kind: 'critical', label: '7 · chat.completions.create', tag: ['snapshot','overview','all'] },
+  { from: 'snapshot-route', to: 'ai-usage',         kind: 'critical', label: '8 · await logUsage', tag: ['snapshot','overview','all'] },
+  { from: 'ai-usage', to: 'tbl-ai-usage',           kind: 'critical', label: '9 · INSERT ai_usage_logs', tag: ['snapshot','overview','all'] },
+  { from: 'intake-snapshot', to: 'outlook',         kind: 'critical', label: '10 · buildOutlookComposeUrl', tag: ['snapshot','overview','all'] },
+
+  // CLIENT mounts
+  { from: 'root-layout', to: 'dashboard-layout', kind: 'mount', label: 'wraps', tag: ['overview','all'] },
+  { from: 'dashboard-layout', to: 'leads-page', kind: 'mount', label: 'route', tag: ['overview','leads','all'] },
+  { from: 'dashboard-layout', to: 'pipeline-page', kind: 'mount', label: 'route', tag: ['pipeline','all'] },
+  { from: 'dashboard-layout', to: 'dashboard-page', kind: 'mount', label: 'route', tag: ['overview','all'] },
+  { from: 'dashboard-layout', to: 'analytics-page', kind: 'mount', label: 'route', tag: ['analytics','all'] },
+  { from: 'dashboard-layout', to: 'admin-page', kind: 'mount', label: 'route', tag: ['admin','all'] },
+  { from: 'dashboard-layout', to: 'lead-detail', kind: 'mount', label: 'route /[id]', tag: ['leads','all'] },
+  { from: 'dashboard-layout', to: 'import-wizard', kind: 'mount', label: 'route', tag: ['import','all'] },
+  { from: 'dashboard-layout', to: 'notif-bell', kind: 'mount', label: 'in header', tag: ['notifications','all'] },
+  { from: 'lead-detail', to: 'questionnaire-ui', kind: 'normal', label: 'tab', tag: ['snapshot','all'] },
+  { from: 'leads-client', to: 'lead-side-panel', kind: 'normal', label: 'row click', tag: ['leads','all'] },
+  { from: 'lead-side-panel', to: 'questionnaire-ui', kind: 'normal', label: 'embeds', tag: ['snapshot','all'] },
+  { from: 'notif-bell', to: 'notif-context', kind: 'normal', label: 'subscribes', tag: ['notifications','all'] },
+
+  // CLIENT → server entry → routes
+  { from: 'leads-page', to: 'middleware', kind: 'mount', label: 'every request', tag: ['overview','leads','all'] },
+  { from: 'middleware', to: 'supabase-mw', kind: 'normal', label: 'updateSession', tag: ['overview','all'] },
+  { from: 'supabase-mw', to: 'supabase-auth', kind: 'api', label: 'refresh cookies', tag: ['overview','all'] },
+  { from: 'leads-page', to: 'supabase-server', kind: 'normal', label: 'createServerClient', tag: ['leads','all'] },
+  { from: 'notif-context', to: 'supabase-client', kind: 'normal', label: 'browser client', tag: ['notifications','all'] },
+
+  // LEADS path
+  { from: 'leads-page', to: 'rpc-leads-page', kind: 'db', label: 'rpc(get_workspace_leads_page)', tag: ['leads','overview','all'] },
+  { from: 'leads-client', to: 'leads-list-route', kind: 'normal', label: 'GET on filter change', tag: ['leads','all'] },
+  { from: 'leads-list-route', to: 'rpc-leads-page', kind: 'db', label: 'rpc', tag: ['leads','all'] },
+  { from: 'rpc-leads-page', to: 'tbl-leads', kind: 'db', label: 'SELECT', tag: ['leads','overview','all'] },
+  { from: 'leads-client', to: 'bulk-route', kind: 'normal', label: 'PATCH bulk', tag: ['leads','all'] },
+  { from: 'bulk-route', to: 'tbl-leads', kind: 'db', label: 'UPDATE / DELETE', tag: ['leads','all'] },
+
+  // LEAD DETAIL
+  { from: 'lead-detail', to: 'lead-full-route', kind: 'normal', label: 'GET full', tag: ['leads','all'] },
+  { from: 'lead-side-panel', to: 'lead-full-route', kind: 'normal', label: 'GET full', tag: ['leads','all'] },
+  { from: 'lead-full-route', to: 'tbl-leads', kind: 'db', label: 'SELECT', tag: ['leads','all'] },
+  { from: 'lead-full-route', to: 'tbl-notes', kind: 'db', label: 'SELECT + assigned_to', tag: ['notes','all'] },
+  { from: 'lead-full-route', to: 'tbl-call-logs', kind: 'db', label: 'SELECT', tag: ['leads','all'] },
+  { from: 'lead-full-route', to: 'tbl-activity-logs', kind: 'db', label: 'SELECT', tag: ['leads','all'] },
+  { from: 'lead-full-route', to: 'tbl-emails', kind: 'db', label: 'SELECT', tag: ['analytics','all'] },
+  { from: 'lead-full-route', to: 'users-lookup', kind: 'normal', label: 'resolve names', tag: ['all'] },
+  { from: 'users-lookup', to: 'rpc-users', kind: 'db', label: 'rpc', tag: ['all'] },
+  { from: 'rpc-users', to: 'tbl-workspace-members', kind: 'db', label: 'join auth.users', tag: ['all'] },
+
+  // NOTES (multi-assign + @mention)
+  { from: 'lead-detail', to: 'lead-notes-route', kind: 'normal', label: 'POST note', tag: ['notes','all'] },
+  { from: 'lead-side-panel', to: 'lead-notes-route', kind: 'normal', label: 'POST note', tag: ['notes','all'] },
+  { from: 'lead-notes-route', to: 'tbl-notes', kind: 'db', label: 'INSERT', tag: ['notes','all'] },
+  { from: 'lead-notes-route', to: 'tbl-notifications', kind: 'db', label: 'INSERT mention(s)', tag: ['notes','notifications','all'] },
+
+  // CALLS
+  { from: 'lead-detail', to: 'lead-calls-route', kind: 'normal', label: 'POST call', tag: ['leads','all'] },
+  { from: 'lead-calls-route', to: 'tbl-call-logs', kind: 'db', label: 'INSERT', tag: ['leads','all'] },
+  { from: 'lead-calls-route', to: 'tbl-leads', kind: 'db', label: 'sync status', tag: ['leads','all'] },
+
+  // QUESTIONNAIRE saves
+  { from: 'questionnaire-ui', to: 'lead-q-route', kind: 'normal', label: 'POST answers', tag: ['snapshot','all'] },
+  { from: 'lead-q-route', to: 'tbl-leads', kind: 'db', label: 'UPDATE custom_fields', tag: ['snapshot','all'] },
+
+  // PIPELINE
+  { from: 'pipeline-page', to: 'rpc-pipeline', kind: 'db', label: 'rpc trim', tag: ['pipeline','all'] },
+  { from: 'pipeline-page', to: 'pipeline-search-route', kind: 'normal', label: 'debounced GET', tag: ['pipeline','all'] },
+  { from: 'pipeline-search-route', to: 'rpc-pipeline', kind: 'db', label: 'rpc', tag: ['pipeline','all'] },
+  { from: 'rpc-pipeline', to: 'tbl-leads', kind: 'db', label: 'SELECT top N', tag: ['pipeline','all'] },
+
+  // DASHBOARD + ADMIN
+  { from: 'dashboard-page', to: 'rpc-unique-calls', kind: 'db', label: 'rpc unique calls', tag: ['overview','all'] },
+  { from: 'admin-page', to: 'admin-overview-route', kind: 'normal', label: 'GET overview', tag: ['admin','all'] },
+  { from: 'admin-overview-route', to: 'tbl-ai-usage', kind: 'db', label: 'MTD cost', tag: ['admin','snapshot','all'] },
+  { from: 'admin-overview-route', to: 'tbl-leads', kind: 'db', label: 'counts', tag: ['admin','all'] },
+
+  // ANALYTICS
+  { from: 'analytics-page', to: 'analytics-funnel-route', kind: 'normal', label: 'GET funnel', tag: ['analytics','all'] },
+  { from: 'analytics-page', to: 'analytics-ts-route', kind: 'normal', label: 'GET time-series', tag: ['analytics','all'] },
+  { from: 'analytics-funnel-route', to: 'rpc-analytics', kind: 'db', label: 'rpc', tag: ['analytics','all'] },
+  { from: 'analytics-ts-route', to: 'rpc-analytics', kind: 'db', label: 'rpc', tag: ['analytics','all'] },
+  { from: 'rpc-analytics', to: 'tbl-leads', kind: 'db', label: 'SELECT', tag: ['analytics','all'] },
+  { from: 'rpc-analytics', to: 'tbl-emails', kind: 'db', label: 'SELECT', tag: ['analytics','all'] },
+
+  // NOTIFICATIONS
+  { from: 'notif-bell', to: 'notif-list-route', kind: 'normal', label: 'GET history', tag: ['notifications','all'] },
+  { from: 'notif-list-route', to: 'tbl-notifications', kind: 'db', label: 'SELECT', tag: ['notifications','all'] },
+  { from: 'notif-bell', to: 'activities-due-route', kind: 'normal', label: 'GET due', tag: ['notifications','all'] },
+  { from: 'notif-context', to: 'supabase-realtime', kind: 'api', label: 'postgres_changes', tag: ['notifications','all'] },
+  { from: 'supabase-realtime', to: 'tbl-notifications', kind: 'db', label: 'INSERT events', tag: ['notifications','all'] },
+  { from: 'notif-prefs-route', to: 'tbl-notif-prefs', kind: 'db', label: 'GET / UPSERT', tag: ['notifications','all'] },
+
+  // IMPORT
+  { from: 'import-wizard', to: 'import-start-route', kind: 'normal', label: 'POST start', tag: ['import','all'] },
+  { from: 'import-start-route', to: 'import-processor', kind: 'normal', label: 'run pipeline', tag: ['import','all'] },
+  { from: 'import-processor', to: 'import-validator', kind: 'normal', label: 'validate each row', tag: ['import','all'] },
+  { from: 'import-processor', to: 'import-dedup', kind: 'normal', label: 'check duplicates', tag: ['import','all'] },
+  { from: 'import-processor', to: 'import-inserter', kind: 'normal', label: 'write rows', tag: ['import','all'] },
+  { from: 'import-inserter', to: 'tbl-leads', kind: 'db', label: 'INSERT batch', tag: ['import','all'] },
+  { from: 'import-start-route', to: 'audit-log', kind: 'normal', label: 'audit', tag: ['import','all'] },
+
+  // DEAD CODE (no callers — drawn faded)
+  { from: 'notif-create-dead', to: 'tbl-notifications', kind: 'normal', label: '(unused) INSERT', tag: ['dead','all'] },
+];
+
+// ── Optional FIXES + KNOWN_BUGS registries ──────────────────────────────────
+const FIXES = {
+  // Backlog the user has explicitly named in this session
+  'leads-client': [
+    { n: 1, t: 'CSV export of ALL matching leads (currently exports only the visible page) — needs a streaming endpoint.' },
+  ],
+  'leads-list-route': [
+    { n: 1, t: 'Companion streaming export endpoint for the "Export All Matching" CSV feature.' },
+  ],
+  'rpc-leads-page': [
+    { n: 2, t: 'last_activity_at sort path uses dynamic SQL, no index. If sort gets hot at 50k+ rows, switch to static ORDER BY or add covering index.' },
+  ],
+  'notif-create-dead': [
+    { n: 3, t: 'Delete this file — zero callers across the codebase. Confirmed by grep this session.' },
+  ],
+  'rate-limit': [
+    { n: 4, t: 'If AI usage scales, wrap the /api/ai/snapshot-email route in AI_LIMIT to cap per-user cost exposure.' },
+  ],
+};
+const KNOWN_BUGS = {
+  // Nothing the user pointed to a file:line for yet — leaving empty so we honor "no invented bugs."
+};
+
+// ── Build feature chips from data ───────────────────────────────────────────
+const ALL_TAGS = new Set();
+nodes.forEach(n => (n.tag || []).forEach(t => ALL_TAGS.add(t)));
+edges.forEach(e => (e.tag || []).forEach(t => ALL_TAGS.add(t)));
+const CHIP_ORDER = ['overview','snapshot','leads','pipeline','notes','notifications','analytics','admin','import','dead','all'];
+const CHIPS = CHIP_ORDER.filter(t => ALL_TAGS.has(t)).map(t => ({
+  id: t,
+  label: (
+    t === 'all'      ? 'Show all wires'
+    : t === 'dead'   ? 'Dead code'
+    : t === 'overview' ? 'Overview (default)'
+    : t.charAt(0).toUpperCase() + t.slice(1)
+  ),
+}));
+
+// ── Render clusters + nodes + edges ─────────────────────────────────────────
+const root = document.getElementById('root');
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs = {}, parent = null) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
+// Helpers for layout
+function nodeById(id) { return nodes.find(n => n.id === id); }
+function colorVar(c) {
+  return ({
+    client:'var(--client)', service:'var(--service)', route:'var(--route)',
+    db:'var(--db)', external:'var(--external)', critical:'var(--critical)',
+  })[c] || 'var(--text)';
+}
+function nodeAnchor(node, side) {
+  // returns {x,y} for source/target connection
+  if (side === 'right') return { x: node.x + node.w, y: node.y + node.h / 2 };
+  if (side === 'left')  return { x: node.x,           y: node.y + node.h / 2 };
+  return { x: node.x + node.w / 2, y: node.y + node.h / 2 };
+}
+
+// Cluster rects
+for (const c of clusters) {
+  el('rect', { x: c.x, y: c.y, width: c.w, height: c.h, class: 'cluster-rect',
+              style: 'fill: rgba(255,255,255,0.018);' }, root);
+  el('text', { x: c.x + 12, y: c.y + 24, class: 'cluster-label' }, root).textContent = c.label;
+}
+
+// Edges first (so nodes sit on top)
+const edgesG = el('g', { id: 'edges' }, root);
+const edgeElems = [];
+for (const e of edges) {
+  const a = nodeById(e.from), b = nodeById(e.to);
+  if (!a || !b) { console.warn('missing node for edge', e); continue; }
+  const aRight = a.x + a.w <= b.x;       // left-to-right
+  const bRight = b.x + b.w <= a.x;       // right-to-left
+  let p1, p2;
+  if (aRight)      { p1 = nodeAnchor(a, 'right'); p2 = nodeAnchor(b, 'left'); }
+  else if (bRight) { p1 = nodeAnchor(a, 'left');  p2 = nodeAnchor(b, 'right'); }
+  else             { p1 = nodeAnchor(a, 'right'); p2 = nodeAnchor(b, 'left'); }
+  const dx = (p2.x - p1.x);
+  const c1x = p1.x + Math.max(40, dx * 0.4);
+  const c2x = p2.x - Math.max(40, dx * 0.4);
+  const d = `M ${p1.x} ${p1.y} C ${c1x} ${p1.y}, ${c2x} ${p2.y}, ${p2.x} ${p2.y}`;
+  const g = el('g', { 'data-edge': `${e.from}::${e.to}`, 'data-from': e.from, 'data-to': e.to,
+                       'data-kind': e.kind, 'data-tags': (e.tag||[]).join(',') }, edgesG);
+  const path = el('path', {
+    d, class: 'edge ' + e.kind,
+    'marker-end': 'url(#arrow)',
+    style: `color: ${e.kind==='critical' ? 'var(--critical)' :
+                     e.kind==='api'      ? 'var(--accent-2)' :
+                     e.kind==='db'       ? 'var(--db)' :
+                     e.kind==='mount'    ? 'var(--client)' : '#555'};`,
+  }, g);
+  // label at midpoint, slightly above
+  if (e.label) {
+    const mx = (p1.x + p2.x) / 2;
+    const my = (p1.y + p2.y) / 2 - 6;
+    const t = el('text', { x: mx, y: my, 'text-anchor': 'middle', class: 'edge-label' }, g);
+    t.textContent = e.label;
+  }
+  edgeElems.push({ el: g, path, edge: e });
+}
+
+// Nodes
+const nodeElems = [];
+for (const n of nodes) {
+  const g = el('g', { 'data-node': n.id, transform: `translate(${n.x} ${n.y})`,
+                       style: 'cursor: pointer;' }, root);
+  const isDead = (n.tag || []).includes('dead');
+  const rect = el('rect', {
+    x: 0, y: 0, width: n.w, height: n.h, class: 'node-rect' + (n.critical ? ' critical' : ''),
+    style: `stroke: ${colorVar(n.color)};`,
+  }, g);
+  el('text', { x: 12, y: 22, class: 'node-label' }, g).textContent = n.label;
+  if (n.sub) {
+    el('text', { x: 12, y: 38, class: 'node-sub' + (isDead ? ' dead' : '') }, g).textContent = n.sub;
+  }
+  // Badges
+  const fixes = FIXES[n.id] || [];
+  const bugs  = KNOWN_BUGS[n.id] || [];
+  let bx = n.w - 12;
+  if (bugs.length) {
+    el('circle', { cx: bx - 7, cy: 14, r: 9, class: 'badge-bug' }, g);
+    el('text', { x: bx - 7, y: 17.5, 'text-anchor': 'middle', class: 'badge-text' }, g).textContent = bugs.length;
+    bx -= 22;
+  }
+  if (fixes.length) {
+    el('circle', { cx: bx - 7, cy: 14, r: 9, class: 'badge-fix' }, g);
+    el('text', { x: bx - 7, y: 17.5, 'text-anchor': 'middle', class: 'badge-text' }, g).textContent = fixes.length;
+  }
+  g.addEventListener('click', (ev) => { ev.stopPropagation(); selectNode(n.id); });
+  g.addEventListener('mouseenter', () => showSidebar(n.id, true));
+  g.addEventListener('mouseleave', () => { if (selectedId) showSidebar(selectedId, false); else showDefaultSidebar(); });
+  nodeElems.push({ el: g, rect, node: n });
+}
+
+// ── Chips ───────────────────────────────────────────────────────────────────
+let activeChip = 'overview';
+const chipsBar = document.getElementById('chips');
+for (const c of CHIPS) {
+  const btn = document.createElement('button');
+  btn.className = 'chip' + (c.id === activeChip ? ' active' : '');
+  btn.textContent = c.label;
+  btn.dataset.id = c.id;
+  btn.addEventListener('click', () => setChip(c.id));
+  chipsBar.appendChild(btn);
+}
+// Roadmap chip
+const roadmap = document.createElement('button');
+roadmap.className = 'chip';
+roadmap.textContent = 'Roadmap & bugs';
+roadmap.dataset.id = '__roadmap';
+roadmap.addEventListener('click', () => setChip('__roadmap'));
+chipsBar.appendChild(roadmap);
+
+function setChip(id) {
+  activeChip = id;
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.id === id));
+  applyFilter();
+}
+
+function applyFilter() {
+  const isRoadmap = activeChip === '__roadmap';
+  const isAll = activeChip === 'all';
+  // Nodes
+  for (const ne of nodeElems) {
+    const tags = ne.node.tag || [];
+    let visible;
+    if (isRoadmap) {
+      visible = (FIXES[ne.node.id] || []).length > 0 || (KNOWN_BUGS[ne.node.id] || []).length > 0;
+    } else if (isAll) {
+      visible = true;
+    } else {
+      visible = tags.includes(activeChip);
+    }
+    ne.el.style.opacity = visible ? 1 : 0.18;
+    ne.rect.classList.toggle('dimmed', !visible);
+  }
+  // Edges
+  for (const ee of edgeElems) {
+    const tags = ee.edge.tag || [];
+    let visible;
+    if (isRoadmap) {
+      const f = nodeById(ee.edge.from), t = nodeById(ee.edge.to);
+      visible = (FIXES[f.id] || KNOWN_BUGS[f.id] || FIXES[t.id] || KNOWN_BUGS[t.id]) ? true : false;
+    } else if (isAll) {
+      visible = true;
+    } else {
+      visible = tags.includes(activeChip);
+    }
+    ee.el.style.opacity = visible ? 1 : 0.05;
+  }
+}
+
+// ── Selection & sidebar ─────────────────────────────────────────────────────
+let selectedId = null;
+function selectNode(id) {
+  selectedId = id;
+  // dim everything not connected
+  const connected = new Set([id]);
+  for (const e of edges) {
+    if (e.from === id) connected.add(e.to);
+    if (e.to   === id) connected.add(e.from);
+  }
+  for (const ne of nodeElems) {
+    const on = connected.has(ne.node.id);
+    ne.el.classList.toggle('dimmed-group', !on);
+    ne.rect.classList.toggle('selected', ne.node.id === id);
+    ne.rect.classList.toggle('dimmed', !on);
+  }
+  for (const ee of edgeElems) {
+    const on = ee.edge.from === id || ee.edge.to === id;
+    ee.path.classList.toggle('highlight', on);
+    ee.el.classList.toggle('dimmed', !on);
+  }
+  showSidebar(id, false);
+}
+function clearSelection() {
+  selectedId = null;
+  for (const ne of nodeElems) { ne.rect.classList.remove('selected','dimmed'); }
+  for (const ee of edgeElems) { ee.path.classList.remove('highlight'); ee.el.classList.remove('dimmed'); }
+  applyFilter();
+  showDefaultSidebar();
+}
+
+document.getElementById('canvas-wrap').addEventListener('click', (ev) => {
+  if (ev.target.id === 'graph' || ev.target.tagName === 'svg' || ev.target.classList.contains('cluster-rect')) {
+    clearSelection();
+  }
+});
+
+// ── Sidebar rendering ───────────────────────────────────────────────────────
+const sidebar = document.getElementById('sidebar');
+
+function showDefaultSidebar() {
+  sidebar.innerHTML = `
+    <h2>SummitCRM map</h2>
+    <p class="plain">Hover any node for details. Click to select + dim unconnected nodes. Click empty canvas to clear. The default view is the AI snapshot critical path — the spine of the app from "click Email Snapshot" → ChatGPT → Outlook draft.</p>
+
+    <div id="findings">
+      <div class="section-title">Notable findings from this map</div>
+      <ul>
+        <li><b>Critical path is the AI snapshot:</b> 10 numbered edges from the questionnaire button → OpenAI → logged in <code>ai_usage_logs</code> → Outlook compose. It's the only LLM task in the codebase and the most distinctive feature surface.</li>
+        <li><b>Dead code:</b> <code>lib/notifications/create.ts</code> exports <code>createNotification</code> + <code>notifyAdmins</code> with zero live callers — every real notification insert in the app is inline. Safe to delete. (<code>formatPercent</code> and <code>slugify</code> in <code>lib/utils</code> are also exported but unused.)</li>
+        <li><b>Schema cleanup this session:</b> notification_type enum trimmed from 9 → 3 active types, <code>email_digest</code> column dropped, <code>FollowUpBell</code> component deleted (214 lines), <code>get_workspace_leads_json</code> RPC backfilled into the migrations folder so a fresh-DB rebuild reproduces it.</li>
+        <li><b>RPC-driven reads:</b> <code>/leads</code>, <code>/pipeline</code>, and 4 analytics charts each fire a single jsonb-returning RPC instead of multiple round-trips. The leads RPC is marked <code>VOLATILE</code> because it builds a temp table.</li>
+        <li><b>Notifications realtime is fragile:</b> works because the table is explicitly in the <code>supabase_realtime</code> publication (migration 20260512000014). New tables don't get added automatically — easy to forget.</li>
+        <li><b>Backlog:</b> #2 CSV export of "all matching" still ships only the visible page. #4 a fresh-DB rebuild now works because of the RPC migration backfill. Rate-limit library exists but is unwired (user opted out).</li>
+      </ul>
+    </div>
+
+    <div class="section-title">Legend</div>
+    <ul>
+      <li><b>Blue</b> · client (browser-side)</li>
+      <li><b>Purple</b> · server lib / service</li>
+      <li><b>Green</b> · API route</li>
+      <li><b>Amber</b> · database (table or RPC)</li>
+      <li><b>Pink</b> · external service</li>
+      <li><b>Red edges</b> · critical path (snapshot flow)</li>
+      <li><b>Green badge</b> · open fix on that node</li>
+    </ul>
+  `;
+}
+
+function showSidebar(id, isHover) {
+  const n = nodeById(id);
+  if (!n) return;
+  const ins  = edges.filter(e => e.to   === id);
+  const outs = edges.filter(e => e.from === id);
+  const fixes = FIXES[id] || [];
+  const bugs  = KNOWN_BUGS[id] || [];
+  const tagHtml = (n.tag || []).map(t => `<span class="tag">${t}</span>`).join('');
+  sidebar.innerHTML = `
+    <h2>${n.label}${n.sub ? ' <span class="muted">· ' + n.sub + '</span>' : ''}</h2>
+    <div class="path">${n.path || ''}</div>
+    <p class="role"><b>What it does:</b> ${n.role || ''}</p>
+    <p class="plain"><b>In plain English:</b> ${n.plain || ''}</p>
+    ${n.notes && n.notes.length ? `<div class="section-title">Notes</div><ul>${n.notes.map(x => `<li>${x}</li>`).join('')}</ul>` : ''}
+    ${ins.length ? `<div class="section-title">Incoming</div>${ins.map(e => `<div class="edge-line"><span class="muted">${e.from}</span><span class="arr">→</span><span class="what">${e.label || e.kind}</span></div>`).join('')}` : ''}
+    ${outs.length ? `<div class="section-title">Outgoing</div>${outs.map(e => `<div class="edge-line"><span class="what">${e.label || e.kind}</span><span class="arr">→</span><span class="muted">${e.to}</span></div>`).join('')}` : ''}
+    ${fixes.length ? `<div class="section-title">Fixes (${fixes.length})</div>${fixes.map(f => `<div class="fix"><b>#${f.n}</b> · ${f.t}</div>`).join('')}` : ''}
+    ${bugs.length ? `<div class="section-title">Bugs (${bugs.length})</div>${bugs.map(b => `<div class="bug"><span class="sev">${b.sev}</span>${b.ref ? '<code>' + b.ref + '</code> — ' : ''}${b.t}</div>`).join('')}` : ''}
+    <div class="tag-row">${tagHtml}</div>
+  `;
+}
+
+// ── Zoom (scrolling is native) ──────────────────────────────────────────────
+// The canvas lives inside #scroll-area which is overflow:auto. Native scroll
+// bars handle pan up/down/left/right. Zoom buttons resize the SVG element
+// itself; the scroll container adjusts its scroll range accordingly.
+const svg = document.getElementById('graph');
+const scrollArea = document.getElementById('scroll-area');
+const BASE_W = 1720, BASE_H = 1480;
+let scale = 1;
+function applyScale() {
+  svg.setAttribute('width',  BASE_W * scale);
+  svg.setAttribute('height', BASE_H * scale);
+}
+function fitToViewport() {
+  const sx = scrollArea.clientWidth  / BASE_W;
+  const sy = scrollArea.clientHeight / BASE_H;
+  scale = Math.min(sx, sy);
+  applyScale();
+  scrollArea.scrollLeft = 0;
+  scrollArea.scrollTop  = 0;
+}
+document.getElementById('fit-btn').addEventListener('click', fitToViewport);
+document.getElementById('reset').addEventListener('click', () => { scale = 1; applyScale(); });
+document.getElementById('zoom-in').addEventListener('click', () => {
+  scale = Math.min(3, scale * 1.2); applyScale();
+});
+document.getElementById('zoom-out').addEventListener('click', () => {
+  scale = Math.max(0.3, scale / 1.2); applyScale();
+});
+
+// Cmd/Ctrl + wheel zooms (anchored to cursor); plain wheel scrolls natively.
+scrollArea.addEventListener('wheel', (ev) => {
+  if (!(ev.metaKey || ev.ctrlKey)) return;  // let native scroll happen
+  ev.preventDefault();
+  const rect = scrollArea.getBoundingClientRect();
+  const cx = ev.clientX - rect.left + scrollArea.scrollLeft;
+  const cy = ev.clientY - rect.top  + scrollArea.scrollTop;
+  const k = ev.deltaY > 0 ? 1/1.12 : 1.12;
+  const newScale = Math.max(0.3, Math.min(3, scale * k));
+  const ratio = newScale / scale;
+  scale = newScale;
+  applyScale();
+  scrollArea.scrollLeft = cx * ratio - (ev.clientX - rect.left);
+  scrollArea.scrollTop  = cy * ratio - (ev.clientY - rect.top);
+}, { passive: false });
+
+// ── Initial render ──────────────────────────────────────────────────────────
+applyFilter();
+showDefaultSidebar();
+</script>
+</body>
+</html>
