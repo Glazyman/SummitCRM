@@ -578,6 +578,60 @@ No DB migration was needed — the fan-out lives entirely in notification rows.
 
 ---
 
+## 21. Houston decoupling — project moved to `~/Desktop/SummitCRM`
+
+2026-05-13. The project used to live at `/Users/glazy/.dev-houston/workspaces/Glazy/Summit/SummitCRM`, a directory created and managed by Houston (a local Tauri app at `~/houston/`). The user found the location hard to find and wanted to step away from Houston.
+
+### 21a. What was running in the background
+
+Before cleanup there were **10 `houston-engine` debug binaries** all listening on their own localhost ports, accumulated over 8 days because closing the Houston UI never killed the Rust engine subprocess. Only PID 22042 (port 54230) matched the live `engine.json`; the other 9 were orphans. All 10 were killed.
+
+### 21b. The move
+
+1. Killed `next dev` (PID 86476) + the postcss helper.
+2. Killed PID 22042 (the live houston-engine).
+3. Removed the existing `~/Desktop/SummitCRM` symlink (it had pointed to the `.dev-houston` path).
+4. `mv /Users/glazy/.dev-houston/workspaces/Glazy/Summit/SummitCRM /Users/glazy/Desktop/SummitCRM` — now the real folder, not a symlink.
+5. Deleted `.next/` and `tsconfig.tsbuildinfo` (both bake absolute paths).
+6. Verified `package.json`, `.env.local`, `.git/`, `.vercel/project.json`, `next.config.ts`, `tsconfig.json` all present.
+7. `git -C ~/Desktop/SummitCRM status` clean on `main` — history intact.
+8. Smoke test: `npm run dev` boots in 367ms, loads `.env.local`. ✓
+
+### 21c. Auto-memory migration
+
+Claude's auto-memory directory is keyed off the cwd. Moved:
+
+```
+~/.claude/projects/-Users-glazy--dev-houston-workspaces-Glazy-Summit-SummitCRM/memory/
+  →
+~/.claude/projects/-Users-glazy-Desktop-SummitCRM/memory/
+```
+
+`feedback_working_directory.md` was rewritten — the old rule ("use the `.dev-houston` path, not the Desktop symlink") is dead. New rule: the Desktop folder IS the project. Future Claude sessions opened from `~/Desktop/SummitCRM` will pick up the migrated memory automatically.
+
+### 21d. What still references the old path (mostly harmless)
+
+- `~/.dev-houston/workspaces/Glazy/Summit/` — empty Houston workspace shell. Houston's `workspaces.json` still registers a "Glazy" workspace but the path it points to is gone, so the Houston app will show it as missing if reopened.
+- `~/.dev-houston/` overall — engine state, tunnel config, logs. Inert now that no engine is running. `rm -rf ~/.dev-houston` is safe whenever the user is confident they're done with Houston.
+- `~/houston/` — Houston's source repo (Tauri + Vite + Rust). Separate from this project; delete if not developing on Houston itself.
+- The internal `.houston/` directory inside the project (`~/Desktop/SummitCRM/.houston/`) — activity log, sessions, learnings from the Houston-managed era. No code reads it; safe to `rm -rf` whenever.
+- Older HANDOFF / docs sections that mention `.dev-houston` paths — historical references, no action needed.
+
+### 21e. What to do after reopening
+
+- Close the old Cursor window (its workspace pointed at the now-missing path) and reopen from `~/Desktop/SummitCRM`.
+- Restart the dev server from the new path: `cd ~/Desktop/SummitCRM && npm run dev`.
+- If `vercel` CLI complains about the link, `vercel link` re-binds to the same deployed project — production isn't affected (Vercel builds from git, not from your laptop).
+
+### 21f. What did NOT need touching
+
+- Deployed CRM at the live Vercel URL — runs independently
+- Supabase database, RLS, auth, env keys — string-based connection, location-agnostic
+- Git remote, history, branches, recent commits (`daab281`, `32473f2`, `a9c573a`, `fc84cd4`, `714842d`)
+- `.env.local` — moved with the folder; Next.js picked it up unchanged in the smoke test
+
+---
+
 ## What's still open after this session
 
 Mostly unchanged from §18, plus two new flags:
