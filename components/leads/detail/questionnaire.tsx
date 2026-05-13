@@ -491,21 +491,6 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
         </div>
       )}
 
-      {/* Save button — anchored at the bottom for easy reach after the
-          user fills in fields top-to-bottom. */}
-      {!readOnly && (
-        <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
-          {emailErr && <span className="text-xs text-destructive">{emailErr}</span>}
-          <Button
-            className={cn('gap-1.5', saved && 'bg-emerald-600 hover:bg-emerald-700')}
-            onClick={handleSave}
-            disabled={saving || !dirty}
-          >
-            {saved ? <><Check className="h-4 w-4" /> Saved</> : saving ? 'Saving…' : <><Save className="h-4 w-4" /> Save</>}
-          </Button>
-        </div>
-      )}
-
       {/* Add custom question */}
       {!readOnly && (
         <div className="border-t border-border pt-4">
@@ -549,6 +534,21 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Save button — always the very last block so it never lands in
+          the middle of the form, even when "Add question" is expanded. */}
+      {!readOnly && (
+        <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+          {emailErr && <span className="text-xs text-destructive">{emailErr}</span>}
+          <Button
+            className={cn('gap-1.5', saved && 'bg-emerald-600 hover:bg-emerald-700')}
+            onClick={handleSave}
+            disabled={saving || !dirty}
+          >
+            {saved ? <><Check className="h-4 w-4" /> Saved</> : saving ? 'Saving…' : <><Save className="h-4 w-4" /> Save</>}
+          </Button>
         </div>
       )}
     </div>
