@@ -246,6 +246,14 @@ export interface PreparedSnapshotEmail {
   body:    string
   /** Subject line — separate from body, also useful for clipboard. */
   subject: string
+  /** 'ai' if the polished version came from /api/ai/snapshot-email,
+   *  'template' if we fell back to the local deterministic builder
+   *  (typically because OPENAI_API_KEY or NEXT_PUBLIC_FEATURE_AI is
+   *  missing in the deployment, or the AI call errored). The UI uses
+   *  this to surface a hint to the admin. */
+  source:  'ai' | 'template'
+  /** If source==='template', the reason the AI call failed. Null on success. */
+  error:   string | null
 }
 
 /**
@@ -261,6 +269,7 @@ export async function prepareSnapshotEmail(input: SnapshotInput): Promise<Prepar
   let subject: string
   let body:    string
   let source:  'ai' | 'template' = 'template'
+  let error:   string | null      = null
 
   try {
     const res = await fetch('/api/ai/snapshot-email', {
@@ -268,15 +277,19 @@ export async function prepareSnapshotEmail(input: SnapshotInput): Promise<Prepar
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(input),
     })
-    if (!res.ok) throw new Error(`AI snapshot returned ${res.status}`)
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({})) as { error?: string }
+      throw new Error(detail.error ?? `AI snapshot returned ${res.status}`)
+    }
     const data = await res.json() as { subject?: string; body?: string }
     if (!data.subject || !data.body) throw new Error('AI snapshot missing fields')
     subject = data.subject
     body    = data.body
     source  = 'ai'
   } catch (err) {
+    error = err instanceof Error ? err.message : 'AI service unavailable'
     if (typeof console !== 'undefined') {
-      console.warn('[Intake Snapshot] AI unavailable, using template fallback:', err)
+      console.warn('[Intake Snapshot] AI unavailable, using template fallback:', error)
     }
     body = buildSnapshot(input)
     const company = clean(input.lead.company)
@@ -288,5 +301,5 @@ export async function prepareSnapshotEmail(input: SnapshotInput): Promise<Prepar
   if (typeof console !== 'undefined') {
     console.log(`[Intake Snapshot] source: ${source}, url length: ${url.length}`)
   }
-  return { url, body: styledBody, subject }
+  return { url, body: styledBody, subject, source, error }
 }

@@ -105,15 +105,18 @@ interface QuestionnaireProps {
   readOnly?: boolean
   /**
    * When provided, an "Email Snapshot" button is shown next to Save.
-   * Parent gets the live edit-state and must return both the Outlook
-   * compose URL AND the raw email body. After loading, the questionnaire
-   * shows two buttons:
-   *   - "Open Outlook draft" → real anchor with target="_blank" (fresh
-   *     user gesture, dodges popup blockers)
-   *   - "Copy snapshot"      → copies the body to clipboard so the user
-   *     can paste it into anything (Slack, Gmail, etc.)
+   * Parent gets the live edit-state and must return:
+   *   - url:    Outlook compose deeplink
+   *   - body:   styled email body (for the Copy button)
+   *   - source: 'ai' | 'template' — when 'template', the UI surfaces a
+   *             hint so the admin knows OpenAI is unreachable and the
+   *             snapshot didn't go through the AI polish step (and so
+   *             the cost won't show up in /settings/ai-usage)
+   *   - error:  reason for the fallback (when source==='template')
    */
-  onEmailSnapshot?: (live: QuestionnaireData) => Promise<{ url: string; body: string }>
+  onEmailSnapshot?: (live: QuestionnaireData) => Promise<{
+    url: string; body: string; source: 'ai' | 'template'; error: string | null
+  }>
 }
 
 // ── Yes / No toggle ──────────────────────────────────────────────────────────
@@ -269,15 +272,18 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
   const [saving,    setSaving]    = React.useState(false)
   const [saved,     setSaved]     = React.useState(false)
   const [dirty,     setDirty]     = React.useState(false)
-  const [emailing,  setEmailing]  = React.useState(false)
-  const [emailUrl,  setEmailUrl]  = React.useState<string | null>(null)
-  const [emailBody, setEmailBody] = React.useState<string | null>(null)
-  const [copied,    setCopied]    = React.useState(false)
-  const [emailErr,  setEmailErr]  = React.useState<string | null>(null)
+  const [emailing,    setEmailing]    = React.useState(false)
+  const [emailUrl,    setEmailUrl]    = React.useState<string | null>(null)
+  const [emailBody,   setEmailBody]   = React.useState<string | null>(null)
+  const [emailSource, setEmailSource] = React.useState<'ai' | 'template' | null>(null)
+  const [copied,      setCopied]      = React.useState(false)
+  const [emailErr,    setEmailErr]    = React.useState<string | null>(null)
 
   // Whenever any intake field changes, the saved snapshot is stale —
-  // clear both URL and body so the user has to regenerate.
-  function clearSnapshot() { setEmailUrl(null); setEmailBody(null); setCopied(false) }
+  // clear everything so the user has to regenerate.
+  function clearSnapshot() {
+    setEmailUrl(null); setEmailBody(null); setEmailSource(null); setCopied(false)
+  }
 
   const [addingCustom, setAddingCustom] = React.useState(false)
   const [newQLabel,    setNewQLabel]    = React.useState('')
@@ -376,6 +382,14 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
                     {copied ? 'Copied' : 'Copy snapshot'}
                   </button>
                 )}
+                {emailSource === 'template' && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+                    title="OpenAI was not reachable. Snapshot was built from the offline template and was NOT charged to /settings/ai-usage. Ask an admin to set OPENAI_API_KEY and NEXT_PUBLIC_FEATURE_AI=true in the deployment."
+                  >
+                    Template (AI down)
+                  </span>
+                )}
               </>
             ) : (
               <Button
@@ -390,6 +404,10 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
                     const result = await onEmailSnapshot({ answers, questions })
                     setEmailUrl(result.url)
                     setEmailBody(result.body)
+                    setEmailSource(result.source)
+                    if (result.source === 'template' && result.error) {
+                      setEmailErr(`AI unavailable: ${result.error}. Used offline template (not logged to /settings/ai-usage).`)
+                    }
                   } catch (err) {
                     setEmailErr(err instanceof Error ? err.message : 'Failed to generate snapshot')
                   } finally {
