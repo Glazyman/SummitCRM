@@ -5,9 +5,15 @@ import { createServerClient, createAdminClient } from '@/lib/supabase/server'
 
 type Params = { params: Promise<{ id: string }> }
 
+// Recipient list — accepts either a single uuid (legacy) or an array
+// (multi-assign UI). Both shapes are normalised to an array.
 const createNoteSchema = z.object({
   content:     z.string().trim().min(1).max(5000),
-  assigned_to: z.string().uuid().nullable().optional(),
+  assigned_to: z.union([
+    z.string().uuid(),
+    z.array(z.string().uuid()).max(50),
+    z.null(),
+  ]).optional(),
 })
 
 export async function POST(req: NextRequest, { params }: Params) {
@@ -47,43 +53,48 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
-    // ── Validate the recipient if one is set ─────────────────────────────
+    // ── Normalise + validate the recipient list ──────────────────────────
     // Rules:
-    //   - Recipient must be an active member of the same workspace.
+    //   - Each recipient must be an active member of the same workspace.
     //   - Reps can only assign notes to admins/super_admins (or themselves).
-    //   - Admins can ping other admins, AND the rep currently assigned to
-    //     this lead. They cannot ping a rep who isn't on this lead.
-    //   - Self-assignment is allowed; notification insert is skipped for self.
-    const assignedTo = parsed.data.assigned_to ?? null
-    let recipientRole: string | null = null
+    //   - Admins can ping other admins AND the rep currently assigned to
+    //     this lead. They can't ping a rep who isn't on this lead.
+    //   - Self-assignment is allowed; the notification fan-out skips self.
+    const rawAssigned = parsed.data.assigned_to
+    const assignedIds: string[] = Array.isArray(rawAssigned)
+      ? Array.from(new Set(rawAssigned))
+      : rawAssigned
+        ? [rawAssigned]
+        : []
 
-    if (assignedTo) {
-      const { data: recipient } = await supabase
+    let recipients: Array<{ user_id: string; role: string }> = []
+    if (assignedIds.length > 0) {
+      const { data } = await supabase
         .from('workspace_members')
         .select('user_id, role')
         .eq('workspace_id', member.workspace_id)
-        .eq('user_id', assignedTo)
         .eq('is_active', true)
-        .single() as { data: { user_id: string; role: string } | null }
+        .in('user_id', assignedIds) as { data: Array<{ user_id: string; role: string }> | null }
 
-      if (!recipient) {
-        return NextResponse.json({ error: 'Recipient is not a workspace member' }, { status: 422 })
+      recipients = data ?? []
+      if (recipients.length !== assignedIds.length) {
+        return NextResponse.json({ error: 'One or more recipients are not workspace members' }, { status: 422 })
       }
-      recipientRole = recipient.role
-      const isSelf            = assignedTo === user.id
-      const isAuthorRep       = member.role === 'rep'
-      const isAuthorAdmin     = ['admin', 'super_admin'].includes(member.role)
-      const isRecipientAdmin  = ['admin', 'super_admin'].includes(recipient.role)
-      const isRecipientRep    = recipient.role === 'rep'
 
-      if (!isSelf) {
+      const isAuthorRep   = member.role === 'rep'
+      const isAuthorAdmin = ['admin', 'super_admin'].includes(member.role)
+      for (const r of recipients) {
+        const isSelf           = r.user_id === user.id
+        const isRecipientAdmin = ['admin', 'super_admin'].includes(r.role)
+        const isRecipientRep   = r.role === 'rep'
+        if (isSelf) continue
         if (isAuthorRep && !isRecipientAdmin) {
           return NextResponse.json(
             { error: 'Reps can only assign notes to admins' },
             { status: 403 },
           )
         }
-        if (isAuthorAdmin && isRecipientRep && lead.assigned_to !== assignedTo) {
+        if (isAuthorAdmin && isRecipientRep && lead.assigned_to !== r.user_id) {
           return NextResponse.json(
             { error: 'Admins can only assign notes to the rep who owns this lead' },
             { status: 403 },
@@ -91,6 +102,10 @@ export async function POST(req: NextRequest, { params }: Params) {
         }
       }
     }
+    // Primary recipient stored on the note row for back-compat with the
+    // single-column assigned_to. Additional recipients exist only as
+    // notification fan-out (no schema change required).
+    const primaryAssignee: string | null = assignedIds[0] ?? null
 
     // ── Insert the note (admin client bypasses RLS) ──────────────────────
     const admin = createAdminClient()
@@ -101,7 +116,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         lead_id:      leadId,
         author_id:    user.id,
         content:      parsed.data.content,
-        assigned_to:  assignedTo,
+        assigned_to:  primaryAssignee,
       })
       .select('id, lead_id, author_id, content, assigned_to, created_at, updated_at')
       .single()
@@ -109,28 +124,28 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     if (!note) return NextResponse.json({ error: 'Failed to create note' }, { status: 500 })
 
-    // ── Create a "mention" notification for the recipient ────────────────
-    // Skip self-assignment (don't ping yourself).
-    if (assignedTo && assignedTo !== user.id) {
+    // ── Fan out one "mention" notification per non-self recipient ────────
+    const fanoutIds = assignedIds.filter((id) => id !== user.id)
+    if (fanoutIds.length > 0) {
       const leadName = [lead.first_name, lead.last_name].filter(Boolean).join(' ').trim() || lead.email
       const preview  = parsed.data.content.length > 140
         ? parsed.data.content.slice(0, 137) + '…'
         : parsed.data.content
+      const rows = fanoutIds.map((uid) => ({
+        workspace_id: member.workspace_id,
+        user_id:      uid,
+        type:         'mention',
+        title:        `Note on ${leadName}`,
+        body:         preview,
+        link:         `/leads/${leadId}`,
+        lead_id:      leadId,
+      }))
       await (admin as any) // eslint-disable-line @typescript-eslint/no-explicit-any
         .from('notifications')
-        .insert({
-          workspace_id: member.workspace_id,
-          user_id:      assignedTo,
-          type:         'mention',
-          title:        `Note on ${leadName}`,
-          body:         preview,
-          link:         `/leads/${leadId}`,
-          lead_id:      leadId,
-        })
+        .insert(rows)
     }
 
-    // Reflect the recipient's role back so the client can update local state
-    return NextResponse.json({ note, recipient_role: recipientRole }, { status: 201 })
+    return NextResponse.json({ note, recipient_count: assignedIds.length }, { status: 201 })
   } catch (err) {
     console.error('[POST /api/leads/[id]/notes]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

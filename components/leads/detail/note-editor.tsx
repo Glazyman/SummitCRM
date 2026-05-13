@@ -1,9 +1,13 @@
 'use client'
 
 import * as React from 'react'
-import { StickyNote, Send, AtSign } from 'lucide-react'
+import { StickyNote, Send, AtSign, Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 
 const MAX_LENGTH = 5000
 
@@ -14,8 +18,8 @@ export interface NoteRecipient {
 }
 
 interface NoteEditorProps {
-  /** Persist a note. Returns once saved. */
-  onSave: (content: string, assignedTo: string | null) => Promise<void>
+  /** Persist a note. Returns once saved. Accepts zero, one, or many recipients. */
+  onSave: (content: string, assignedTo: string[]) => Promise<void>
   /** Workspace members the current user is allowed to assign notes to.
    *  Empty list hides the recipient dropdown. */
   recipients?: NoteRecipient[]
@@ -23,15 +27,17 @@ interface NoteEditorProps {
 
 /**
  * Composer for new notes.
- * Character count, submit on Cmd/Ctrl+Enter, textarea auto-grows, and
- * an optional "Assign to" dropdown that mentions a teammate.
+ * - Character count, submit on Cmd/Ctrl+Enter, textarea auto-grows
+ * - "Assign to" dropdown is multi-select and styled to match the other
+ *   dropdowns in the side panel (DropdownMenu trigger + popover items
+ *   with chevron + checkmarks). Stays open while toggling recipients.
  */
 export function NoteEditor({ onSave, recipients }: NoteEditorProps) {
-  const [content,    setContent]    = React.useState('')
-  const [assignedTo, setAssignedTo] = React.useState<string>('')
-  const [saving,     setSaving]     = React.useState(false)
-  const [focused,    setFocused]    = React.useState(false)
-  const textareaRef                 = React.useRef<HTMLTextAreaElement>(null)
+  const [content,      setContent]      = React.useState('')
+  const [assignedIds,  setAssignedIds]  = React.useState<string[]>([])
+  const [saving,       setSaving]       = React.useState(false)
+  const [focused,      setFocused]      = React.useState(false)
+  const textareaRef                     = React.useRef<HTMLTextAreaElement>(null)
 
   const remaining   = MAX_LENGTH - content.length
   const isOverflow  = remaining < 0
@@ -46,13 +52,17 @@ export function NoteEditor({ onSave, recipients }: NoteEditorProps) {
     }
   }
 
+  function toggleRecipient(id: string) {
+    setAssignedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+  }
+
   async function handleSave() {
     if (!canSubmit) return
     setSaving(true)
     try {
-      await onSave(content.trim(), assignedTo || null)
+      await onSave(content.trim(), assignedIds)
       setContent('')
-      setAssignedTo('')
+      setAssignedIds([])
       if (textareaRef.current) textareaRef.current.style.height = 'auto'
     } finally {
       setSaving(false)
@@ -65,6 +75,16 @@ export function NoteEditor({ onSave, recipients }: NoteEditorProps) {
       handleSave()
     }
   }
+
+  // Resolve picked recipient names for the trigger label.
+  const pickedNames = (recipients ?? [])
+    .filter((r) => assignedIds.includes(r.id))
+    .map((r) => r.name)
+  const triggerLabel = pickedNames.length === 0
+    ? 'Assign to…'
+    : pickedNames.length === 1
+      ? pickedNames[0]
+      : `${pickedNames.length} people`
 
   return (
     <div className={cn(
@@ -95,26 +115,64 @@ export function NoteEditor({ onSave, recipients }: NoteEditorProps) {
       <div className={cn(
         'flex flex-wrap items-center justify-between gap-2 px-3 pb-2.5 pt-1',
         'transition-opacity',
-        focused || content ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        focused || content || assignedIds.length > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'
       )}>
-        {/* Assign-to picker — left side */}
+        {/* Left: assign-to dropdown + char count */}
         <div className="flex items-center gap-2">
           {showAssign && (
-            <label className="flex items-center gap-1 text-xs">
-              <AtSign className="h-3 w-3 text-muted-foreground" />
-              <select
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                className="h-6 rounded-md border border-border bg-background px-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">No one (just a note)</option>
-                {recipients!.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    Assign to {r.name}{r.role ? ` (${r.role})` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={cn(
+                    'h-7 gap-1.5 px-2 text-xs font-medium',
+                    assignedIds.length > 0 && 'border-primary/40 bg-primary/5 text-foreground'
+                  )}
+                >
+                  <AtSign className="h-3 w-3 opacity-60" />
+                  {triggerLabel}
+                  <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" minWidth="200px">
+                <DropdownMenuLabel>Assign this note to</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {recipients!.map((r) => {
+                  const picked = assignedIds.includes(r.id)
+                  return (
+                    <DropdownMenuItem
+                      key={r.id}
+                      // preventDefault keeps the menu open while toggling.
+                      onClick={(e) => { e.preventDefault(); toggleRecipient(r.id) }}
+                      className="flex items-center gap-2"
+                    >
+                      <span className={cn(
+                        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
+                        picked ? 'border-primary bg-primary text-primary-foreground' : 'border-border'
+                      )}>
+                        {picked && <Check className="h-2.5 w-2.5" />}
+                      </span>
+                      <span className="flex-1 truncate">
+                        {r.name}
+                        {r.role && <span className="ml-1 text-xs text-muted-foreground">· {r.role}</span>}
+                      </span>
+                    </DropdownMenuItem>
+                  )
+                })}
+                {assignedIds.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={(e) => { e.preventDefault(); setAssignedIds([]) }}
+                      className="text-xs text-muted-foreground"
+                    >
+                      Clear selection
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <span className={cn(
             'text-xs tabular-nums',
@@ -128,11 +186,16 @@ export function NoteEditor({ onSave, recipients }: NoteEditorProps) {
           </span>
         </div>
 
+        {/* Right: clear + save */}
         <div className="flex items-center gap-2">
-          {content && (
+          {(content || assignedIds.length > 0) && (
             <button
               type="button"
-              onClick={() => { setContent(''); setAssignedTo(''); if (textareaRef.current) textareaRef.current.style.height = 'auto' }}
+              onClick={() => {
+                setContent('')
+                setAssignedIds([])
+                if (textareaRef.current) textareaRef.current.style.height = 'auto'
+              }}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
               Clear

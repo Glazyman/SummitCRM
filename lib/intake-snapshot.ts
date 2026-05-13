@@ -239,15 +239,25 @@ export function buildOutlookComposeUrl(opts: {
   return `https://outlook.office.com/mail/deeplink/compose?${parts.join('&')}`
 }
 
+export interface PreparedSnapshotEmail {
+  /** Outlook deeplink ready for a fresh-user-gesture <a target="_blank"> click. */
+  url:     string
+  /** The full styled email body — used by the "Copy snapshot" button. */
+  body:    string
+  /** Subject line — separate from body, also useful for clipboard. */
+  subject: string
+}
+
 /**
- * Generate the Outlook compose URL for this lead's snapshot.
+ * Generate the Outlook compose URL + raw body for this lead's snapshot.
  *
  * Tries the AI-polished version via /api/ai/snapshot-email first, falls back
- * to the deterministic template if AI is unavailable. Always resolves with a
- * usable URL — the caller is responsible for opening it from a fresh user
- * gesture (e.g. an <a target="_blank"> click) to avoid popup blockers.
+ * to the deterministic template if AI is unavailable. The caller is
+ * responsible for opening the URL from a fresh user gesture (e.g. an
+ * <a target="_blank"> click) to avoid popup blockers — or for copying
+ * the `body` to clipboard directly.
  */
-export async function prepareSnapshotEmail(input: SnapshotInput): Promise<string> {
+export async function prepareSnapshotEmail(input: SnapshotInput): Promise<PreparedSnapshotEmail> {
   let subject: string
   let body:    string
   let source:  'ai' | 'template' = 'template'
@@ -277,7 +287,6 @@ export async function prepareSnapshotEmail(input: SnapshotInput): Promise<string
   const url        = buildOutlookComposeUrl({ subject, body: styledBody })
   if (typeof console !== 'undefined') {
     console.log(`[Intake Snapshot] source: ${source}, url length: ${url.length}`)
-    console.log('[Intake Snapshot] body:\n' + styledBody)
   }
-  return url
+  return { url, body: styledBody, subject }
 }

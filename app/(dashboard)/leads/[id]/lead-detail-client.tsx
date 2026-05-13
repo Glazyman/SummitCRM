@@ -194,7 +194,7 @@ export default function LeadDetailClient({
   }
 
   // ── Note mutations ─────────────────────────────────────────────────────
-  async function handleAddNote(content: string, assignedTo: string | null) {
+  async function handleAddNote(content: string, assignedTo: string[]) {
     const data = await requestJson<{ note: { id: string; author_id: string; content: string; created_at: string } }>(
       `/api/leads/${lead.id}/notes`,
       {

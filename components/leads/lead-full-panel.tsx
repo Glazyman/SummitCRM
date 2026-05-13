@@ -171,7 +171,7 @@ export function LeadFullPanel({
   }
 
   // ── Note mutations ────────────────────────────────────────────────────
-  async function handleAddNote(content: string, assignedTo: string | null) {
+  async function handleAddNote(content: string, assignedTo: string[]) {
     const res  = await fetch(`/api/leads/${leadId}/notes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

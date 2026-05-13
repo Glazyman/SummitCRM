@@ -105,12 +105,15 @@ interface QuestionnaireProps {
   readOnly?: boolean
   /**
    * When provided, an "Email Snapshot" button is shown next to Save.
-   * Parent gets the live edit-state and must return the Outlook compose URL.
-   * The button shows a spinner while awaiting, then swaps to a real
-   * "Open Outlook draft" anchor — clicking the anchor is a fresh user gesture,
-   * which prevents popup blockers from intercepting the new tab.
+   * Parent gets the live edit-state and must return both the Outlook
+   * compose URL AND the raw email body. After loading, the questionnaire
+   * shows two buttons:
+   *   - "Open Outlook draft" → real anchor with target="_blank" (fresh
+   *     user gesture, dodges popup blockers)
+   *   - "Copy snapshot"      → copies the body to clipboard so the user
+   *     can paste it into anything (Slack, Gmail, etc.)
    */
-  onEmailSnapshot?: (live: QuestionnaireData) => Promise<string>
+  onEmailSnapshot?: (live: QuestionnaireData) => Promise<{ url: string; body: string }>
 }
 
 // ── Yes / No toggle ──────────────────────────────────────────────────────────
@@ -268,7 +271,13 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
   const [dirty,     setDirty]     = React.useState(false)
   const [emailing,  setEmailing]  = React.useState(false)
   const [emailUrl,  setEmailUrl]  = React.useState<string | null>(null)
+  const [emailBody, setEmailBody] = React.useState<string | null>(null)
+  const [copied,    setCopied]    = React.useState(false)
   const [emailErr,  setEmailErr]  = React.useState<string | null>(null)
+
+  // Whenever any intake field changes, the saved snapshot is stale —
+  // clear both URL and body so the user has to regenerate.
+  function clearSnapshot() { setEmailUrl(null); setEmailBody(null); setCopied(false) }
 
   const [addingCustom, setAddingCustom] = React.useState(false)
   const [newQLabel,    setNewQLabel]    = React.useState('')
@@ -280,7 +289,7 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
     setAnswers((a) => ({ ...a, [id]: value }))
     setDirty(true)
     setSaved(false)
-    setEmailUrl(null)
+    clearSnapshot()
   }
 
   function addCustomQuestion() {
@@ -292,7 +301,7 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
     setAddingCustom(false)
     setDirty(true)
     setSaved(false)
-    setEmailUrl(null)
+    clearSnapshot()
   }
 
   function removeCustomQuestion(id: string) {
@@ -300,7 +309,7 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
     setAnswers((a) => { const next = { ...a }; delete next[id]; return next })
     setDirty(true)
     setSaved(false)
-    setEmailUrl(null)
+    clearSnapshot()
   }
 
   async function handleSave() {
@@ -327,21 +336,47 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
           <ClipboardList className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold">Summit Mergers Questionnaire</h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {onEmailSnapshot && (
             emailUrl ? (
-              // Real anchor → fresh user gesture, never blocked by popup blockers.
-              <a
-                href={emailUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setEmailUrl(null)}
-                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 text-xs font-medium text-emerald-600 hover:bg-emerald-500/15 transition-colors"
-                title="Opens a new Outlook tab with the prefilled draft"
-              >
-                <Mail className="h-3.5 w-3.5" />
-                Open Outlook draft
-              </a>
+              <>
+                {/* Real anchor → fresh user gesture, dodges popup blockers. */}
+                <a
+                  href={emailUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={clearSnapshot}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 text-xs font-medium text-emerald-600 hover:bg-emerald-500/15 transition-colors"
+                  title="Opens a new Outlook tab with the prefilled draft"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Open Outlook draft
+                </a>
+                {emailBody && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(emailBody)
+                        setCopied(true)
+                        setTimeout(() => setCopied(false), 1800)
+                      } catch {
+                        window.prompt('Copy:', emailBody)
+                      }
+                    }}
+                    className={cn(
+                      'inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors',
+                      copied
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600'
+                        : 'border-border bg-background text-foreground hover:bg-secondary'
+                    )}
+                    title="Copy the snapshot text to your clipboard"
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5" /> : <ClipboardList className="h-3.5 w-3.5" />}
+                    {copied ? 'Copied' : 'Copy snapshot'}
+                  </button>
+                )}
+              </>
             ) : (
               <Button
                 size="sm"
@@ -352,15 +387,16 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
                   setEmailing(true)
                   setEmailErr(null)
                   try {
-                    const url = await onEmailSnapshot({ answers, questions })
-                    setEmailUrl(url)
+                    const result = await onEmailSnapshot({ answers, questions })
+                    setEmailUrl(result.url)
+                    setEmailBody(result.body)
                   } catch (err) {
                     setEmailErr(err instanceof Error ? err.message : 'Failed to generate snapshot')
                   } finally {
                     setEmailing(false)
                   }
                 }}
-                title="Ask the AI to write a snapshot email, then open it in Outlook"
+                title="Ask the AI to write a snapshot email, then open or copy it"
               >
                 {emailing ? (
                   <>
@@ -375,16 +411,6 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
                 )}
               </Button>
             )
-          )}
-          {!readOnly && (
-            <Button
-              size="sm"
-              className={cn('gap-1.5', saved && 'bg-emerald-600 hover:bg-emerald-700')}
-              onClick={handleSave}
-              disabled={saving || !dirty}
-            >
-              {saved ? <><Check className="h-3.5 w-3.5" /> Saved</> : saving ? 'Saving…' : <><Save className="h-3.5 w-3.5" /> Save</>}
-            </Button>
           )}
         </div>
       </div>
@@ -462,6 +488,21 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
               />
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Save button — anchored at the bottom for easy reach after the
+          user fills in fields top-to-bottom. */}
+      {!readOnly && (
+        <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+          {emailErr && <span className="text-xs text-destructive">{emailErr}</span>}
+          <Button
+            className={cn('gap-1.5', saved && 'bg-emerald-600 hover:bg-emerald-700')}
+            onClick={handleSave}
+            disabled={saving || !dirty}
+          >
+            {saved ? <><Check className="h-4 w-4" /> Saved</> : saving ? 'Saving…' : <><Save className="h-4 w-4" /> Save</>}
+          </Button>
         </div>
       )}
 
