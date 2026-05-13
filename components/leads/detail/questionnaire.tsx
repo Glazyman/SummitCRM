@@ -105,9 +105,9 @@ interface QuestionnaireProps {
   readOnly?: boolean
   /**
    * When provided, an "Email Snapshot" button is shown next to Save.
-   * Parent gets the live edit-state and must return the Gmail compose URL.
+   * Parent gets the live edit-state and must return the Outlook compose URL.
    * The button shows a spinner while awaiting, then swaps to a real
-   * "Open Gmail draft" anchor — clicking the anchor is a fresh user gesture,
+   * "Open Outlook draft" anchor — clicking the anchor is a fresh user gesture,
    * which prevents popup blockers from intercepting the new tab.
    */
   onEmailSnapshot?: (live: QuestionnaireData) => Promise<string>
@@ -337,10 +337,10 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
                 rel="noopener noreferrer"
                 onClick={() => setEmailUrl(null)}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 text-xs font-medium text-emerald-600 hover:bg-emerald-500/15 transition-colors"
-                title="Opens a new Gmail tab with the prefilled draft"
+                title="Opens a new Outlook tab with the prefilled draft"
               >
                 <Mail className="h-3.5 w-3.5" />
-                Open Gmail draft
+                Open Outlook draft
               </a>
             ) : (
               <Button
@@ -360,7 +360,7 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
                     setEmailing(false)
                   }
                 }}
-                title="Ask the AI to write a snapshot email, then open it in Gmail"
+                title="Ask the AI to write a snapshot email, then open it in Outlook"
               >
                 {emailing ? (
                   <>

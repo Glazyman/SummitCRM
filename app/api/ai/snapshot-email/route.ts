@@ -2,7 +2,7 @@
  * POST /api/ai/snapshot-email
  *
  * Admin-only. Generates an AI-polished company snapshot from the lead
- * profile + questionnaire answers, ready to drop into a Gmail draft.
+ * profile + questionnaire answers, ready to drop into an Outlook draft.
  *
  * The deterministic builder in `lib/intake-snapshot.ts` is the client-side
  * fallback if this endpoint fails — both produce the same structural format.

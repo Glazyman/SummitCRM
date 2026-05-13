@@ -1,6 +1,6 @@
 /**
  * Builds a Summit-Deals–style plain-text snapshot from the lead profile +
- * questionnaire data, then opens it as a Gmail compose draft in a new tab.
+ * questionnaire data, then opens it as an Outlook compose draft in a new tab.
  *
  * Fields are read by the question IDs defined in `components/leads/detail/
  * questionnaire.tsx` (revenue, ebitda, residential_pct, etc.). Custom
@@ -198,9 +198,9 @@ export function buildSnapshot({ lead, answers, questions }: SnapshotInput): stri
 }
 
 // ── Visual bold for plain-text email ──────────────────────────────────────
-// Gmail's compose URL accepts plain text only, so we use the Unicode
-// Mathematical Sans-Serif Bold block (U+1D5D4…). Modern mail clients
-// render these as bold by default.
+// Outlook's compose deeplink accepts plain text only (no HTML), so we
+// use the Unicode Mathematical Sans-Serif Bold block (U+1D5D4…). Modern
+// mail clients (including Outlook) render these as bold by default.
 function toUnicodeBold(text: string): string {
   let out = ''
   for (const ch of text) {
@@ -231,26 +231,31 @@ export function styleSnapshotBody(body: string): string {
     .join('\n')
 }
 
-// ── Gmail compose URL ─────────────────────────────────────────────────────
+// ── Outlook compose URL ───────────────────────────────────────────────────
 /**
- * Build a Gmail compose URL. Uses encodeURIComponent (%20 for spaces) for
- * maximum Gmail compatibility — URLSearchParams encodes spaces as `+` which
- * Gmail's body parser sometimes treats as a literal plus.
+ * Build an Outlook web compose URL via the Microsoft 365 deeplink.
+ *
+ * Uses encodeURIComponent (%20 for spaces) rather than URLSearchParams —
+ * URLSearchParams encodes spaces as `+`, which the deeplink endpoint
+ * sometimes treats as a literal plus inside the body.
+ *
+ * outlook.office.com works for M365 / business accounts. Personal
+ * outlook.com accounts get redirected automatically by Microsoft.
  */
-export function buildGmailComposeUrl(opts: {
+export function buildOutlookComposeUrl(opts: {
   subject: string
   body:    string
   to?:     string
 }): string {
-  const parts: string[] = ['view=cm', 'fs=1']
+  const parts: string[] = ['path=/mail/action/compose']
   if (opts.to)      parts.push(`to=${encodeURIComponent(opts.to)}`)
-  if (opts.subject) parts.push(`su=${encodeURIComponent(opts.subject)}`)
+  if (opts.subject) parts.push(`subject=${encodeURIComponent(opts.subject)}`)
   if (opts.body)    parts.push(`body=${encodeURIComponent(opts.body)}`)
-  return `https://mail.google.com/mail/?${parts.join('&')}`
+  return `https://outlook.office.com/mail/deeplink/compose?${parts.join('&')}`
 }
 
 /**
- * Generate the Gmail compose URL for this lead's snapshot.
+ * Generate the Outlook compose URL for this lead's snapshot.
  *
  * Tries the AI-polished version via /api/ai/snapshot-email first, falls back
  * to the deterministic template if AI is unavailable. Always resolves with a
@@ -284,7 +289,7 @@ export async function prepareSnapshotEmail(input: SnapshotInput): Promise<string
   }
 
   const styledBody = styleSnapshotBody(body)
-  const url        = buildGmailComposeUrl({ subject, body: styledBody })
+  const url        = buildOutlookComposeUrl({ subject, body: styledBody })
   if (typeof console !== 'undefined') {
     console.log(`[Intake Snapshot] source: ${source}, url length: ${url.length}`)
     console.log('[Intake Snapshot] body:\n' + styledBody)
