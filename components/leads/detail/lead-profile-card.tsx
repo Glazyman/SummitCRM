@@ -178,87 +178,8 @@ export function LeadProfileCard({
           </div>
         </div>
 
-        {/* Status + Interest + edit button */}
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {/* Status dropdown */}
-            {onStatusChange ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', statusMeta.badge)}
-                  >
-                    {statusMeta.label}
-                    <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" minWidth="170px">
-                  <DropdownMenuLabel>Change status</DropdownMenuLabel>
-                  {ALL_STATUSES.map((s) => {
-                    const m = STATUS_CONFIG[s]
-                    return (
-                      <DropdownMenuItem
-                        key={s}
-                        onClick={() => onStatusChange(s)}
-                        className={cn(s === lead.status && 'opacity-50 cursor-default')}
-                      >
-                        <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
-                        {m.label}
-                        {s === lead.status && (
-                          <span className="ml-auto text-xs text-muted-foreground">current</span>
-                        )}
-                      </DropdownMenuItem>
-                    )
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <span className={cn(
-                'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium',
-                statusMeta.badge
-              )}>
-                {statusMeta.label}
-              </span>
-            )}
-
-            {/* Interest level dropdown */}
-            {onInterestChange && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', interestMeta ? interestMeta.badge : 'bg-muted text-muted-foreground')}
-                  >
-                    {interestMeta?.label ?? 'Interest'}
-                    <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" minWidth="160px">
-                  <DropdownMenuLabel>Interest level</DropdownMenuLabel>
-                  {ALL_INTEREST_STATUSES.map((s) => {
-                    const m = INTEREST_CONFIG[s]
-                    return (
-                      <DropdownMenuItem
-                        key={s}
-                        onClick={() => onInterestChange(s)}
-                        className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}
-                      >
-                        <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
-                        {m.label}
-                        {s === lead.interest_status && (
-                          <span className="ml-auto text-xs text-muted-foreground">current</span>
-                        )}
-                      </DropdownMenuItem>
-                    )
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-
+        {/* Edit button row */}
+        <div className="mt-3 flex items-center justify-end">
           {!editing ? (
             <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1.5 px-3 text-xs font-medium" onClick={startEdit}>
               <Pencil className="h-3.5 w-3.5" /> Edit
@@ -280,6 +201,77 @@ export function LeadProfileCard({
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Status + Interest ── */}
+      <div className="grid grid-cols-2 gap-2 border-b border-border px-5 py-3">
+        {/* Status */}
+        {onStatusChange ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="h-9 w-full justify-between gap-2 px-3 text-xs font-medium">
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <span className={cn('h-2 w-2 shrink-0 rounded-full', statusMeta.dot)} />
+                  <span className="truncate">{statusMeta.label}</span>
+                </span>
+                <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" minWidth="170px">
+              <DropdownMenuLabel>Status</DropdownMenuLabel>
+              {ALL_STATUSES.map((s) => {
+                const m = STATUS_CONFIG[s]
+                return (
+                  <DropdownMenuItem key={s} onClick={() => onStatusChange(s)} className={cn(s === lead.status && 'opacity-50 cursor-default')}>
+                    <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
+                    {m.label}
+                    {s === lead.status && <span className="ml-auto text-xs text-muted-foreground">current</span>}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <div className="flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium">
+            <span className={cn('h-2 w-2 shrink-0 rounded-full', statusMeta.dot)} />
+            <span className="truncate">{statusMeta.label}</span>
+          </div>
+        )}
+
+        {/* Interest */}
+        {onInterestChange ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="h-9 w-full justify-between gap-2 px-3 text-xs font-medium">
+                <span className="flex items-center gap-1.5 min-w-0">
+                  {interestMeta && <span className={cn('h-2 w-2 shrink-0 rounded-full', interestMeta.dot)} />}
+                  <span className="truncate">{interestMeta?.label ?? 'Interest'}</span>
+                </span>
+                <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" minWidth="160px">
+              <DropdownMenuLabel>Interest</DropdownMenuLabel>
+              {ALL_INTEREST_STATUSES.map((s) => {
+                const m = INTEREST_CONFIG[s]
+                return (
+                  <DropdownMenuItem key={s} onClick={() => onInterestChange(s)} className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}>
+                    <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
+                    {m.label}
+                    {s === lead.interest_status && <span className="ml-auto text-xs text-muted-foreground">current</span>}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <div className="flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-muted-foreground">
+            {interestMeta
+              ? <><span className={cn('h-2 w-2 shrink-0 rounded-full', interestMeta.dot)} /><span className="truncate">{interestMeta.label}</span></>
+              : <span>No interest set</span>
+            }
+          </div>
+        )}
       </div>
 
       {/* ── Fields ── */}
