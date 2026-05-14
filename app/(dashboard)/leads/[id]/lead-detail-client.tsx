@@ -471,13 +471,13 @@ export default function LeadDetailClient({
                   type="button"
                   onClick={() => setActiveTab(id)}
                   className={cn(
-                    'flex shrink-0 items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                    'flex shrink-0 items-center gap-1.5 border-b-2 px-5 py-3.5 text-sm font-medium transition-colors',
                     activeTab === id
                       ? 'border-primary text-primary'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
                   )}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className="h-4 w-4" />
                   {label}
                   {id === 'followups' && pendingFollowUps > 0 && (
                     <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">

@@ -93,7 +93,6 @@ export function LeadProfileCard({
   }
 
   async function handleSave() {
-    if (!draft.email?.trim()) return
     setSaving(true)
     try {
       // Cast: draft contains the two extra state fields that the API
@@ -256,15 +255,15 @@ export function LeadProfileCard({
           </div>
 
           {!editing ? (
-            <Button size="sm" variant="ghost" className="h-7 shrink-0 gap-1.5 text-xs" onClick={startEdit}>
-              <Pencil className="h-3 w-3" /> Edit
+            <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1.5 px-3 text-xs font-medium" onClick={startEdit}>
+              <Pencil className="h-3.5 w-3.5" /> Edit
             </Button>
           ) : (
-            <div className="flex gap-1">
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={cancelEdit} disabled={saving}>
-                <X className="h-3.5 w-3.5" />
+            <div className="flex gap-1.5">
+              <Button size="sm" variant="ghost" className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground" onClick={cancelEdit} disabled={saving}>
+                <X className="h-3.5 w-3.5 mr-1" /> Cancel
               </Button>
-              <Button size="sm" className="h-7 gap-1 text-xs" onClick={handleSave} disabled={saving}>
+              <Button size="sm" className="h-8 gap-1.5 px-3 text-xs font-medium" onClick={handleSave} disabled={saving}>
                 <Check className="h-3.5 w-3.5" />
                 {saving ? 'Saving…' : 'Save'}
               </Button>
@@ -529,9 +528,9 @@ export function LeadProfileCard({
                 {canEditBatch && onRenameBatch && (
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="h-7 shrink-0 gap-1 px-2 text-xs text-muted-foreground"
+                    className="h-7 shrink-0 gap-1.5 px-2.5 text-xs font-medium"
                     onClick={() => {
                       setBatchDraft(lead.batch_name ?? '')
                       setBatchEditing(true)
