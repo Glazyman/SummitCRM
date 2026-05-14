@@ -386,7 +386,7 @@ export function LeadFullPanel({
             )}
 
             {/* Tab bar — full width, 4 equal tabs, no overflow */}
-            <div className="grid shrink-0 border-b border-border bg-card" style={{ gridTemplateColumns: `repeat(${TABS.length}, 1fr)` }}>
+            <div className="grid shrink-0 divide-x divide-border border-b border-border bg-card" style={{ gridTemplateColumns: `repeat(${TABS.length}, 1fr)` }}>
               {TABS.map(({ id, label, Icon }) => (
                 <button
                   key={id}
