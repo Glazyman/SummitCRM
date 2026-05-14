@@ -10,7 +10,7 @@
 export interface SnapshotLead {
   first_name: string | null
   last_name:  string | null
-  email:      string
+  email:      string | null
   phone:      string | null
   company:    string | null
   website:    string | null
@@ -104,8 +104,8 @@ export function buildSnapshotPrompt({ lead, answers, questions }: SnapshotPrompt
     `- Website: ${lead.website  ?? '(none)'}`,
     `- Contact: ${[lead.first_name, lead.last_name].filter(Boolean).join(' ') || '(none)'}`,
     `- Phone:   ${lead.phone    ?? '(none)'}`,
-    `- Email:   ${lead.email}`,
-  ].join('\n')
+    lead.email ? `- Email:   ${lead.email}` : null,
+  ].filter(Boolean).join('\n')
 
   const system =
 `You are a senior M&A advisor at Summit Mergers writing a deal teaser email to a strategic acquirer (often a PE-backed HVAC platform). Tone is informed, plain, and confident — a senior advisor briefing a buyer, not a marketing pitch.

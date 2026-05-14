@@ -18,7 +18,7 @@ const bodySchema = z.object({
   lead: z.object({
     first_name: z.string().nullable(),
     last_name:  z.string().nullable(),
-    email:      z.string().email(),
+    email:      z.string().email().nullable().optional(),
     phone:      z.string().nullable(),
     company:    z.string().nullable(),
     website:    z.string().nullable(),
@@ -63,7 +63,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body', issues: parsed.error.issues }, { status: 422 })
     }
 
-    const { subject, body, usage } = await generateSnapshotEmail(parsed.data)
+    const { subject, body, usage } = await generateSnapshotEmail({
+      ...parsed.data,
+      lead: { ...parsed.data.lead, email: parsed.data.lead.email ?? null },
+    })
 
     // Await so the row is committed before the request completes — the
     // ~50ms cost is worth the guarantee. Errors are swallowed inside logUsage.
