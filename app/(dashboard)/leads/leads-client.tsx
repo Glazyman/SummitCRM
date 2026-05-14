@@ -863,7 +863,7 @@ export function LeadsClient({
               setLeads((prev) =>
                 prev.map((l) =>
                   l.id === selectedLeadId
-                    ? { ...l, ...patch, updated_at: new Date().toISOString() }
+                    ? { ...l, ...(patch as unknown as Partial<LeadRow>), updated_at: new Date().toISOString() }
                     : l
                 )
               )

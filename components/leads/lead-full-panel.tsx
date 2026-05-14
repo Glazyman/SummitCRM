@@ -43,8 +43,8 @@ export interface LeadFullPanelProps {
   currentUserId: string
   canEditBatch:  boolean
   onClose:       () => void
-  /** Propagate status/interest changes back to the parent list */
-  onLeadChange:  (patch: { status?: LeadStatus; interest_status?: InterestStatus }) => void
+  /** Propagate lead field changes back to the parent list */
+  onLeadChange:  (patch: Partial<LeadDetail>) => void
   /** When opened from the activities view — shows a Mark Done button in the header */
   activityDone?:         boolean
   onMarkActivityDone?:   () => void
@@ -123,9 +123,10 @@ export function LeadFullPanel({
     try {
       const res  = await fetch(`/api/leads/${leadId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
       const json = await res.json()
+      if (!res.ok) throw new Error(json?.error ?? 'Save failed')
       setData((d) => d ? { ...d, lead: { ...d.lead, ...json.lead, batch_name: d.lead.batch_name, assigned_name: d.lead.assigned_name } } : d)
-      if (patch.status)          onLeadChange({ status: patch.status as LeadStatus })
-      if (patch.interest_status) onLeadChange({ interest_status: patch.interest_status as InterestStatus })
+      // Propagate all changed fields to the parent list (leads/pipeline)
+      if (json.lead) onLeadChange(json.lead as Partial<LeadDetail>)
     } catch {
       setData((d) => d ? { ...d, lead: prev } : d)
     }

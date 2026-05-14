@@ -75,7 +75,7 @@ export function LeadProfileCard({
     setDraft({
       first_name:  lead.first_name  ?? '',
       last_name:   lead.last_name   ?? '',
-      email:       lead.email,
+      email:       lead.email       ?? '',
       phone:       lead.phone       ?? '',
       title:       lead.title       ?? '',
       company:     lead.company     ?? '',

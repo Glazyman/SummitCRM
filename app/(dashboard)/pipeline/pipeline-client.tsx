@@ -488,7 +488,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             currentUserId={currentUserId}
             canEditBatch={isAdmin}
             onClose={() => setSelectedLeadId(null)}
-            onLeadChange={patch => patchLead(selectedLeadId, patch)}
+            onLeadChange={patch => patchLead(selectedLeadId, patch as unknown as Partial<PipelineLead>)}
           />
         </>
       )}

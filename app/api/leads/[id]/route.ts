@@ -111,7 +111,7 @@ const stateField = z.union([
 const patchSchema = z.object({
   first_name:        optionalText(100),
   last_name:         optionalText(100),
-  email:             z.string().trim().email().max(320).optional(),
+  email:             z.union([z.string().trim().email().max(320), z.literal('')]).optional(),
   phone:             optionalText(30),
   title:             optionalText(200),
   company:           optionalText(200),
@@ -412,7 +412,7 @@ function normalizeLeadPatch(input: z.infer<typeof patchSchema>) {
     }
   }
 
-  if (input.email             !== undefined) patch.email             = input.email.trim().toLowerCase()
+  if (input.email !== undefined && input.email.trim() !== '') patch.email = input.email.trim().toLowerCase()
   if (input.status            !== undefined) patch.status            = input.status
   if (input.interest_status   !== undefined) patch.interest_status   = input.interest_status
   if (input.pipeline_stage_id !== undefined) patch.pipeline_stage_id = input.pipeline_stage_id
