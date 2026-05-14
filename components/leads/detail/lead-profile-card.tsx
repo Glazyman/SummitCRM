@@ -585,23 +585,33 @@ export function LeadProfileCard({
       )}
 
       {/* ── Custom fields ── */}
-      {Object.keys(lead.custom_fields).length > 0 && (
-        <div className="border-t border-border px-5 pt-4 pb-5">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Custom Fields
-          </p>
-          <div className="space-y-2">
-            {Object.entries(lead.custom_fields).map(([key, value]) => (
-              <div key={key} className="flex items-start justify-between gap-2 text-sm">
-                <span className="text-muted-foreground capitalize min-w-0">
-                  {key.replace(/_/g, ' ')}
-                </span>
-                <span className="font-medium text-right break-words">{String(value)}</span>
-              </div>
-            ))}
+      {(() => {
+        // Skip internal keys (_questionnaire etc.), already-displayed keys,
+        // and any value that isn't a plain scalar.
+        const SKIP = new Set(['contact_state', 'company_state', 'email_2', 'email_3',
+          'phone_2', 'phone_3', 'company_phone', 'company_phone_2'])
+        const entries = Object.entries(lead.custom_fields).filter(
+          ([k, v]) => !k.startsWith('_') && !SKIP.has(k) && typeof v !== 'object'
+        )
+        if (entries.length === 0) return null
+        return (
+          <div className="border-t border-border px-5 pt-4 pb-5">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Custom Fields
+            </p>
+            <div className="space-y-2">
+              {entries.map(([key, value]) => (
+                <div key={key} className="flex items-start justify-between gap-2 text-sm">
+                  <span className="text-muted-foreground capitalize min-w-0">
+                    {key.replace(/_/g, ' ')}
+                  </span>
+                  <span className="font-medium text-right break-words">{String(value)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

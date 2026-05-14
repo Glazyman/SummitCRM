@@ -369,6 +369,8 @@ export function LeadFullPanel({
               onSave={handleSaveProfile}
               onRenameBatch={canEditBatch ? handleRenameBatch : undefined}
               canEditBatch={canEditBatch}
+              onStatusChange={handleStatusChange}
+              onInterestChange={handleInterestChange}
             />
           </div>
 
@@ -383,93 +385,29 @@ export function LeadFullPanel({
               </div>
             )}
 
-            {/* Tab bar + status/interest dropdowns */}
-            <div className="flex shrink-0 items-center border-b border-border bg-card">
-              {/* Tabs */}
-              <div className="flex flex-1 overflow-x-auto scrollbar-hide">
-                {TABS.map(({ id, label, Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setActiveTab(id)}
-                    className={cn(
-                      'flex shrink-0 items-center gap-1.5 border-b-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap',
-                      activeTab === id
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                    {id === 'followups' && pendingFollowUps > 0 && (
-                      <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-                        {pendingFollowUps}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {/* Status + Interest dropdowns */}
-              <div className="flex shrink-0 items-center gap-1.5 border-l border-border px-3">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', STATUS_CONFIG[lead.status].badge)}
-                    >
-                      {STATUS_CONFIG[lead.status].label}
-                      <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" minWidth="170px">
-                    <DropdownMenuLabel>Change status</DropdownMenuLabel>
-                    {ALL_STATUSES.map((s) => {
-                      const m = STATUS_CONFIG[s]
-                      return (
-                        <DropdownMenuItem
-                          key={s}
-                          onClick={() => handleStatusChange(s)}
-                          className={cn(s === lead.status && 'opacity-50 cursor-default')}
-                        >
-                          <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
-                          {m.label}
-                        </DropdownMenuItem>
-                      )
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap', INTEREST_CONFIG[lead.interest_status].badge)}
-                    >
-                      {INTEREST_CONFIG[lead.interest_status].label}
-                      <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" minWidth="160px">
-                    <DropdownMenuLabel>Interest level</DropdownMenuLabel>
-                    {ALL_INTEREST_STATUSES.map((s) => {
-                      const m = INTEREST_CONFIG[s]
-                      return (
-                        <DropdownMenuItem
-                          key={s}
-                          onClick={() => handleInterestChange(s)}
-                          className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}
-                        >
-                          <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
-                          {m.label}
-                        </DropdownMenuItem>
-                      )
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+            {/* Tab bar — full width, 4 equal tabs, no overflow */}
+            <div className="grid shrink-0 border-b border-border bg-card" style={{ gridTemplateColumns: `repeat(${TABS.length}, 1fr)` }}>
+              {TABS.map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveTab(id)}
+                  className={cn(
+                    'flex items-center justify-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors',
+                    activeTab === id
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{label}</span>
+                  {id === 'followups' && pendingFollowUps > 0 && (
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                      {pendingFollowUps}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
 
             {/* Tab content */}
