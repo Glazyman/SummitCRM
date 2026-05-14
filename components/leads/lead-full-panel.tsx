@@ -386,19 +386,22 @@ export function LeadFullPanel({
             )}
 
             {/* Tab bar — full width, 4 equal tabs, no overflow */}
-            <div className="grid shrink-0 divide-x divide-border border-b border-border bg-card" style={{ gridTemplateColumns: `repeat(${TABS.length}, 1fr)` }}>
-              {TABS.map(({ id, label, Icon }) => (
+            <div className="grid shrink-0 border-b border-border bg-card" style={{ gridTemplateColumns: `repeat(${TABS.length}, 1fr)` }}>
+              {TABS.map(({ id, label, Icon }, i) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setActiveTab(id)}
                   className={cn(
-                    'flex items-center justify-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors',
+                    'relative flex items-center justify-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors',
                     activeTab === id
                       ? 'border-primary text-primary'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
                   )}
                 >
+                  {i > 0 && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-px bg-border/50" />
+                  )}
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="truncate">{label}</span>
                   {id === 'followups' && pendingFollowUps > 0 && (
