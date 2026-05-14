@@ -56,6 +56,7 @@ export function LeadProfileCard({
 }: LeadProfileCardProps) {
   const [editing, setEditing]     = React.useState(false)
   const [saving,  setSaving]      = React.useState(false)
+  const [saveError, setSaveError] = React.useState<string | null>(null)
   // Draft holds Partial<LeadDetail> plus the two custom_fields-backed
   // state fields. The PATCH route accepts these at the top level and
   // merges them into custom_fields server-side.
@@ -90,16 +91,20 @@ export function LeadProfileCard({
   function cancelEdit() {
     setEditing(false)
     setDraft({})
+    setSaveError(null)
   }
 
   async function handleSave() {
     setSaving(true)
+    setSaveError(null)
     try {
       // Cast: draft contains the two extra state fields that the API
       // PATCH route accepts and merges into custom_fields.
       await onSave(draft as Partial<LeadDetail>)
       setEditing(false)
       setDraft({})
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed')
     } finally {
       setSaving(false)
     }
@@ -259,14 +264,19 @@ export function LeadProfileCard({
               <Pencil className="h-3.5 w-3.5" /> Edit
             </Button>
           ) : (
-            <div className="flex gap-1.5">
-              <Button size="sm" variant="ghost" className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground" onClick={cancelEdit} disabled={saving}>
-                <X className="h-3.5 w-3.5 mr-1" /> Cancel
-              </Button>
-              <Button size="sm" className="h-8 gap-1.5 px-3 text-xs font-medium" onClick={handleSave} disabled={saving}>
-                <Check className="h-3.5 w-3.5" />
-                {saving ? 'Saving…' : 'Save'}
-              </Button>
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex gap-1.5">
+                <Button size="sm" variant="ghost" className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground" onClick={cancelEdit} disabled={saving}>
+                  <X className="h-3.5 w-3.5 mr-1" /> Cancel
+                </Button>
+                <Button size="sm" className="h-8 gap-1.5 px-3 text-xs font-medium" onClick={handleSave} disabled={saving}>
+                  <Check className="h-3.5 w-3.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+              {saveError && (
+                <p className="text-xs text-destructive">{saveError}</p>
+              )}
             </div>
           )}
         </div>

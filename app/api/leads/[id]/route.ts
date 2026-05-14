@@ -102,11 +102,10 @@ const interestStatusSchema = z.enum(['pending', 'interested', 'not_interested'])
 
 const optionalText = (max: number) => z.string().max(max).nullable().optional()
 
-// US state codes (50 + DC) or empty string (clear field).
-const stateField = z.union([
-  z.literal(''),
-  z.string().regex(/^[A-Z]{2}$/),
-]).nullable().optional()
+// Accept any string — UI dropdown enforces 2-char codes for new entries;
+// CSV-imported leads may have free-text values (e.g. "Texas", "tx") that
+// would otherwise block saves for ALL fields on that lead.
+const stateField = z.string().max(50).nullable().optional()
 
 const patchSchema = z.object({
   first_name:        optionalText(100),

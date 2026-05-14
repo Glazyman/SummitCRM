@@ -127,8 +127,9 @@ export function LeadFullPanel({
       setData((d) => d ? { ...d, lead: { ...d.lead, ...json.lead, batch_name: d.lead.batch_name, assigned_name: d.lead.assigned_name } } : d)
       // Propagate all changed fields to the parent list (leads/pipeline)
       if (json.lead) onLeadChange(json.lead as Partial<LeadDetail>)
-    } catch {
+    } catch (err) {
       setData((d) => d ? { ...d, lead: prev } : d)
+      throw err
     }
   }
 
