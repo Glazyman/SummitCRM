@@ -227,7 +227,7 @@ function CallsByRepPanel({ reps }: { reps: RepStat[] }) {
 
 // ── Main component ────────────────────────────────────────────────────────
 export function RepPerformancePanel() {
-  const [period, setPeriod]   = React.useState<Period>('week')
+  const [period, setPeriod]   = React.useState<Period>('day')
   const [anchor, setAnchor]   = React.useState<Date>(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d
   })
