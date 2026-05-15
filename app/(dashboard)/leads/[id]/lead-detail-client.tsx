@@ -115,6 +115,15 @@ export default function LeadDetailClient({
     router.refresh()
   }
 
+  async function handleMoveBatch(batchId: string | null, batchName: string | null) {
+    await requestJson(`/api/leads/${lead.id}`, {
+      method: 'PATCH',
+      body:   JSON.stringify({ batch_id: batchId }),
+    })
+    setLead((l) => ({ ...l, batch_id: batchId, batch_name: batchName }))
+    router.refresh()
+  }
+
   async function handleStatusChange(status: LeadStatus) {
     const prev = lead.status
     if (prev === status) return
@@ -454,6 +463,7 @@ export default function LeadDetailClient({
               teamMembers={teamMembers}
               onSave={handleSaveProfile}
               onRenameBatch={canEditBatch ? handleRenameBatch : undefined}
+              onMoveBatch={canEditBatch ? handleMoveBatch : undefined}
               canEditBatch={canEditBatch}
               onStatusChange={handleStatusChange}
               onInterestChange={handleInterestChange}

@@ -120,6 +120,7 @@ const patchSchema = z.object({
   interest_status:   interestStatusSchema.optional(),
   pipeline_stage_id: z.string().uuid().nullable().optional(),
   assigned_to:       z.string().uuid().nullable().optional(),
+  batch_id:          z.string().uuid().nullable().optional(),
   // Stored inside leads.custom_fields, not as top-level columns.
   contact_state:     stateField,
   company_state:     stateField,
@@ -185,6 +186,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         .single() as { data: { user_id: string } | null; error: unknown }
 
       if (!assignee) return NextResponse.json({ error: 'Assignee is not a workspace member' }, { status: 422 })
+    }
+
+    if ('batch_id' in patch) {
+      if (!['admin', 'super_admin'].includes(member.role)) {
+        return NextResponse.json({ error: 'Only admins can move leads between batches' }, { status: 403 })
+      }
+      if (patch.batch_id) {
+        const { data: batchRow } = await (adminClient as any)
+          .from('lead_batches')
+          .select('id')
+          .eq('id', patch.batch_id)
+          .eq('workspace_id', member.workspace_id)
+          .single() as { data: { id: string } | null }
+        if (!batchRow) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
+      }
     }
 
     const { data: existing } = await supabase
@@ -416,6 +432,7 @@ function normalizeLeadPatch(input: z.infer<typeof patchSchema>) {
   if (input.interest_status   !== undefined) patch.interest_status   = input.interest_status
   if (input.pipeline_stage_id !== undefined) patch.pipeline_stage_id = input.pipeline_stage_id
   if (input.assigned_to       !== undefined) patch.assigned_to       = input.assigned_to
+  if (input.batch_id          !== undefined) patch.batch_id          = input.batch_id
 
   return patch as Partial<{
     first_name:        string | null
@@ -430,5 +447,6 @@ function normalizeLeadPatch(input: z.infer<typeof patchSchema>) {
     interest_status:   string
     pipeline_stage_id: string | null
     assigned_to:       string | null
+    batch_id:          string | null
   }>
 }

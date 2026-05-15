@@ -172,6 +172,16 @@ export function LeadFullPanel({
     setData((d) => d ? { ...d, lead: { ...d.lead, batch_name: name } } : d)
   }
 
+  async function handleMoveBatch(batchId: string | null, batchName: string | null) {
+    const res = await fetch(`/api/leads/${leadId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId }) })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      throw new Error(json?.error ?? 'Move failed')
+    }
+    setData((d) => d ? { ...d, lead: { ...d.lead, batch_id: batchId, batch_name: batchName } } : d)
+    onLeadChange({ batch_id: batchId } as Partial<LeadDetail>)
+  }
+
   // ── Note mutations ────────────────────────────────────────────────────
   async function handleAddNote(content: string, assignedTo: string[]) {
     const res  = await fetch(`/api/leads/${leadId}/notes`, {
@@ -368,6 +378,7 @@ export function LeadFullPanel({
               teamMembers={teamMembers}
               onSave={handleSaveProfile}
               onRenameBatch={canEditBatch ? handleRenameBatch : undefined}
+              onMoveBatch={canEditBatch ? handleMoveBatch : undefined}
               canEditBatch={canEditBatch}
               onStatusChange={handleStatusChange}
               onInterestChange={handleInterestChange}

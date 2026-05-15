@@ -19,12 +19,19 @@ import { US_STATES } from '@/lib/us-states'
 import { CopyableContact } from './copyable-contact'
 import type { LeadDetail, TeamMember, LeadStatus, InterestStatus } from './types'
 
+interface BatchOption {
+  id:   string
+  name: string
+}
+
 interface LeadProfileCardProps {
   lead:               LeadDetail
   teamMembers:        TeamMember[]
   onSave:             (patch: Partial<LeadDetail>) => Promise<void>
   /** When set, user can rename the linked batch (updates all leads in that batch). */
   onRenameBatch?:     (name: string) => Promise<void>
+  /** When set, user can move the lead to a different batch. */
+  onMoveBatch?:       (batchId: string | null, batchName: string | null) => Promise<void>
   canEditBatch?:      boolean
   onStatusChange?:    (status: LeadStatus) => void
   onInterestChange?:  (status: InterestStatus) => void
@@ -50,6 +57,7 @@ export function LeadProfileCard({
   teamMembers,
   onSave,
   onRenameBatch,
+  onMoveBatch,
   canEditBatch = true,
   onStatusChange,
   onInterestChange,
@@ -66,6 +74,11 @@ export function LeadProfileCard({
   const [batchEditing, setBatchEditing] = React.useState(false)
   const [batchDraft, setBatchDraft]     = React.useState('')
   const [batchSaving, setBatchSaving]   = React.useState(false)
+  const [moveBatchMode, setMoveBatchMode]       = React.useState(false)
+  const [availableBatches, setAvailableBatches] = React.useState<BatchOption[]>([])
+  const [batchesLoading, setBatchesLoading]     = React.useState(false)
+  const [selectedBatchId, setSelectedBatchId]   = React.useState<string>('')
+  const [moveBatchSaving, setMoveBatchSaving]   = React.useState(false)
 
   const name         = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '—'
   const initials     = [lead.first_name?.[0], lead.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
@@ -524,23 +537,96 @@ export function LeadProfileCard({
                   Cancel
                 </Button>
               </div>
+            ) : moveBatchMode ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <select
+                  value={selectedBatchId}
+                  onChange={(e) => setSelectedBatchId(e.target.value)}
+                  disabled={batchesLoading || moveBatchSaving}
+                  className={cn(fieldInput, 'min-w-[10rem] flex-1')}
+                >
+                  {batchesLoading ? (
+                    <option value="">Loading…</option>
+                  ) : (
+                    availableBatches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))
+                  )}
+                </select>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  disabled={moveBatchSaving || batchesLoading || selectedBatchId === lead.batch_id}
+                  onClick={async () => {
+                    if (!onMoveBatch) return
+                    const target = availableBatches.find((b) => b.id === selectedBatchId)
+                    setMoveBatchSaving(true)
+                    try {
+                      await onMoveBatch(selectedBatchId || null, target?.name ?? null)
+                      setMoveBatchMode(false)
+                    } finally {
+                      setMoveBatchSaving(false)
+                    }
+                  }}
+                >
+                  {moveBatchSaving ? 'Moving…' : 'Move'}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 shrink-0"
+                  disabled={moveBatchSaving}
+                  onClick={() => setMoveBatchMode(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
             ) : (
               <div className="flex items-start justify-between gap-2">
                 <span className="text-sm break-words">{lead.batch_name ?? 'Unnamed batch'}</span>
-                {canEditBatch && onRenameBatch && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 shrink-0 gap-1.5 px-2.5 text-xs font-medium"
-                    onClick={() => {
-                      setBatchDraft(lead.batch_name ?? '')
-                      setBatchEditing(true)
-                    }}
-                  >
-                    <Pencil className="h-3 w-3" />
-                    Rename
-                  </Button>
+                {canEditBatch && (onRenameBatch || onMoveBatch) && (
+                  <div className="flex shrink-0 gap-1">
+                    {onRenameBatch && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1.5 px-2.5 text-xs font-medium"
+                        onClick={() => {
+                          setBatchDraft(lead.batch_name ?? '')
+                          setBatchEditing(true)
+                        }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                        Rename
+                      </Button>
+                    )}
+                    {onMoveBatch && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2.5 text-xs font-medium"
+                        onClick={async () => {
+                          setBatchesLoading(true)
+                          setMoveBatchMode(true)
+                          setSelectedBatchId(lead.batch_id ?? '')
+                          try {
+                            const res  = await fetch('/api/batches')
+                            const json = await res.json()
+                            setAvailableBatches((json.data?.batches ?? []) as BatchOption[])
+                            setSelectedBatchId(lead.batch_id ?? (json.data?.batches?.[0]?.id ?? ''))
+                          } finally {
+                            setBatchesLoading(false)
+                          }
+                        }}
+                      >
+                        Move
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
