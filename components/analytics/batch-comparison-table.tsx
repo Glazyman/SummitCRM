@@ -4,12 +4,12 @@ import React, { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Layers, ChevronUp, ChevronDown, ChevronsUpDown, X, RefreshCw, ExternalLink } from 'lucide-react'
+import { Layers, ChevronUp, ChevronDown, ChevronsUpDown, X, RefreshCw, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
 import type { BatchRow } from './types'
 
-type SortKey = 'lead_count' | 'emails_sent' | 'open_rate' | 'reply_rate' | 'conversion_rate'
+type SortKey = 'lead_count'
 
 interface BatchLead {
   id:         string
@@ -24,14 +24,15 @@ interface BatchLead {
 }
 
 interface Props {
-  batches:       BatchRow[]
-  loading?:      boolean
-  isAdmin?:      boolean
+  batches:        BatchRow[]
+  loading?:       boolean
+  isAdmin?:       boolean
   currentUserId?: string
+  onDelete?:      (id: string) => void
 }
 
-export function BatchComparisonTable({ batches, loading, isAdmin, currentUserId }: Props) {
-  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'open_rate', dir: 'desc' })
+export function BatchComparisonTable({ batches, loading, isAdmin, currentUserId, onDelete }: Props) {
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'lead_count', dir: 'desc' })
   const sorted = useMemo(() =>
     [...batches].sort((a, b) => {
       const d = sort.dir === 'asc' ? 1 : -1
@@ -41,15 +42,24 @@ export function BatchComparisonTable({ batches, loading, isAdmin, currentUserId 
   const onSort = (key: SortKey) =>
     setSort(p => ({ key, dir: p.key === key && p.dir === 'desc' ? 'asc' : 'desc' }))
 
-  const cols: Array<{ key: SortKey; label: string }> = [
-    { key: 'lead_count',      label: 'Leads'       },
-    { key: 'emails_sent',     label: 'Sent'        },
-    { key: 'open_rate',       label: 'Open rate'   },
-    { key: 'reply_rate',      label: 'Reply rate'  },
-    { key: 'conversion_rate', label: 'Conversion'  },
-  ]
-
   const maxLeads = Math.max(...batches.map(b => b.lead_count), 1)
+
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  async function handleDelete(e: React.MouseEvent, batch: BatchRow) {
+    e.stopPropagation()
+    if (!confirm(`Delete "${batch.name}" and all its leads? This cannot be undone.`)) return
+    setDeletingId(batch.id)
+    try {
+      const res = await fetch(`/api/batches/${batch.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        onDelete?.(batch.id)
+        if (openBatch?.id === batch.id) setOpenBatch(null)
+      }
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   // Side panel state
   const [openBatch,    setOpenBatch]    = useState<BatchRow | null>(null)
@@ -79,6 +89,8 @@ export function BatchComparisonTable({ batches, loading, isAdmin, currentUserId 
     setSelectedLeadId(null)
   }
 
+  const colCount = isAdmin ? 4 : 3 // batch | leads | added | (delete if admin)
+
   return (
     <>
       <Card>
@@ -95,24 +107,23 @@ export function BatchComparisonTable({ batches, loading, isAdmin, currentUserId 
               <thead>
                 <tr className="border-b bg-muted/40">
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Batch</th>
-                  {cols.map(c => (
-                    <th key={c.key} className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
-                      <button onClick={() => onSort(c.key)} className="flex items-center gap-1 group hover:text-foreground">
-                        {c.label}
-                        {sort.key === c.key
-                          ? sort.dir === 'asc' ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-primary" />
-                          : <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground" />
-                        }
-                      </button>
-                    </th>
-                  ))}
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
+                    <button onClick={() => onSort('lead_count')} className="flex items-center gap-1 group hover:text-foreground">
+                      Leads
+                      {sort.key === 'lead_count'
+                        ? sort.dir === 'asc' ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-primary" />
+                        : <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground" />
+                      }
+                    </button>
+                  </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Added</th>
+                  {isAdmin && <th className="w-10 px-2 py-3" />}
                 </tr>
               </thead>
               <tbody>
                 {loading && Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b animate-pulse">
-                    {Array.from({ length: 7 }).map((__, j) => (
+                    {Array.from({ length: colCount }).map((__, j) => (
                       <td key={j} className="px-4 py-3"><div className="h-4 w-16 rounded bg-muted" /></td>
                     ))}
                   </tr>
@@ -137,25 +148,28 @@ export function BatchComparisonTable({ batches, loading, isAdmin, currentUserId 
                         <Progress value={Math.round((b.lead_count / maxLeads) * 100)} className="h-1 w-20" />
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-medium">{b.emails_sent.toLocaleString()}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-semibold">{b.open_rate}%</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-semibold">{b.reply_rate}%</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={cn('font-semibold', b.conversion_rate === 0 && 'text-muted-foreground')}>
-                        {b.conversion_rate}%
-                      </span>
-                    </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
                       {new Date(b.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
                     </td>
+                    {isAdmin && (
+                      <td className="px-2 py-3" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={e => void handleDelete(e, b)}
+                          disabled={deletingId === b.id}
+                          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40"
+                          title="Delete batch"
+                        >
+                          {deletingId === b.id
+                            ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            : <Trash2 className="h-3.5 w-3.5" />
+                          }
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {!loading && sorted.length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No batches found</td></tr>
+                  <tr><td colSpan={colCount} className="px-4 py-8 text-center text-muted-foreground">No batches found</td></tr>
                 )}
               </tbody>
             </table>

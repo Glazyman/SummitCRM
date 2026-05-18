@@ -68,14 +68,10 @@ export interface RepRow {
 }
 
 export interface BatchRow {
-  id:              string
-  name:            string
-  lead_count:      number
-  emails_sent:     number
-  open_rate:       number
-  reply_rate:      number
-  conversion_rate: number
-  created_at:      string
+  id:         string
+  name:       string
+  lead_count: number
+  created_at: string
 }
 
 export interface CallOverview {

@@ -283,6 +283,7 @@ function AnalyticsContent({ userRole, userId }: Props) {
             loading={loadingBatches}
             isAdmin={isAdmin}
             currentUserId={userId}
+            onDelete={id => setBatches(prev => prev.filter(b => b.id !== id))}
           />
         )}
       </div>

@@ -1,6 +1,6 @@
 /**
  * GET /api/analytics/batches
- * Per-batch lead performance. manager+
+ * Per-batch lead counts. manager+
  */
 import { NextResponse } from 'next/server'
 import { cookies }      from 'next/headers'
@@ -36,10 +36,6 @@ export async function GET(req: Request) {
 
     const batchIds = batches.map(b => b.id)
 
-    // SQL aggregate returned as a single jsonb value — PostgREST's
-    // db-max-rows cap (1000) doesn't apply to single-row responses, so
-    // batch counts are accurate even at 10k+ leads per batch. The previous
-    // approach silently truncated to 1000.
     const { data: stats } = await adminClient.rpc('get_batch_analytics', {
       p_workspace_id: member.workspace_id,
       p_batch_ids:    batchIds,
@@ -48,28 +44,15 @@ export async function GET(req: Request) {
       emails: Array<{ batch_id: string; sent: number; opened: number; replied: number }>
     } | null }
 
-    const leadMap  = new Map<string, { total: number; converted: number }>()
-    const emailMap = new Map<string, { sent: number; opened: number; replied: number }>()
+    const leadMap = new Map<string, { total: number }>()
+    for (const l of stats?.leads ?? []) leadMap.set(l.batch_id, { total: l.total })
 
-    for (const l of stats?.leads ?? [])  leadMap.set(l.batch_id,  { total: l.total, converted: l.converted })
-    for (const e of stats?.emails ?? []) emailMap.set(e.batch_id, { sent: e.sent, opened: e.opened, replied: e.replied })
-
-    const r = (n: number, d: number) => d > 0 ? Math.round((n / d) * 1000) / 10 : 0
-
-    const rows = batches.map(b => {
-      const l = leadMap.get(b.id)  ?? { total: 0, converted: 0 }
-      const e = emailMap.get(b.id) ?? { sent: 0, opened: 0, replied: 0 }
-      return {
-        id:              b.id,
-        name:            b.name,
-        lead_count:      l.total,
-        emails_sent:     e.sent,
-        open_rate:       r(e.opened,  e.sent),
-        reply_rate:      r(e.replied, e.sent),
-        conversion_rate: r(l.converted, l.total),
-        created_at:      b.created_at,
-      }
-    })
+    const rows = batches.map(b => ({
+      id:         b.id,
+      name:       b.name,
+      lead_count: leadMap.get(b.id)?.total ?? 0,
+      created_at: b.created_at,
+    }))
 
     return NextResponse.json({ batches: rows })
   } catch (err) {
