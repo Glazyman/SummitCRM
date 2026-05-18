@@ -765,3 +765,32 @@ User asked to build a one-shot interactive HTML architecture map (spec from `~/D
 3. `20260513000003_declare_get_workspace_leads_json.sql` — `CREATE OR REPLACE` of the existing prod function (no-op against the live function, registers in migrations history).
 
 **Updated migration tally:** 16 migrations total / ~42 commits / 3 production migrations applied this session, each with explicit user authorization via Supabase MCP OAuth.
+
+---
+
+## 23. Session 2026-05-18 — analytics batches cleanup
+
+### 23a. Deleteable batches + remove email columns (`dfe98e9`)
+
+User request: make batches deleteable from the analytics Batches tab, and remove the email-metric columns (Sent / Open rate / Reply rate / Conversion) since they're unused.
+
+**Columns removed from `BatchRow`:**
+- `emails_sent`, `open_rate`, `reply_rate`, `conversion_rate` — stripped from the type (`components/analytics/types.ts`), the table component, and the API route.
+
+**New columns:** Batch | Leads (sortable, with progress bar) | Added | 🗑 (admin only)
+
+**Delete flow** mirrors the existing `activities-batches-view.tsx` pattern:
+- Trash icon button, admin-only (`isAdmin` prop gates visibility).
+- Calls `DELETE /api/batches/:id` — the existing endpoint that hard-deletes the `lead_batches` row and all leads with that `batch_id`.
+- `onDelete` callback passed from `analytics-client.tsx` removes the row from local state immediately (`setBatches(prev => prev.filter(b => b.id !== id))`).
+- No new API route or migration needed — the DELETE endpoint was already wired up and used by the activities/batches view.
+
+**Sync with past imports:** both analytics and the import page read from `lead_batches`. Deleting via analytics removes the row from the DB; past imports will no longer show the batch on next page load. No additional sync work needed.
+
+**Files changed:**
+- `components/analytics/types.ts` — stripped email fields from `BatchRow`
+- `components/analytics/batch-comparison-table.tsx` — removed email columns, added trash button + delete handler
+- `app/(dashboard)/analytics/analytics-client.tsx` — wired `onDelete` callback
+- `app/api/analytics/batches/route.ts` — simplified, no longer computes email metrics
+
+No DB migrations. No new API routes. Pushed to `origin/main` at `dfe98e9`.
