@@ -127,7 +127,7 @@ async function DashboardStats({
       <StatCard
         title="Calls Logged"
         value={formatNumber(metrics.callsLogged)}
-        description="this week"
+        description="last 30 days"
         icon={PhoneCall}
         color="purple"
       />
@@ -199,7 +199,7 @@ async function getDashboardMetrics(
   endOfToday.setHours(23, 59, 59, 999)
 
   const weekAgo = new Date(now)
-  weekAgo.setDate(weekAgo.getDate() - 7)
+  weekAgo.setDate(weekAgo.getDate() - 30)
   const startOfToday = new Date(now)
   startOfToday.setHours(0, 0, 0, 0)
 

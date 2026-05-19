@@ -235,13 +235,22 @@ export function RepPerformancePanel() {
   const [loading, setLoading] = React.useState(true)
   const [error, setError]     = React.useState<string | null>(null)
 
-  const load = React.useCallback(async (p: Period, a: Date) => {
+  const load = React.useCallback(async (p: Period, a: Date, autoStep = true) => {
     setLoading(true); setError(null)
     try {
       const res  = await fetch(`/api/admin/rep-performance?period=${p}&date=${toDateString(a)}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
-      setReps(json.reps ?? [])
+      const repsData: RepStat[] = json.reps ?? []
+      // If the current period has no calls at all and we're at or past today,
+      // silently step back one period so the user sees the most recent data.
+      const totalCalls = repsData.reduce((s, r) => s + r.calls, 0)
+      if (totalCalls === 0 && isAtOrPastToday(p, a) && autoStep) {
+        const prev = stepAnchor(p, a, -1)
+        setAnchor(prev)
+        return
+      }
+      setReps(repsData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
