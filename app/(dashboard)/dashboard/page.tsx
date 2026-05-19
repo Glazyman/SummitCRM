@@ -230,7 +230,6 @@ async function getDashboardMetrics(
     followUpsDueResult,
     workspaceResult,
     callsRes,
-    statusActivitiesRes,
     uniqueLeadsRes,
   ] = await Promise.all([
     supabase
@@ -262,12 +261,6 @@ async function getDashboardMetrics(
       .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
       .gte('called_at', weekAgo.toISOString()),
-    supabase
-      .from('activity_logs')
-      .select('metadata')
-      .eq('workspace_id', workspaceId)
-      .eq('type', 'lead_status_changed')
-      .gte('created_at', weekAgo.toISOString()),
     // Unique leads called today (vs daily target).
     supabaseAny.rpc('get_unique_leads_called', {
       p_workspace_id: workspaceId,
@@ -276,17 +269,13 @@ async function getDashboardMetrics(
     }),
   ])
 
-  // Calls logged this week (call logs + legacy bulk status-change fallback)
+  // Calls logged this week — all call paths write to call_logs, so the
+  // HEAD count is the single source of truth. The old activity_logs synthetic
+  // count was removed because it double-counted bulk status changes.
   let callsLogged = 0
   let callsToday  = 0
   try {
-    const statusToCall = new Set(['called', 'voicemail', 'no_answer', 'wrong_number', 'sold_already'])
-    const synthetic = ((statusActivitiesRes.data ?? []) as Array<{ metadata: Record<string, unknown> | null }>)
-      .filter((row) => row.metadata?.bulk === true)
-      .filter((row) => typeof row.metadata?.to === 'string' && statusToCall.has(row.metadata.to as string))
-      .length
-
-    callsLogged = ((callsRes as unknown as { count: number | null }).count ?? 0) + synthetic
+    callsLogged = (callsRes as unknown as { count: number | null }).count ?? 0
   } catch {}
 
   try {

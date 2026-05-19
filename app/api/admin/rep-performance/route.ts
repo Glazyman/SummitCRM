@@ -77,26 +77,26 @@ export async function GET(req: NextRequest) {
     const range     = periodRange(period, anchor)
     const wsId      = member.workspace_id
 
-    // Fetch everything in parallel
-    const [membersRes, callsRes, followUpsRes, leadsRes, statusActivitiesRes,
+    // Fetch everything in parallel.
+    // Call stats use get_call_stats_by_rep — a SQL aggregate RPC that returns a
+    // single jsonb row, bypassing PostgREST's 1000-row cap. All call paths
+    // (Log Call UI, status PATCH, bulk PATCH) write to call_logs, so that table
+    // is the single source of truth; the old activity_logs synthetic count was
+    // removed because it double-counted bulk calls.
+    const [membersRes, callStatsRes, followUpsRes, leadsRes,
            leadsCalledInPeriodRes, workspaceRes] = await Promise.all([
       admin.from('workspace_members').select('user_id, role').eq('workspace_id', wsId).eq('is_active', true),
-      admin.from('call_logs')
-        .select('logged_by, outcome, called_at')
-        .eq('workspace_id', wsId)
-        .gte('called_at', range.start)
-        .lt('called_at',  range.end),
+      // RPC aggregate — bypasses PostgREST row limit; returns [{logged_by, outcome, cnt}]
+      admin.rpc('get_call_stats_by_rep', {
+        p_workspace_id: wsId,
+        p_start:        range.start,
+        p_end:          range.end,
+      }),
       admin.from('follow_ups')
         .select('assigned_to, completed_at, due_at')
         .eq('workspace_id', wsId),
       // RPC aggregate — bypasses PostgREST row limit
       admin.rpc('get_leads_assigned_status_counts', { p_workspace_id: wsId }),
-      admin.from('activity_logs')
-        .select('user_id, metadata')
-        .eq('workspace_id', wsId)
-        .eq('type', 'lead_status_changed')
-        .gte('created_at', range.start)
-        .lt('created_at',  range.end),
       // Unique leads each rep called IN THIS PERIOD — bounded range.
       admin.rpc('get_unique_leads_called_by_rep_range', {
         p_workspace_id: wsId,
@@ -122,8 +122,17 @@ export async function GET(req: NextRequest) {
     const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
     const memberIds = members.map((m) => m.user_id)
     const nameById  = await getUsersById(admin, wsId, memberIds)
-    const calls     = (callsRes.data ?? []) as Array<{ logged_by: string; outcome: string; called_at: string }>
-    const statusActivities = (statusActivitiesRes.data ?? []) as Array<{ user_id: string; metadata: Record<string, unknown> | null }>
+
+    // Build per-rep call stats from RPC result [{logged_by, outcome, cnt}]
+    const callStatsRows = (callStatsRes.data ?? []) as Array<{ logged_by: string; outcome: string; cnt: number }>
+    const callsByUserOutcome = new Map<string, Map<string, number>>()
+    for (const row of callStatsRows) {
+      if (!row.logged_by) continue
+      const outcomeMap = callsByUserOutcome.get(row.logged_by) ?? new Map<string, number>()
+      outcomeMap.set(row.outcome, Number(row.cnt))
+      callsByUserOutcome.set(row.logged_by, outcomeMap)
+    }
+
     const followUps = (followUpsRes.data ?? []) as Array<{ assigned_to: string | null; completed_at: string | null; due_at: string }>
     // RPC returns [{assigned_to, status, cnt}] — expand into flat rows so filter logic works unchanged
     const leadCounts = (leadsRes.data ?? []) as Array<{ assigned_to: string | null; status: string; cnt: number }>
@@ -131,42 +140,15 @@ export async function GET(req: NextRequest) {
 
     const now = new Date()
 
-    const statusToOutcome = new Map<string, string>([
-      ['called', 'answered'],
-      ['voicemail', 'voicemail'],
-      ['no_answer', 'no_answer'],
-      ['wrong_number', 'wrong_number'],
-      ['sold_already', 'answered'],
-    ])
-
-    const syntheticCallsByUser = new Map<string, string[]>()
-    for (const row of statusActivities) {
-      if (!row.user_id) continue
-      const md = row.metadata ?? {}
-      if (md.bulk !== true) continue
-      const nextStatus = typeof md.to === 'string' ? md.to : ''
-      const outcome = statusToOutcome.get(nextStatus)
-      if (!outcome) continue
-      const existing = syntheticCallsByUser.get(row.user_id) ?? []
-      existing.push(outcome)
-      syntheticCallsByUser.set(row.user_id, existing)
-    }
-
     // Aggregate per user
     const reps = members
       .filter(m => ['rep', 'admin', 'super_admin'].includes(m.role))
       .map(m => {
         const uid = m.user_id
 
-        // Calls in period
-        const myCalls = calls.filter(c => c.logged_by === uid)
-        const callsByOutcome: Record<string, number> = {}
-        for (const c of myCalls) {
-          callsByOutcome[c.outcome] = (callsByOutcome[c.outcome] ?? 0) + 1
-        }
-        for (const outcome of (syntheticCallsByUser.get(uid) ?? [])) {
-          callsByOutcome[outcome] = (callsByOutcome[outcome] ?? 0) + 1
-        }
+        // Calls in period — from aggregate RPC, no row-cap risk
+        const outcomeMap = callsByUserOutcome.get(uid) ?? new Map<string, number>()
+        const callsByOutcome: Record<string, number> = Object.fromEntries(outcomeMap)
 
         // Follow-ups
         const myFUs = followUps.filter(f => f.assigned_to === uid)
@@ -183,7 +165,7 @@ export async function GET(req: NextRequest) {
           id:               uid,
           name:             nameById.get(uid) ?? uid,
           role:             m.role,
-          calls:            myCalls.length + (syntheticCallsByUser.get(uid)?.length ?? 0),
+          calls:            [...outcomeMap.values()].reduce((s, n) => s + n, 0),
           callsByOutcome,
           followUpsPending:  fuPending,
           followUpsOverdue:  fuOverdue,

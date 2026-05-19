@@ -56,8 +56,13 @@ export async function GET(req: Request) {
 
     const wsId = member.workspace_id
 
-    // Load all active members + their emails in the period
-    const [membersRes, emailsRes, leadsAssignedRes] = await Promise.all([
+    // Load all active members + their emails in the period.
+    // Call stats use get_call_stats_by_rep — a SQL aggregate RPC that returns a
+    // single jsonb row, bypassing PostgREST's 1000-row cap. All call paths
+    // (Log Call UI, status PATCH, bulk PATCH) write to call_logs, so that table
+    // is the single source of truth; the old activity_logs synthetic count was
+    // removed because it double-counted bulk calls.
+    const [membersRes, emailsRes, leadsAssignedRes, callStatsRes] = await Promise.all([
       adminClient
         .from('workspace_members')
         .select('user_id, role, users:user_id(email, raw_user_meta_data)')
@@ -73,44 +78,19 @@ export async function GET(req: Request) {
 
       // RPC aggregate — bypasses PostgREST row limit
       adminClient.rpc('get_leads_assigned_status_counts', { p_workspace_id: wsId }),
+
+      // RPC aggregate — bypasses PostgREST row limit; returns [{logged_by, outcome, cnt}]
+      adminClient.rpc('get_call_stats_by_rep', {
+        p_workspace_id: wsId,
+        p_start:        range.start,
+        p_end:          range.end,
+      }),
     ]) as [
       { data: Array<{ user_id: string; role: string; users: { email: string; raw_user_meta_data: Record<string, unknown> } | null }> | null },
       { data: Array<{ sent_by: string | null; status: string; created_at: string }> | null },
-      { data: Array<{ assigned_to: string }> | null }
+      { data: Array<{ assigned_to: string }> | null },
+      { data: Array<{ logged_by: string; outcome: string; cnt: number }> | null },
     ]
-
-    // Calls per rep: call logs + legacy fallback from bulk status changes
-    let callRows: Array<{ user_id: string }> = []
-    try {
-      const [callLogsRes, statusActivitiesRes] = await Promise.all([
-        adminClient
-          .from('call_logs')
-          .select('logged_by')
-          .eq('workspace_id', wsId)
-          .gte('called_at', range.start)
-          .lte('called_at', range.end),
-        adminClient
-          .from('activity_logs')
-          .select('user_id, metadata')
-          .eq('workspace_id', wsId)
-          .eq('type', 'lead_status_changed')
-          .gte('created_at', range.start)
-          .lte('created_at', range.end),
-      ])
-
-      callRows = ((callLogsRes.data ?? []) as Array<{ logged_by: string | null }>)
-        .filter((r) => !!r.logged_by)
-        .map((r) => ({ user_id: r.logged_by as string }))
-
-      const statusToCall = new Set(['called', 'voicemail', 'no_answer', 'wrong_number', 'sold_already'])
-      const syntheticRows = ((statusActivitiesRes.data ?? []) as Array<{ user_id: string; metadata: Record<string, unknown> | null }>)
-        .filter((r) => !!r.user_id)
-        .filter((r) => r.metadata?.bulk === true)
-        .filter((r) => typeof r.metadata?.to === 'string' && statusToCall.has(r.metadata.to as string))
-        .map((r) => ({ user_id: r.user_id }))
-
-      callRows = [...callRows, ...syntheticRows]
-    } catch {}
 
     const members   = membersRes.data ?? []
     const emails    = emailsRes.data  ?? []
@@ -125,11 +105,12 @@ export async function GET(req: Request) {
       }
     }
 
-    // Count calls per user
+    // Count calls per user from RPC result [{logged_by, outcome, cnt}]
+    const callStatsRows = (callStatsRes.data ?? []) as Array<{ logged_by: string; outcome: string; cnt: number }>
     const callsByUser = new Map<string, number>()
-    for (const row of callRows) {
-      if (row.user_id) {
-        callsByUser.set(row.user_id, (callsByUser.get(row.user_id) ?? 0) + 1)
+    for (const row of callStatsRows) {
+      if (row.logged_by) {
+        callsByUser.set(row.logged_by, (callsByUser.get(row.logged_by) ?? 0) + Number(row.cnt))
       }
     }
 

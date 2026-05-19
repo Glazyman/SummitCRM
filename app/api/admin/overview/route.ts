@@ -131,32 +131,19 @@ export async function GET(req: Request) {
         { count: number | null },
       ]
 
-    // Calls count: primary from call logs + legacy fallback from bulk status changes
+    // Calls count: all call_logs rows in the period. All call paths (Log Call
+    // UI, status PATCH, bulk PATCH) write to call_logs, so this is the single
+    // source of truth. The old activity_logs synthetic count double-counted
+    // bulk calls and has been removed.
     let callsCount = 0
     try {
-      const [callsRes, statusActivitiesRes] = await Promise.all([
-        adminClient
-          .from('call_logs')
-          .select('id', { count: 'exact', head: true })
-          .eq('workspace_id', wsId)
-          .gte('called_at', range.start)
-          .lte('called_at', range.end),
-        adminClient
-          .from('activity_logs')
-          .select('metadata')
-          .eq('workspace_id', wsId)
-          .eq('type', 'lead_status_changed')
-          .gte('created_at', range.start)
-          .lte('created_at', range.end),
-      ])
-
-      const statusToCall = new Set(['called', 'voicemail', 'no_answer', 'wrong_number', 'sold_already'])
-      const synthetic = ((statusActivitiesRes.data ?? []) as Array<{ metadata: Record<string, unknown> | null }>)
-        .filter((row) => row.metadata?.bulk === true)
-        .filter((row) => typeof row.metadata?.to === 'string' && statusToCall.has(row.metadata.to as string))
-        .length
-
-      callsCount = (callsRes.count ?? 0) + synthetic
+      const callsRes = await adminClient
+        .from('call_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', wsId)
+        .gte('called_at', range.start)
+        .lte('called_at', range.end)
+      callsCount = callsRes.count ?? 0
     } catch {}
 
     const emails      = emailsRes.data     ?? []
