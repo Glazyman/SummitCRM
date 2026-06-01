@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
@@ -74,8 +74,9 @@ function getInitials(name: string | null | undefined, email: string | null | und
 }
 
 export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarProps) {
-  const pathname  = usePathname()
-  const router    = useRouter()
+  const pathname     = usePathname()
+  const searchParams = useSearchParams()
+  const router       = useRouter()
   const [activitiesDue, setActivitiesDue] = React.useState<number | undefined>(undefined)
 
   async function handleSignOut() {
@@ -100,10 +101,16 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
       .catch(() => {})
   }, [pathname]) // refresh count on every navigation
 
+  // When viewing a lead's full profile opened from another section (e.g.
+  // /leads/<id>?from=/pipeline), keep THAT section highlighted instead of Leads.
+  const fromParam = searchParams.get('from')
+  const isLeadDetail = /^\/leads\/[^/]+$/.test(pathname) && pathname !== '/leads/import'
+  const navPath = isLeadDetail && fromParam ? fromParam : pathname
+
   function isActive(href: string) {
-    if (href === '/dashboard' || href === '/settings' || href === '/leads/import') return pathname === href
-    if (href === '/leads') return pathname === '/leads' || (pathname.startsWith('/leads/') && !pathname.startsWith('/leads/import'))
-    return pathname.startsWith(href)
+    if (href === '/dashboard' || href === '/settings' || href === '/leads/import') return navPath === href
+    if (href === '/leads') return navPath === '/leads' || (navPath.startsWith('/leads/') && !navPath.startsWith('/leads/import'))
+    return navPath.startsWith(href)
   }
 
   const visibleMain = mainNav.map((item) => {

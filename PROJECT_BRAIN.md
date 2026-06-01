@@ -904,6 +904,25 @@ Header is `sticky top-0 z-20`. Any `z-50` inside is bounded by z-20 against outs
 | — | Approach: responsive shared components — only base/sm/md rules added, no `lg:`/`xl:` desktop rules modified, so desktop is unchanged | — |
 | — | Dashboard/analytics/admin/settings/lead-detail were already responsive (grids stack, tables in `overflow-x-auto`, mobile tab bar) — no change needed | — |
 
+### Session 2026-06-01 (follow-up scheduling + profile nav)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | **Untimed tasks** via a midnight sentinel (no migration): a task stored at local 00:00 = "no time slot". `fmtDate` shows date-only; `isOverdue` is calendar-day aware so a midnight task isn't "overdue" at 9am. New-task dialog got an "all day / no time" checkbox. | `app/(dashboard)/tasks/tasks-client.tsx` |
+| 2 | **No-answer/voicemail follow-up popup reworked** → shared `<FollowUpPrompt>`: "Add to tasks" creates an UNTIMED task (tomorrow 00:00); "Set time" reveals a date+time picker. Replaces the old hardcoded "tomorrow 11am" in all 4 call sites. | `components/leads/detail/follow-up-prompt.tsx`, `lead-full-panel.tsx`, `lead-detail-client.tsx`, `leads-client.tsx`, `quick-log-call-widget.tsx` |
+| 3 | **Time-conflict greying** (same-rep scope): `TimePicker` gained a `disabledSlots` prop; `useTakenSlots(assignee, date)` fetches the assignee's non-completed tasks for that date and greys booked HH:MM slots. | `components/ui/calendar-picker.tsx`, `hooks/use-taken-slots.ts` |
+| 4 | **Full profile opens in origin context**: the "Full profile" link carries `?from=<path>`; the sidebar highlights that section instead of always Leads when on `/leads/<id>?from=…`. (Back button already returns to origin via `router.back()`.) | `components/leads/lead-full-panel.tsx`, `components/layout/sidebar.tsx` |
+
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile/responsive pass)*
+## Untimed tasks (midnight sentinel) — how it works
+
+A `follow_ups.due_at` at **local 00:00** means "no time slot" (the time picker only offers 6am–9:30pm, so midnight can't collide with a real pick). No DB column was added.
+- Display: `fmtDate`/calendar show date-only (no "· 2:30 PM"); day panel shows "All day".
+- Overdue: `isOverdue()` in `tasks-client.tsx` is calendar-day aware — a midnight task today is NOT overdue until the day passes.
+- Created by: the follow-up popup's "Add to tasks", and the New Task dialog's "all day / no time" checkbox.
+- Conflict greying: `useTakenSlots` ignores untimed tasks (they occupy no slot).
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav)*

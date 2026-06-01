@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Activity, Clock, Phone, X, ExternalLink, ChevronDown, CheckCircle2, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import { LeadProfileCard }  from '@/components/leads/detail/lead-profile-card'
 import { ActivityTimeline } from '@/components/leads/detail/activity-timeline'
 import { NoteEditor }       from '@/components/leads/detail/note-editor'
 import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
+import { FollowUpPrompt }   from '@/components/leads/detail/follow-up-prompt'
 import { CallHistory }      from '@/components/leads/detail/call-history'
 import { Questionnaire }   from '@/components/leads/detail/questionnaire'
 import type { QuestionnaireData } from '@/components/leads/detail/questionnaire'
@@ -84,6 +86,9 @@ export function LeadFullPanel({
   const [activeTab,        setActiveTab]        = React.useState<TabId>('activity')
   const [followUpPrompt,   setFollowUpPrompt]   = React.useState<{ title: string; notes: string | null; due_at: string } | null>(null)
   const [questionnaireData, setQuestionnaireData] = React.useState<QuestionnaireData | null>(null)
+  // Remember which page the panel was opened from so the full profile can keep
+  // that section active in the sidebar and offer a Back link to it.
+  const pathname = usePathname()
 
   React.useEffect(() => {
     let cancelled = false
@@ -286,31 +291,6 @@ export function LeadFullPanel({
   }
 
 
-  async function scheduleSuggestedFollowUp() {
-    if (!followUpPrompt) return
-    const res = await fetch(`/api/leads/${leadId}/follow-ups`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(followUpPrompt),
-    })
-    const json = await res.json()
-    if (res.ok && json.follow_up) {
-      setData((d) => d ? {
-        ...d,
-        followUps: [
-          {
-            ...json.follow_up,
-            is_completed: !!json.follow_up.completed_at,
-            assigned_name: 'You',
-          },
-          ...d.followUps,
-        ],
-      } : d)
-      setFollowUpPrompt(null)
-      setActiveTab('followups')
-    }
-  }
-
   // ── Derived ───────────────────────────────────────────────────────────
   const lead             = data?.lead
   const name             = lead ? [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email : '…'
@@ -344,7 +324,7 @@ export function LeadFullPanel({
             </button>
           )}
           <Link
-            href={`/leads/${leadId}`}
+            href={`/leads/${leadId}?from=${encodeURIComponent(pathname)}`}
             className="flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             <ExternalLink className="h-3.5 w-3.5" />
@@ -388,11 +368,20 @@ export function LeadFullPanel({
           {/* Tabbed right column */}
           <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
             {followUpPrompt && (
-              <div className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900 flex items-center justify-between gap-3">
-                <span>No answer/voicemail logged. Schedule a follow-up for tomorrow morning?</span>
-                <Button size="sm" className="h-7" onClick={scheduleSuggestedFollowUp}>
-                  Schedule
-                </Button>
+              <div className="border-b border-amber-300 p-2">
+                <FollowUpPrompt
+                  leadId={leadId}
+                  title={followUpPrompt.title}
+                  notes={followUpPrompt.notes}
+                  assigneeId={currentUserId}
+                  message="No answer / voicemail logged. Add a follow-up task?"
+                  onScheduled={() => {
+                    setFollowUpPrompt(null)
+                    setActiveTab('followups')
+                    fetch(`/api/leads/${leadId}/full`).then((r) => r.json()).then((d) => setData(d)).catch(() => {})
+                  }}
+                  onDismiss={() => setFollowUpPrompt(null)}
+                />
               </div>
             )}
 

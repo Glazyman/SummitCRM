@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 
 import { LeadStatusBar }        from '@/components/leads/lead-status-bar'
 import { LeadFullPanel }        from '@/components/leads/lead-full-panel'
+import { FollowUpPrompt }       from '@/components/leads/detail/follow-up-prompt'
 import { LeadFiltersPanel }     from '@/components/leads/lead-filters'
 import { LeadTable }            from '@/components/leads/lead-table'
 import { BulkActionBar }        from '@/components/leads/bulk-action-bar'
@@ -363,26 +364,6 @@ export function LeadsClient({
     router.refresh()
   }
 
-  async function handleScheduleStatusFollowUp() {
-    if (!statusFollowUpPrompt) return
-    try {
-      const res = await fetch(`/api/leads/${statusFollowUpPrompt.leadId}/follow-ups`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: statusFollowUpPrompt.title,
-          notes: statusFollowUpPrompt.notes,
-          due_at: statusFollowUpPrompt.due_at,
-        }),
-      })
-      if (!res.ok) throw new Error('Failed to schedule follow-up')
-      setStatusFollowUpPrompt(null)
-      router.refresh()
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
   // ── Inline interest change (optimistic + API) ─────────────────────────
   async function handleInterestChange(leadId: string, interest_status: InterestStatus) {
     const previous = leads
@@ -668,13 +649,15 @@ export function LeadsClient({
       />
 
       {statusFollowUpPrompt && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <span>{statusFollowUpPrompt.leadName}: schedule a follow-up for tomorrow morning?</span>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handleScheduleStatusFollowUp}>Schedule</Button>
-            <Button size="sm" variant="ghost" onClick={() => setStatusFollowUpPrompt(null)}>Dismiss</Button>
-          </div>
-        </div>
+        <FollowUpPrompt
+          leadId={statusFollowUpPrompt.leadId}
+          title={statusFollowUpPrompt.title}
+          notes={statusFollowUpPrompt.notes}
+          assigneeId={currentUserId}
+          message={`${statusFollowUpPrompt.leadName}: add a follow-up task?`}
+          onScheduled={() => { setStatusFollowUpPrompt(null); router.refresh() }}
+          onDismiss={() => setStatusFollowUpPrompt(null)}
+        />
       )}
 
       {/* ── Toolbar: results count + per-page + columns ── */}

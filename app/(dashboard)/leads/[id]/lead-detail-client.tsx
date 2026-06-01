@@ -9,6 +9,7 @@ import { LeadProfileCard }  from '@/components/leads/detail/lead-profile-card'
 import { ActivityTimeline } from '@/components/leads/detail/activity-timeline'
 import { NoteEditor }       from '@/components/leads/detail/note-editor'
 import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
+import { FollowUpPrompt }   from '@/components/leads/detail/follow-up-prompt'
 import { CallHistory }      from '@/components/leads/detail/call-history'
 import { Questionnaire }   from '@/components/leads/detail/questionnaire'
 import type { QuestionnaireData } from '@/components/leads/detail/questionnaire'
@@ -381,24 +382,18 @@ export default function LeadDetailClient({
     }
   }
 
-  async function scheduleSuggestedFollowUp() {
-    if (!followUpPrompt) return
-    const result = await requestJson<{ follow_up: Omit<FollowUp, 'is_completed' | 'assigned_name'> }>(
-      `/api/leads/${lead.id}/follow-ups`,
-      {
-        method: 'POST',
-        body: JSON.stringify(followUpPrompt),
-      }
-    )
-    const member = teamMembers.find((m) => m.id === result.follow_up.assigned_to)
+  function handleFollowUpScheduled(created: Record<string, unknown> | null) {
+    setFollowUpPrompt(null)
+    setActiveTab('followups')
+    if (!created) { router.refresh(); return }
+    const fu = created as unknown as Omit<FollowUp, 'is_completed' | 'assigned_name'>
+    const member = teamMembers.find((m) => m.id === fu.assigned_to)
     const newFU: FollowUp = {
-      ...result.follow_up,
-      is_completed:  Boolean(result.follow_up.completed_at),
+      ...fu,
+      is_completed:  Boolean(fu.completed_at),
       assigned_name: member?.name ?? null,
     }
     setFollowUps((prev) => [newFU, ...prev])
-    setFollowUpPrompt(null)
-    setActiveTab('followups')
     addActivity({ type: 'follow_up_scheduled', metadata: { title: newFU.title, due_at: newFU.due_at } })
   }
 
@@ -438,17 +433,15 @@ export default function LeadDetailClient({
 
       {followUpPrompt && (
         <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6">
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            <span>Status updated to no answer/voicemail. Schedule a follow-up for tomorrow morning?</span>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={scheduleSuggestedFollowUp} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
-                Schedule
-              </button>
-              <button type="button" onClick={() => setFollowUpPrompt(null)} className="rounded-md px-2 py-1.5 text-xs text-amber-900 hover:bg-amber-100">
-                Dismiss
-              </button>
-            </div>
-          </div>
+          <FollowUpPrompt
+            leadId={lead.id}
+            title={followUpPrompt.title}
+            notes={followUpPrompt.notes}
+            assigneeId={currentUserId}
+            message="Status updated to no answer / voicemail. Add a follow-up task?"
+            onScheduled={handleFollowUpScheduled}
+            onDismiss={() => setFollowUpPrompt(null)}
+          />
         </div>
       )}
 

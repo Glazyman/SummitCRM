@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFoo
 import { Label } from '@/components/ui/label'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { CalendarPicker, TimePicker, splitDateTime, joinDateTime, toLocalDatetimeInput } from '@/components/ui/calendar-picker'
+import { useTakenSlots } from '@/hooks'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
 import { TasksCalendar, toLocalDateKey, fmtTime } from './tasks-calendar'
 import type { TeamMember } from '@/components/leads/detail/types'
@@ -51,6 +52,12 @@ function leadName(lead: Lead | null) {
 
 type DueBucket = 'past' | 'today' | 'future'
 
+// A task stored at local 00:00 is "untimed" (no time slot). The time picker
+// only offers 6am–9:30pm, so midnight is an unambiguous "no time" sentinel.
+function isUntimed(d: Date): boolean {
+  return d.getHours() === 0 && d.getMinutes() === 0
+}
+
 function fmtDate(iso: string): { label: string; bucket: DueBucket } {
   const d   = new Date(iso)
   const now = new Date()
@@ -58,11 +65,25 @@ function fmtDate(iso: string): { label: string; bucket: DueBucket } {
   const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const dueMidnight   = new Date(d.getFullYear(),   d.getMonth(),   d.getDate())
   const days = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / 86400000)
-  const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  // Untimed tasks show only the date (no "· 2:30 PM" suffix).
+  const suffix = isUntimed(d) ? '' : ` · ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
   if (days < 0)   return { label: `${Math.abs(days)}d overdue`, bucket: 'past' }
-  if (days === 0) return { label: `Today · ${timeStr}`, bucket: 'today' }
-  if (days === 1) return { label: `Tomorrow · ${timeStr}`, bucket: 'future' }
-  return { label: `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${timeStr}`, bucket: 'future' }
+  if (days === 0) return { label: `Today${suffix}`, bucket: 'today' }
+  if (days === 1) return { label: `Tomorrow${suffix}`, bucket: 'future' }
+  return { label: `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${suffix}`, bucket: 'future' }
+}
+
+// Overdue is calendar-day aware: an untimed task due today (stored at 00:00) is
+// NOT overdue just because midnight has passed — only a past calendar day, or a
+// timed task whose time has elapsed today, counts as overdue.
+function isOverdue(iso: string): boolean {
+  const d = new Date(iso)
+  const now = new Date()
+  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const due0   = new Date(d.getFullYear(),   d.getMonth(),   d.getDate())
+  if (due0.getTime() < today0.getTime()) return true
+  if (due0.getTime() > today0.getTime()) return false
+  return !isUntimed(d) && d.getTime() < now.getTime()
 }
 
 /** Tomorrow at 9 AM in local time. */
@@ -113,8 +134,12 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
     notes:      '',
     dueDate:    defaultDue.date,
     dueTime:    defaultDue.time,
+    noTime:     false,   // "all day" — store at 00:00 (no time slot)
     assignedTo: currentUserId,
   }))
+  // Slots already booked by this task's assignee on the chosen date, so the
+  // time picker can grey them out and avoid double-booking the rep.
+  const takenSlots = useTakenSlots(newForm.assignedTo || currentUserId, newForm.dueDate)
 
   // ── Filtered list ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -136,11 +161,10 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
 
   // ── Calendar-specific filtered activities ────────────────────────────────
   const calendarFiltered = useMemo(() => {
-    const now = new Date()
     return activities.filter((a) => {
       if (calendarFilterAssigned && a.assigned_to !== calendarFilterAssigned) return false
       if (calendarFilterStatus === 'open')     return !a.completed_at
-      if (calendarFilterStatus === 'past_due') return !a.completed_at && new Date(a.due_at) < now
+      if (calendarFilterStatus === 'past_due') return !a.completed_at && isOverdue(a.due_at)
       if (calendarFilterStatus === 'completed') return !!a.completed_at
       return true // 'all'
     })
@@ -196,7 +220,7 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
           priority:   newForm.priority,
           title:      newForm.title,
           notes:      newForm.notes || undefined,
-          dueAt:      new Date(joinDateTime(newForm.dueDate, newForm.dueTime || '09:00')).toISOString(),
+          dueAt:      new Date(joinDateTime(newForm.dueDate, newForm.noTime ? '00:00' : (newForm.dueTime || '09:00'))).toISOString(),
           assignedTo: newForm.assignedTo || null,
         }),
       })
@@ -207,13 +231,13 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
         setShowNew(false)
         const resetDue = splitDateTime(defaultActivityDueAt())
         setNewForm({ leadId: '', type: 'follow_up', priority: 'medium', title: '', notes: '',
-          dueDate: resetDue.date, dueTime: resetDue.time, assignedTo: currentUserId })
+          dueDate: resetDue.date, dueTime: resetDue.time, noTime: false, assignedTo: currentUserId })
       }
     } finally { setSaving(false) }
   }
 
   const openCount    = activities.filter((a) => !a.completed_at).length
-  const overdueCount = activities.filter((a) => !a.completed_at && new Date(a.due_at) < new Date()).length
+  const overdueCount = activities.filter((a) => !a.completed_at && isOverdue(a.due_at)).length
 
   const panelTeamMembers = (teamMembers as TeamMember[])
 
@@ -645,11 +669,23 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
                       onChange={(v) => setNewForm((f) => ({ ...f, dueDate: v }))}
                     />
                   </div>
-                  <TimePicker
-                    value={newForm.dueTime}
-                    onChange={(v) => setNewForm((f) => ({ ...f, dueTime: v }))}
-                  />
+                  {!newForm.noTime && (
+                    <TimePicker
+                      value={newForm.dueTime}
+                      onChange={(v) => setNewForm((f) => ({ ...f, dueTime: v }))}
+                      disabledSlots={takenSlots}
+                    />
+                  )}
                 </div>
+                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newForm.noTime}
+                    onChange={(e) => setNewForm((f) => ({ ...f, noTime: e.target.checked }))}
+                    className="h-3.5 w-3.5 rounded border-border accent-primary"
+                  />
+                  No specific time (all day)
+                </label>
               </div>
               {isAdmin && (
                 <div className="space-y-1.5">
@@ -740,7 +776,7 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
                     >
                       {/* Header row: time + type + mark done */}
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[11px] font-semibold text-muted-foreground">{fmtTime(a.due_at)}</span>
+                        <span className="text-[11px] font-semibold text-muted-foreground">{isUntimed(new Date(a.due_at)) ? 'All day' : fmtTime(a.due_at)}</span>
                         <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', typeColor)}>
                           {a.type === 'callback' ? 'Call Back' : 'Follow-up'}
                         </span>

@@ -287,10 +287,13 @@ export function TimePicker({
   value,
   onChange,
   className,
+  disabledSlots,
 }: {
   value:     string  // "HH:MM"
   onChange:  (v: string) => void
   className?: string
+  /** "HH:MM" slots to grey out (e.g. already booked for this rep). */
+  disabledSlots?: Set<string>
 }) {
   const [open,    setOpen]    = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
@@ -337,21 +340,27 @@ export function TimePicker({
         >
           <div className="max-h-60 overflow-y-auto py-1.5 overscroll-contain">
             {TIME_SLOTS.map((slot) => {
-              const sel = slot === value
+              const sel  = slot === value
+              const taken = disabledSlots?.has(slot) && !sel
               return (
                 <button
                   key={slot}
                   ref={sel ? selectedRef : undefined}
                   type="button"
-                  onClick={() => { onChange(slot); setOpen(false) }}
+                  disabled={taken}
+                  onClick={() => { if (!taken) { onChange(slot); setOpen(false) } }}
+                  title={taken ? 'Already booked' : undefined}
                   className={cn(
-                    'flex w-full items-center px-4 py-1.5 text-sm transition-colors',
+                    'flex w-full items-center justify-between gap-2 px-4 py-1.5 text-sm transition-colors',
                     sel
                       ? 'bg-primary text-primary-foreground font-semibold'
+                      : taken
+                      ? 'cursor-not-allowed text-muted-foreground/40 line-through'
                       : 'text-foreground hover:bg-muted',
                   )}
                 >
-                  {fmt12(slot)}
+                  <span>{fmt12(slot)}</span>
+                  {taken && <span className="text-[10px] font-medium not-italic no-underline">booked</span>}
                 </button>
               )
             })}
@@ -369,18 +378,21 @@ export function DateTimePicker({
   time,
   onDateChange,
   onTimeChange,
+  disabledSlots,
 }: {
   date:         string
   time:         string
   onDateChange: (v: string) => void
   onTimeChange: (v: string) => void
+  /** "HH:MM" slots to grey out in the time dropdown. */
+  disabledSlots?: Set<string>
 }) {
   return (
     <div className="flex gap-2">
       <div className="flex-1">
         <CalendarPicker value={date} onChange={onDateChange} />
       </div>
-      <TimePicker value={time} onChange={onTimeChange} />
+      <TimePicker value={time} onChange={onTimeChange} disabledSlots={disabledSlots} />
     </div>
   )
 }
