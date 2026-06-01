@@ -144,6 +144,10 @@ const nullableTextFields = [
 const INTEREST_PIPELINE_RULES: Record<string, string> = {
   interested: 'Interested',
 }
+// interest_status values that REMOVE the lead from the pipeline entirely
+// (clear pipeline_stage_id). Moving a lead back to "pending" takes it out of
+// the pipeline so it isn't a stale deal sitting in a stage.
+const INTEREST_PIPELINE_REMOVE = new Set<string>(['pending'])
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
@@ -241,17 +245,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       patch.interest_status !== existing.interest_status &&
       !('pipeline_stage_id' in patch)
     ) {
-      const targetStageName = INTEREST_PIPELINE_RULES[patch.interest_status]
-      if (targetStageName) {
-        const { data: stage } = await (adminClient as any)
-          .from('pipeline_stages')
-          .select('id')
-          .eq('workspace_id', member.workspace_id)
-          .ilike('name', targetStageName)
-          .single() as { data: { id: string } | null }
+      if (INTEREST_PIPELINE_REMOVE.has(patch.interest_status)) {
+        // e.g. moving back to "pending" — take it out of the pipeline.
+        patch.pipeline_stage_id = null
+      } else {
+        const targetStageName = INTEREST_PIPELINE_RULES[patch.interest_status]
+        if (targetStageName) {
+          const { data: stage } = await (adminClient as any)
+            .from('pipeline_stages')
+            .select('id')
+            .eq('workspace_id', member.workspace_id)
+            .ilike('name', targetStageName)
+            .single() as { data: { id: string } | null }
 
-        if (stage) {
-          patch.pipeline_stage_id = stage.id
+          if (stage) {
+            patch.pipeline_stage_id = stage.id
+          }
         }
       }
     }

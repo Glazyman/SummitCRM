@@ -999,4 +999,10 @@ Removed the separate "Leads Contacted" / "New Leads" card (merged contacted into
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards)*
+### Session 2026-06-01 (interest → pipeline removal)
+
+**Bug:** Setting a lead's interest to "interested" auto-adds it to the pipeline (the `Interested` stage), but moving interest back to "pending" left `pipeline_stage_id` set, so it stayed in the pipeline. **Cause:** `PATCH /api/leads/[id]` `INTEREST_PIPELINE_RULES` only mapped `interested → 'Interested'`; "pending" had no rule, so the stage was never cleared. **Fix:** added `INTEREST_PIPELINE_REMOVE = {'pending'}` — when interest changes to one of those (and the caller didn't set a stage explicitly), `patch.pipeline_stage_id = null`, removing the lead from the pipeline. (`not_interested` not included — say so if it should also drop out.)
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal)*
