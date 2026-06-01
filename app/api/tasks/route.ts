@@ -1,6 +1,6 @@
 /**
- * GET  /api/activities  — list follow-ups + callbacks for workspace
- * POST /api/activities  — create a new activity
+ * GET  /api/tasks  — list follow-ups + callbacks for workspace
+ * POST /api/tasks  — create a new task
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from 'next/server'
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     const effectiveAssignedTo = assignedTo ?? user.id
     if (member.role === 'rep' && effectiveAssignedTo !== user.id) {
-      return apiError('Reps can only assign activities to themselves', 403)
+      return apiError('Reps can only assign tasks to themselves', 403)
     }
 
     if (assignedTo) {

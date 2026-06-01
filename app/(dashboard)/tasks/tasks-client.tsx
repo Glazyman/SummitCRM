@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { CalendarPicker, TimePicker, splitDateTime, joinDateTime, toLocalDatetimeInput } from '@/components/ui/calendar-picker'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
-import { ActivitiesCalendar, toLocalDateKey, fmtTime } from './activities-calendar'
+import { TasksCalendar, toLocalDateKey, fmtTime } from './tasks-calendar'
 import type { TeamMember } from '@/components/leads/detail/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ interface Props {
   isAdmin?:          boolean
 }
 
-export function ActivitiesClient({ initialActivities, teamMembers, currentUserId, isAdmin }: Props) {
+export function TasksClient({ initialActivities, teamMembers, currentUserId, isAdmin }: Props) {
   const [activities,      setActivities]      = useState<Activity[]>(initialActivities)
   const [justCompleted,   setJustCompleted]   = useState<Set<string>>(new Set())
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
@@ -171,7 +171,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
       setJustCompleted((s) => { const n = new Set(s); n.delete(activity.id); return n })
     }
 
-    await fetch(`/api/activities/${activity.id}`, {
+    await fetch(`/api/tasks/${activity.id}`, {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ completed: nowDone }),
@@ -180,14 +180,14 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
 
   async function deleteActivity(id: string) {
     setActivities((prev) => prev.filter((a) => a.id !== id))
-    await fetch(`/api/activities/${id}`, { method: 'DELETE' })
+    await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
   }
 
   async function handleCreate() {
     if (!newForm.title.trim() || !newForm.leadId) return
     setSaving(true)
     try {
-      const res = await fetch('/api/activities', {
+      const res = await fetch('/api/tasks', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
@@ -201,7 +201,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
         }),
       })
       if (res.ok) {
-        const listRes = await fetch('/api/activities?done=false')
+        const listRes = await fetch('/api/tasks?done=false')
         const json = await listRes.json() as { data?: { activities: Activity[] } }
         if (json.data?.activities) setActivities(json.data.activities)
         setShowNew(false)
@@ -222,7 +222,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Activities</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {openCount} open{overdueCount > 0 && <span className="text-red-500 font-medium"> · {overdueCount} overdue</span>}
           </p>
@@ -250,7 +250,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
             </button>
           </div>
           <Button onClick={() => setShowNew(true)} className="gap-1.5">
-            <Plus className="h-4 w-4" /> New Activity
+            <Plus className="h-4 w-4" /> New Task
           </Button>
         </div>
       </div>
@@ -298,11 +298,11 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
             )}
 
             <span className="ml-auto text-[12px] text-muted-foreground">
-              {calendarFiltered.length} {calendarFiltered.length === 1 ? 'activity' : 'activities'}
+              {calendarFiltered.length} {calendarFiltered.length === 1 ? 'task' : 'tasks'}
             </span>
           </div>
 
-          <ActivitiesCalendar
+          <TasksCalendar
             activities={calendarFiltered}
             selectedDay={calendarDay}
             onDayOpen={(d) => { setCalendarDay(d); setCalendarLeadId(null) }}
@@ -390,7 +390,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={9} className="py-16 text-center text-muted-foreground text-sm">
-                  {activities.length === 0 ? 'No activities yet.' : 'No activities match the current filters.'}
+                  {activities.length === 0 ? 'No tasks yet.' : 'No tasks match the current filters.'}
                 </td>
               </tr>
             )}
@@ -529,11 +529,11 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
         </>
       )}
 
-      {/* New Activity Dialog */}
+      {/* New Task Dialog */}
       <Dialog open={showNew} onClose={() => setShowNew(false)}>
         <DialogContent size="md">
           <DialogHeader>
-            <DialogTitle>New Activity</DialogTitle>
+            <DialogTitle>New Task</DialogTitle>
           </DialogHeader>
           <DialogBody>
             <div className="grid grid-cols-2 gap-4">
@@ -610,7 +610,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)} disabled={saving}>Cancel</Button>
             <Button onClick={handleCreate} disabled={!newForm.title.trim() || !newForm.leadId || saving} loading={saving}>
-              Create Activity
+              Create Task
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -652,7 +652,7 @@ export function ActivitiesClient({ initialActivities, teamMembers, currentUserId
 
               <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
                 {dayActs.length === 0 && (
-                  <p className="py-8 text-center text-sm text-muted-foreground">No activities on this day.</p>
+                  <p className="py-8 text-center text-sm text-muted-foreground">No tasks on this day.</p>
                 )}
                 {dayActs.map((a) => {
                   const done = !!a.completed_at

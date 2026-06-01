@@ -62,7 +62,7 @@ export function NotificationPanel({ open, anchorRef, onClose }: Props) {
   const loadActivities = useCallback(async () => {
     setActivitiesLoading(true)
     try {
-      const res = await fetch('/api/activities/due')
+      const res = await fetch('/api/tasks/due')
       if (res.ok) setActivities(await res.json() as DueData)
     } finally {
       setActivitiesLoading(false)

@@ -64,7 +64,7 @@ export async function GET() {
       count: overdue.length + dueToday.length,
     })
   } catch (err) {
-    console.error('[GET /api/activities/due]', err)
+    console.error('[GET /api/tasks/due]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

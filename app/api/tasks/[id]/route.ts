@@ -1,6 +1,6 @@
 /**
- * PATCH  /api/activities/[id]  — update (mark done, change priority, etc.)
- * DELETE /api/activities/[id]  — delete
+ * PATCH  /api/tasks/[id]  — update (mark done, change priority, etc.)
+ * DELETE /api/tasks/[id]  — delete
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from 'next/server'
@@ -62,12 +62,12 @@ export async function PATCH(
       .eq('id', id)
       .eq('workspace_id', member.workspace_id)
       .single()
-    if (!existing) return apiError('Activity not found', 404)
+    if (!existing) return apiError('Task not found', 404)
     if (member.role === 'rep' && existing.assigned_to !== ctx.user.id) {
       return apiError('Insufficient permissions', 403)
     }
     if (member.role === 'rep' && assignedTo !== undefined && assignedTo !== ctx.user.id) {
-      return apiError('Reps can only assign activities to themselves', 403)
+      return apiError('Reps can only assign tasks to themselves', 403)
     }
     if (assignedTo) {
       const { data: assignee } = await (admin as any)
@@ -109,7 +109,7 @@ export async function DELETE(
       .eq('id', id)
       .eq('workspace_id', member.workspace_id)
       .single()
-    if (!existing) return apiError('Activity not found', 404)
+    if (!existing) return apiError('Task not found', 404)
     if (member.role === 'rep' && existing.assigned_to !== ctx.user.id) {
       return apiError('Insufficient permissions', 403)
     }
