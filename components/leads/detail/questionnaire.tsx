@@ -279,6 +279,23 @@ export function Questionnaire({ leadId, data, onSave, readOnly, onEmailSnapshot 
   const [copied,      setCopied]      = React.useState(false)
   const [emailErr,    setEmailErr]    = React.useState<string | null>(null)
 
+  // Re-sync from the parent when `data` arrives or changes after mount.
+  // The full lead-detail page mounts this component eagerly (its <Section>
+  // always renders children) BEFORE the async questionnaire fetch resolves,
+  // so the useState initializers above capture `null`. Without this effect
+  // the form would stay blank even though the lead has saved intake data.
+  // Guarded by `dirty` (via a ref to avoid re-running on every keystroke) so
+  // we never clobber the user's unsaved edits — `data` only changes on load
+  // and after save, never mid-edit.
+  const dirtyRef = React.useRef(false)
+  dirtyRef.current = dirty   // keep the ref pointing at the latest dirty flag
+  React.useEffect(() => {
+    if (data && !dirtyRef.current) {
+      setAnswers(data.answers ?? {})
+      setQuestions(data.questions ?? DEFAULT_QUESTIONS)
+    }
+  }, [data])
+
   // Whenever any intake field changes, the saved snapshot is stale —
   // clear everything so the user has to regenerate.
   function clearSnapshot() {

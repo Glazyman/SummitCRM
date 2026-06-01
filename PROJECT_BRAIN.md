@@ -832,6 +832,8 @@ Header is `sticky top-0 z-20`. Any `z-50` inside is bounded by z-20 against outs
     5. PR + merge: `gh api .../pulls`, `gh api -X PUT .../pulls/<n>/merge`
     `gh` is installed and authed as `Glazyman`. The user runs the app locally in their **native Terminal** (not the agent), where `npm run dev` boots normally. See the helper script pattern at `/tmp/summit-api-commit.sh` from the 2026-06-01 session. Note: this commits straight to the remote — outward-facing, so confirm intent first.
 
+16. **`Questionnaire` (intake form) must re-sync from its `data` prop, not just the `useState` initializer.** `components/leads/detail/questionnaire.tsx` is a controlled form whose state seeds from `data`. The full lead-detail page (`lead-detail-client.tsx`) mounts it **eagerly** — `<Section>` always renders children and shows all sections on desktop (`lg:block`) — *before* the async `/api/leads/[id]/questionnaire` fetch resolves, so the initializer captured `null` and the form stayed blank even when intake existed. The side panel only *appeared* to work because it mounts the form conditionally (`activeTab === 'questionnaire' && <Questionnaire>`), i.e. after data loaded. Fixed 2026-06-01 with a `useEffect([data])` that re-seeds `answers`/`questions`, guarded by a `dirtyRef` so it never clobbers unsaved edits. Lesson: any eagerly-mounted controlled form fed by an async fetch needs a prop-change re-sync, not just an initializer.
+
 ---
 
 ## 13. Security Model
