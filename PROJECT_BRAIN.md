@@ -1005,4 +1005,17 @@ Removed the separate "Leads Contacted" / "New Leads" card (merged contacted into
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal)*
+### Session 2026-06-01 (admin dashboard KPI cards)
+
+Admin dashboard 4 cards now mirror the rep layout, workspace-wide:
+| Card | Shows |
+|---|---|
+| **Total Leads** | `contacted / total` — `leadsContacted` (count of leads with `last_contacted_at IS NOT NULL` = contacted by any rep/admin, all-time) over workspace total. |
+| **Deals in Pipeline** | workspace leads with `pipeline_stage_id IS NOT NULL` (all reps' deals). Links to `/pipeline`. Replaced the old "Interested" card. |
+| **Calls Logged** | last 30 days (unchanged). |
+| **Tasks Due** | follow_ups due today, workspace (unchanged). |
+`getDashboardMetrics`: `leadsContacted` and `dealsInPipeline` queries are now role-aware (admins = workspace-wide via `last_contacted_at`/no-assignee-filter; reps = their own via the RPC / `assigned_to`). Removed the `interestedLeads` metric + its query.
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards)*

@@ -67,7 +67,6 @@ async function DashboardStats({
 }) {
   const supabase = await createClient()
   const metrics  = await getDashboardMetrics(supabase, workspaceId, userId, role)
-  const totalLeadsDescription = role === 'rep' ? 'assigned to you' : 'in workspace'
 
   if (role === 'rep') {
     return (
@@ -110,17 +109,19 @@ async function DashboardStats({
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
         title="Total Leads"
-        value={formatNumber(metrics.totalLeads)}
-        description={totalLeadsDescription}
+        value={`${formatNumber(metrics.leadsContacted)} / ${formatNumber(metrics.totalLeads)}`}
+        description="contacted / total"
         icon={Users}
         color="blue"
+        href="/leads"
       />
       <StatCard
-        title="Interested"
-        value={formatNumber(metrics.interestedLeads)}
-        description="expressed interest"
+        title="Deals in Pipeline"
+        value={formatNumber(metrics.dealsInPipeline)}
+        description="across all reps"
         icon={TrendingUp}
         color="green"
+        href="/pipeline"
       />
       <StatCard
         title="Calls Logged"
@@ -164,7 +165,6 @@ type DashboardMetrics = {
   totalLeads:       number
   leadsContacted:   number
   dealsInPipeline:  number
-  interestedLeads:  number
   callsLogged:      number
   callsToday:       number
   dailyCallTarget:  number
@@ -177,7 +177,6 @@ function emptyDashboardMetrics(): DashboardMetrics {
     totalLeads:          0,
     leadsContacted:      0,
     dealsInPipeline:     0,
-    interestedLeads:     0,
     callsLogged:         0,
     callsToday:          0,
     dailyCallTarget:     100,
@@ -225,25 +224,37 @@ async function getDashboardMetrics(
     .is('deleted_at', null)
   if (!isAdmin) totalLeadsQuery = totalLeadsQuery.eq('assigned_to', userId)
 
-  // Rep's own deals currently in the pipeline (any stage).
-  const dealsInPipelineQuery = supabase
+  // Deals currently in the pipeline (any stage). Admins see all reps' deals,
+  // reps see only their own.
+  let dealsInPipelineQuery = supabase
     .from('leads')
     .select('id', { count: 'exact', head: true })
     .eq('workspace_id', workspaceId)
-    .eq('assigned_to', userId)
     .not('pipeline_stage_id', 'is', null)
     .is('deleted_at', null)
+  if (!isAdmin) dealsInPipelineQuery = dealsInPipelineQuery.eq('assigned_to', userId)
 
-  // All independent queries fan out in ONE round-trip. Previously the
-  // dashboard did three sequential awaits, each adding ~100ms of network
-  // overhead. Nothing in this batch depends on anything else in it.
   const supabaseAny = supabase as unknown as {
     rpc: (n: string, a: Record<string, unknown>) => Promise<{ data: unknown }>
   }
+
+  // Leads contacted: admins = every lead contacted by anyone (last_contacted_at
+  // set), all-time; reps = unique leads THEY called all-time (via RPC).
+  const contactedQuery = isAdmin
+    ? supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .not('last_contacted_at', 'is', null)
+        .is('deleted_at', null)
+    : supabaseAny.rpc('get_unique_leads_called', {
+        p_workspace_id: workspaceId,
+        p_user_id:      userId,
+        p_since:        new Date(0).toISOString(),
+      })
   const [
     leadsResult,
     contactedRes,
-    interestedResult,
     followUpsDueResult,
     workspaceResult,
     callsRes,
@@ -251,18 +262,7 @@ async function getDashboardMetrics(
     dealsRes,
   ] = await Promise.all([
     totalLeadsQuery,
-    // Unique leads this rep has contacted (called) all-time — `since` = epoch.
-    supabaseAny.rpc('get_unique_leads_called', {
-      p_workspace_id: workspaceId,
-      p_user_id:      userId,
-      p_since:        new Date(0).toISOString(),
-    }),
-    supabase
-      .from('leads')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .eq('interest_status', 'interested')
-      .is('deleted_at', null),
+    contactedQuery,
     followUpsDueQuery,
     supabase
       .from('workspaces')
@@ -304,9 +304,11 @@ async function getDashboardMetrics(
 
   return {
     totalLeads:          leadsResult.count     ?? 0,
-    leadsContacted:      Number((contactedRes as { data: number | null }).data ?? 0),
+    // admins: count query → .count; reps: RPC → .data
+    leadsContacted:      isAdmin
+      ? ((contactedRes as { count: number | null }).count ?? 0)
+      : Number((contactedRes as { data: number | null }).data ?? 0),
     dealsInPipeline:     dealsRes.count ?? 0,
-    interestedLeads:     interestedResult.count ?? 0,
     callsLogged,
     callsToday,
     dailyCallTarget,
