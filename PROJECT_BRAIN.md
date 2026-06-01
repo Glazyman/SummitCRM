@@ -984,4 +984,14 @@ UI gating (added 2026-06-01 — the server checks existed but the buttons were s
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page)*
+### Session 2026-06-01 (rep dashboard KPI cards)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | Rep dashboard "New Leads" card → **"Leads Contacted"** (all-time): reused `get_unique_leads_called(ws, userId, since=epoch)` = distinct leads the rep ever called. Replaced the `status='new'` count. | `app/(dashboard)/dashboard/page.tsx` |
+| 2 | "Leads Called Today" card description "unique leads vs. target" → **"of your daily target"** (clearer). Value is still `unique-leads-called-today / daily-target`. | same |
+| — | Total Leads kept. (Known: its query counts workspace-wide leads, not the rep's assigned — label says "assigned to you". Left as-is per request.) | — |
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards)*

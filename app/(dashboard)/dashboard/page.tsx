@@ -81,12 +81,11 @@ async function DashboardStats({
           href="/leads"
         />
         <StatCard
-          title="New Leads"
-          value={formatNumber(metrics.newLeads)}
-          description="not yet contacted"
+          title="Leads Contacted"
+          value={formatNumber(metrics.leadsContacted)}
+          description="all time"
           icon={Users}
           color="green"
-          href="/leads?status=new"
         />
         <StatCard
           title="Tasks Due"
@@ -98,7 +97,7 @@ async function DashboardStats({
         <StatCard
           title="Leads Called Today"
           value={`${formatNumber(metrics.callsToday)} / ${formatNumber(metrics.dailyCallTarget)}`}
-          description="unique leads vs. target"
+          description="of your daily target"
           icon={PhoneCall}
           color="purple"
         />
@@ -162,7 +161,7 @@ function StatsRowSkeleton() {
 
 type DashboardMetrics = {
   totalLeads:       number
-  newLeads:         number
+  leadsContacted:   number
   interestedLeads:  number
   callsLogged:      number
   callsToday:       number
@@ -174,7 +173,7 @@ type DashboardMetrics = {
 function emptyDashboardMetrics(): DashboardMetrics {
   return {
     totalLeads:          0,
-    newLeads:            0,
+    leadsContacted:      0,
     interestedLeads:     0,
     callsLogged:         0,
     callsToday:          0,
@@ -223,7 +222,7 @@ async function getDashboardMetrics(
   }
   const [
     leadsResult,
-    newLeadsResult,
+    contactedRes,
     interestedResult,
     followUpsDueResult,
     workspaceResult,
@@ -235,13 +234,12 @@ async function getDashboardMetrics(
       .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null),
-    supabase
-      .from('leads')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .eq('assigned_to', userId)
-      .eq('status', 'new')
-      .is('deleted_at', null),
+    // Unique leads this rep has contacted (called) all-time — `since` = epoch.
+    supabaseAny.rpc('get_unique_leads_called', {
+      p_workspace_id: workspaceId,
+      p_user_id:      userId,
+      p_since:        new Date(0).toISOString(),
+    }),
     supabase
       .from('leads')
       .select('id', { count: 'exact', head: true })
@@ -288,7 +286,7 @@ async function getDashboardMetrics(
 
   return {
     totalLeads:          leadsResult.count     ?? 0,
-    newLeads:            newLeadsResult.count   ?? 0,
+    leadsContacted:      Number((contactedRes as { data: number | null }).data ?? 0),
     interestedLeads:     interestedResult.count ?? 0,
     callsLogged,
     callsToday,
