@@ -988,9 +988,14 @@ UI gating (added 2026-06-01 — the server checks existed but the buttons were s
 
 | # | What | Key files |
 |---|---|---|
-| 1 | Rep dashboard "New Leads" card → **"Leads Contacted"** (all-time): reused `get_unique_leads_called(ws, userId, since=epoch)` = distinct leads the rep ever called. Replaced the `status='new'` count. | `app/(dashboard)/dashboard/page.tsx` |
-| 2 | "Leads Called Today" card description "unique leads vs. target" → **"of your daily target"** (clearer). Value is still `unique-leads-called-today / daily-target`. | same |
-| — | Total Leads kept. (Known: its query counts workspace-wide leads, not the rep's assigned — label says "assigned to you". Left as-is per request.) | — |
+Rep dashboard 4 KPI cards, final state:
+| Card | Shows |
+|---|---|
+| **Total Leads** | `contacted / assigned` e.g. `300 / 600` — `leadsContacted` (all-time unique leads the rep called, via `get_unique_leads_called(ws,userId,epoch)`) over the rep's **assigned** total. Total now filters `assigned_to = userId` for reps (admins still see workspace-wide). |
+| **Deals in Pipeline** | the rep's own deals: count of `assigned_to=userId AND pipeline_stage_id IS NOT NULL`. Links to `/pipeline`. |
+| **Tasks Due** | follow_ups due today (rep's own). |
+| **Leads Called Today** | `unique-leads-today / daily-target`; description reworded "unique leads vs. target" → **"of your daily target"**. |
+Removed the separate "Leads Contacted" / "New Leads" card (merged contacted into Total Leads).
 
 ---
 

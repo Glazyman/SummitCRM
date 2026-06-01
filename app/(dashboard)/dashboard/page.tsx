@@ -74,18 +74,19 @@ async function DashboardStats({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Leads"
-          value={formatNumber(metrics.totalLeads)}
-          description="assigned to you"
+          value={`${formatNumber(metrics.leadsContacted)} / ${formatNumber(metrics.totalLeads)}`}
+          description="contacted / assigned"
           icon={Users}
           color="blue"
           href="/leads"
         />
         <StatCard
-          title="Leads Contacted"
-          value={formatNumber(metrics.leadsContacted)}
-          description="all time"
-          icon={Users}
+          title="Deals in Pipeline"
+          value={formatNumber(metrics.dealsInPipeline)}
+          description="your deals"
+          icon={TrendingUp}
           color="green"
+          href="/pipeline"
         />
         <StatCard
           title="Tasks Due"
@@ -162,6 +163,7 @@ function StatsRowSkeleton() {
 type DashboardMetrics = {
   totalLeads:       number
   leadsContacted:   number
+  dealsInPipeline:  number
   interestedLeads:  number
   callsLogged:      number
   callsToday:       number
@@ -174,6 +176,7 @@ function emptyDashboardMetrics(): DashboardMetrics {
   return {
     totalLeads:          0,
     leadsContacted:      0,
+    dealsInPipeline:     0,
     interestedLeads:     0,
     callsLogged:         0,
     callsToday:          0,
@@ -214,6 +217,23 @@ async function getDashboardMetrics(
     ? followUpsBase
     : followUpsBase.eq('assigned_to', userId)
 
+  // Total leads: admins see the whole workspace, reps see only their assigned.
+  let totalLeadsQuery = supabase
+    .from('leads')
+    .select('id', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId)
+    .is('deleted_at', null)
+  if (!isAdmin) totalLeadsQuery = totalLeadsQuery.eq('assigned_to', userId)
+
+  // Rep's own deals currently in the pipeline (any stage).
+  const dealsInPipelineQuery = supabase
+    .from('leads')
+    .select('id', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId)
+    .eq('assigned_to', userId)
+    .not('pipeline_stage_id', 'is', null)
+    .is('deleted_at', null)
+
   // All independent queries fan out in ONE round-trip. Previously the
   // dashboard did three sequential awaits, each adding ~100ms of network
   // overhead. Nothing in this batch depends on anything else in it.
@@ -228,12 +248,9 @@ async function getDashboardMetrics(
     workspaceResult,
     callsRes,
     uniqueLeadsRes,
+    dealsRes,
   ] = await Promise.all([
-    supabase
-      .from('leads')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .is('deleted_at', null),
+    totalLeadsQuery,
     // Unique leads this rep has contacted (called) all-time — `since` = epoch.
     supabaseAny.rpc('get_unique_leads_called', {
       p_workspace_id: workspaceId,
@@ -263,6 +280,7 @@ async function getDashboardMetrics(
       p_user_id:      userId,
       p_since:        startOfToday.toISOString(),
     }),
+    dealsInPipelineQuery,
   ])
 
   // Calls logged this week — all call paths write to call_logs, so the
@@ -287,6 +305,7 @@ async function getDashboardMetrics(
   return {
     totalLeads:          leadsResult.count     ?? 0,
     leadsContacted:      Number((contactedRes as { data: number | null }).data ?? 0),
+    dealsInPipeline:     dealsRes.count ?? 0,
     interestedLeads:     interestedResult.count ?? 0,
     callsLogged,
     callsToday,
