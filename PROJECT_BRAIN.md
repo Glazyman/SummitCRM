@@ -963,4 +963,10 @@ UI gating (added 2026-06-01 — the server checks existed but the buttons were s
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget)*
+### Session 2026-06-01 (rep-performance "Today" bounce fix)
+
+**Bug:** The admin dashboard Rep Performance panel defaulted to *yesterday* and clicking "Today" bounced back to yesterday. **Root cause:** `components/dashboard/rep-performance.tsx` `load()` ran an auto-step-back on *every* anchor change — if the period had 0 calls and was at/past today, it called `setAnchor(yesterday)`. So `jumpToday()` → effect → `load(today)` → 0 calls → stepped back, fighting the click. **Fix:** removed the auto-step-back entirely (per user choice). The panel now always shows the selected day, defaults to today (empty "no calls yet" early in the day is fine), and the Today button / arrows stick. (Supersedes the 2026-05-19 §4 "auto-step back on empty period" behavior.)
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix)*
