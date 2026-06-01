@@ -58,7 +58,7 @@ export function LeadProfileCard({
   onSave,
   onRenameBatch,
   onMoveBatch,
-  canEditBatch = true,
+  canEditBatch = false, // safe default: only admins/managers move leads between batches
   onStatusChange,
   onInterestChange,
 }: LeadProfileCardProps) {

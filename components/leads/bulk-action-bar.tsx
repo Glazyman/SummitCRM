@@ -124,8 +124,8 @@ export function BulkActionBar({
             </DropdownMenu>
           )}
 
-          {/* Add to batch */}
-          {batches.length > 0 && (
+          {/* Add to batch — admin only (reps can't move leads between batches) */}
+          {isAdmin && batches.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">

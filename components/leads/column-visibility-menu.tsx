@@ -13,6 +13,8 @@ interface ColumnVisibilityMenuProps {
   onToggle:       (id: ColumnId) => void
   onReorder:      (order: ColumnId[]) => void
   onSave:         (order: ColumnId[], visible: Set<ColumnId>) => void
+  /** Column ids to omit entirely (e.g. reps don't get "Assigned To"). */
+  hiddenColumnIds?: Set<ColumnId>
 }
 
 export function ColumnVisibilityMenu({
@@ -21,6 +23,7 @@ export function ColumnVisibilityMenu({
   onToggle,
   onReorder,
   onSave,
+  hiddenColumnIds,
 }: ColumnVisibilityMenuProps) {
   const [open,      setOpen]      = React.useState(false)
   const [dragIndex, setDragIndex] = React.useState<number | null>(null)
@@ -135,6 +138,7 @@ export function ColumnVisibilityMenu({
             {columnOrder.map((id, i) => {
               const col = colMap.get(id)
               if (!col) return null
+              if (hiddenColumnIds?.has(id)) return null
               const isLocked  = !col.optional
               const isVisible = visibleColumns.has(id)
               const isDragging = dragIndex === i

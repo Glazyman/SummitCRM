@@ -184,8 +184,8 @@ function LeadTableRow({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" minWidth="160px">
               <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)} icon={<ExternalLink className="h-3.5 w-3.5" />}>View Lead</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem destructive onClick={onDelete}>Delete Lead</DropdownMenuItem>
+              {isAdmin && <DropdownMenuSeparator />}
+              {isAdmin && <DropdownMenuItem destructive onClick={onDelete}>Delete Lead</DropdownMenuItem>}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -214,7 +214,6 @@ function ColumnHeader({ colId, sortBy, sortDir, onSort, isAdmin }: {
     case 'title':         return plain('Job Title')
     case 'website':       return plain('Website')
     case 'batch':         return plain('Batch')
-    case 'tags':          return plain('Tags')
     case 'assigned':      return isAdmin ? plain('Assigned To') : null
     default:              return null
   }
@@ -324,8 +323,6 @@ function LeadCell({ colId, lead, isAdmin, onStatusChange, onInterestChange }: {
           </td>
         )
       }
-    case 'tags':
-      return <td className="px-5 py-4"><span className="text-muted-foreground/40 text-xs">—</span></td>
     default:
       return null
   }

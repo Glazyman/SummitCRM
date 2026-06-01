@@ -86,7 +86,6 @@ export type ColumnId =
   | 'company'
   | 'status'
   | 'interest'
-  | 'tags'
   | 'batch'
   | 'assigned'
   | 'last_activity'
@@ -117,7 +116,6 @@ export const COLUMNS: ColumnDef[] = [
   { id: 'company_phone', label: 'Company Phone',                                optional: true,  defaultOn: false },
   { id: 'title',         label: 'Job Title',                                    optional: true,  defaultOn: false },
   { id: 'website',       label: 'Website',                                      optional: true,  defaultOn: false },
-  { id: 'tags',          label: 'Tags',                                         optional: true,  defaultOn: false },
   { id: 'batch',         label: 'Batch',                                        optional: true,  defaultOn: false },
 ]
 

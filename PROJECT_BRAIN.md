@@ -925,4 +925,32 @@ A `follow_ups.due_at` at **local 00:00** means "no time slot" (the time picker o
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav)*
+## Rep permissions on leads (what a `rep` can't do)
+
+Server already enforces (defense-in-depth, all pre-existing):
+- Delete a lead — single `DELETE /api/leads/[id]` (admin-only) and `DELETE /api/leads/bulk` (admin-only) both 403 a rep.
+- Move a lead between batches — `PATCH /api/leads/[id]` rejects `batch_id` changes for non-admins; reps also can't reassign `assigned_to`.
+
+UI gating (added 2026-06-01 — the server checks existed but the buttons were still shown):
+- Row "Delete Lead" menu (`lead-table.tsx`) — now `{isAdmin && …}`. Full-page action bar already gated.
+- Bulk "Add to batch" (`bulk-action-bar.tsx`) — now `{isAdmin && …}` (bulk Assign + Delete were already admin-only).
+- Batch move/rename in the profile card is gated by `canEditBatch` (= `isAdmin` at every call site); `LeadProfileCard` default flipped to `canEditBatch = false` for safety.
+- **Columns for reps**: the "Assigned To" column is removed from the column menu (`hiddenColumnIds={isRep ? {'assigned'} : …}`) and forced off in `visibleColumns` — reps only see their own leads so the assignee is always them. Its header already returned `null` for non-admins.
+
+**Tags column removed**: the `tags` column was a dead placeholder (always rendered "—" — never wired to the real tags system in `tag-picker.tsx` / `/api/tags`). Removed from `COLUMNS` and `ColumnId`. The `LeadRow.tags` data field stays (used elsewhere).
+
+---
+
+### Session 2026-06-01 (rep permissions + column cleanup)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | Hide row "Delete Lead" for reps (server already 403'd) | `components/leads/lead-table.tsx` |
+| 2 | Hide bulk "Add to batch" for reps | `components/leads/bulk-action-bar.tsx` |
+| 3 | Reps can't toggle the "Assigned To" column (menu + visibleColumns) | `column-visibility-menu.tsx`, `leads-client.tsx` |
+| 4 | Removed dead "Tags" placeholder column | `components/leads/types.ts`, `lead-table.tsx` |
+| 5 | `LeadProfileCard` default `canEditBatch` → `false` (safety) | `components/leads/detail/lead-profile-card.tsx` |
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal)*

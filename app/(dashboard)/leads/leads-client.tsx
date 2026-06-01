@@ -125,7 +125,9 @@ export function LeadsClient({
           COLUMNS.forEach(c => {
             if (!savedOrderSet.has(c.id) && c.defaultOn) filtered.push(c.id)
           })
-          return new Set(filtered)
+          const result = new Set(filtered)
+          if (isRep) result.delete('assigned') // reps never see the Assigned To column
+          return result
         }
       }
     } catch { /* ignore */ }
@@ -726,6 +728,7 @@ export function LeadsClient({
                 onToggle={handleToggleColumn}
                 onReorder={handleReorderColumns}
                 onSave={handleSaveColumns}
+                hiddenColumnIds={isRep ? new Set<ColumnId>(['assigned']) : undefined}
               />
             </div>
           </div>
