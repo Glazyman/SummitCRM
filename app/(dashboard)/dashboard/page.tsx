@@ -7,7 +7,6 @@ import { OverdueFollowUpsWidget } from '@/components/notifications/overdue-follo
 import { RepPerformancePanel } from '@/components/dashboard/rep-performance'
 import { MyActivityPanel }     from '@/components/dashboard/my-activity'
 import { CallsTodayCard }      from '@/components/dashboard/calls-today-card'
-import { QuickLogCallWidget }  from '@/components/dashboard/quick-log-call-widget'
 import { Users, PhoneCall, TrendingUp, Bell } from 'lucide-react'
 import type { WorkspaceRole } from '@/types/database'
 
@@ -56,7 +55,6 @@ export default async function DashboardPage() {
       {(role === 'admin' || role === 'super_admin') && <RepPerformancePanel />}
 
       <OverdueFollowUpsWidget />
-      {role === 'rep' && <QuickLogCallWidget />}
     </div>
   )
 }

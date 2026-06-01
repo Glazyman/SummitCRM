@@ -959,6 +959,7 @@ UI gating (added 2026-06-01 — the server checks existed but the buttons were s
 |---|---|---|
 | 1 | Dashboard follow-ups widget renamed **"Follow-ups" → "Tasks"**; now shows **all** of the day's tasks (overdue + due today, removed the 5-item cap; list scrolls); untimed tasks show "Due today"; link to `/tasks` ("All tasks"). | `components/notifications/overdue-followups-widget.tsx` |
 | 2 | KPI stat cards "Follow-ups Due" → "Tasks Due" (rep + admin). | `app/(dashboard)/dashboard/page.tsx` |
+| 3 | Removed the "Log a call" quick widget from the rep dashboard (import + render). `quick-log-call-widget.tsx` now orphaned/dead code, left in place. | `app/(dashboard)/dashboard/page.tsx` |
 
 ---
 
