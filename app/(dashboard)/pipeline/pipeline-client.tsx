@@ -9,6 +9,7 @@ import {
   BarChart3, Trophy,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -86,6 +87,10 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
   const [pipelineView,   setPipelineView]   = React.useState<'kanban' | 'list'>(() => {
     try { return localStorage.getItem('pipeline_view_mode') === 'list' ? 'list' : 'kanban' } catch { return 'kanban' }
   })
+  // The kanban board is 1500px+ wide (one 300px column per stage), so on
+  // phones/tablets force the list view. Desktop (≥ lg) keeps the saved choice.
+  const isMobile = useIsMobile()
+  const effectivePipelineView = isMobile ? 'list' : pipelineView
   const didDragRef = React.useRef(false)
 
   // When router.refresh() runs (after a mutation), the server component
@@ -224,13 +229,13 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
     <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
 
       {/* ── Page title + toolbar ── */}
-      <div className="px-6 pt-6 pb-4 space-y-5">
+      <div className="px-4 sm:px-6 pt-6 pb-4 space-y-5">
         <h1 className="text-2xl font-bold tracking-[-0.025em]">Sales Pipeline</h1>
 
         {/* Toolbar */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Search */}
-          <div className="flex items-center gap-2.5 h-[38px] rounded-xl border border-border bg-card px-3 w-64">
+          <div className="flex items-center gap-2.5 h-[38px] rounded-xl border border-border bg-card px-3 w-full sm:w-64">
             <Search className="h-[15px] w-[15px] text-muted-foreground shrink-0" />
             <input
               type="text"
@@ -244,8 +249,8 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             )}
           </div>
 
-          {/* View toggle */}
-          <div className="flex items-center gap-1.5">
+          {/* View toggle — desktop only; mobile is always the list view */}
+          <div className="hidden lg:flex items-center gap-1.5">
             <Button
               size="sm"
               variant={pipelineView === 'kanban' ? 'default' : 'outline'}
@@ -308,7 +313,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
       </div>
 
       {/* ── Kanban view ── */}
-      {pipelineView === 'kanban' ? (
+      {effectivePipelineView === 'kanban' ? (
         <div className="flex-1 overflow-x-auto">
           <div className="flex gap-4 px-6 pb-10 pt-1 items-start"
             style={{ minWidth: `${stages.length * 320 + 96}px` }}>

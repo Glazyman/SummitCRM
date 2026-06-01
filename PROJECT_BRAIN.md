@@ -608,6 +608,17 @@ The only surviving AI feature. Flow:
 - `/settings/ai-usage`: Month-to-date USD cost, total emails sent this month, average cost per email, recent 50 generations table
 - Admin only
 
+### Mobile / Responsive (added 2026-06-01)
+
+Responsive, shared-component approach — **desktop (`lg:`/`xl:`) rules are never modified**; mobile behaviour is added only at base/`sm`/`md`, so the desktop view is unchanged by construction.
+- **Viewport meta**: `export const viewport` in `app/layout.tsx` (`width=device-width, initialScale=1`) — without it phones render zoomed-out. Was missing.
+- **`useIsMobile()` hook** (`hooks/use-is-mobile.ts`): SSR-safe `matchMedia` at the `lg` breakpoint (1024px). Returns `false` on server + first client render (no desktop flash), updates after mount. Used to auto-pick mobile views.
+- **Leads** (`leads-client.tsx`): `effectiveLeadView = isMobile ? 'cards' : leadView` — the wide `min-w-[760px]` table auto-switches to the existing card view on mobile; Table/Cards toggle + column menu hidden (`hidden lg:flex`/`lg:block`).
+- **Pipeline** (`pipeline-client.tsx`): `effectivePipelineView = isMobile ? 'list' : pipelineView` — the 1500px+ kanban auto-switches to the list view; kanban/list toggle hidden on mobile; search full-width (`w-full sm:w-64`).
+- **Tasks** (`tasks-client.tsx`): added a mobile card list (`lg:hidden`); the wide table is `hidden lg:block`. Calendar day-panel capped to `maxWidth:100vw`.
+- **Lead side panel** (`lead-full-panel.tsx`): inner two-column layout stacks on mobile (`flex-col lg:flex-row`; profile card `w-full lg:w-72` capped to `max-h-[45vh] lg:max-h-none`). Panel was already `w-full` (full-screen on mobile).
+- **Already responsive (no change needed)**: dashboard/analytics/admin grids (`sm:`/`lg:grid-cols-*`), all wide tables wrapped in `overflow-x-auto`, lead-detail (mobile tab bar `lg:hidden` + `flex-col lg:flex-row`), header (hamburger + mobile search overlay), `MobileSidebar` drawer.
+
 ---
 
 ## 9. Key Implementation Patterns
@@ -878,4 +889,19 @@ Header is `sticky top-0 z-20`. Any `z-50` inside is bounded by z-20 against outs
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow)*
+### Session 2026-06-01 (mobile / responsive pass)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | Added viewport meta (was missing → phones rendered zoomed-out) | `app/layout.tsx` |
+| 2 | `useIsMobile()` SSR-safe hook (lg breakpoint) | `hooks/use-is-mobile.ts`, `hooks/index.ts` |
+| 3 | Leads: auto card view on mobile; desktop table/column controls hidden below lg | `app/(dashboard)/leads/leads-client.tsx` |
+| 4 | Pipeline: auto list view on mobile (kanban is 1500px+ wide); search full-width | `app/(dashboard)/pipeline/pipeline-client.tsx` |
+| 5 | Tasks: mobile card list; wide table desktop-only; calendar panel capped to 100vw | `app/(dashboard)/tasks/tasks-client.tsx` |
+| 6 | Lead side panel: inner columns stack on mobile | `components/leads/lead-full-panel.tsx` |
+| — | Approach: responsive shared components — only base/sm/md rules added, no `lg:`/`xl:` desktop rules modified, so desktop is unchanged | — |
+| — | Dashboard/analytics/admin/settings/lead-detail were already responsive (grids stack, tables in `overflow-x-auto`, mobile tab bar) — no change needed | — |
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile/responsive pass)*

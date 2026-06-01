@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/layout/theme-provider'
 import './globals.css'
@@ -19,6 +19,15 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.ico',
   },
+}
+
+// Ensures phones render at device width (not zoomed-out at 980px) and
+// scale to 1. Without this the entire mobile layout looks tiny.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Allow pinch-zoom for accessibility; cap to avoid accidental over-zoom.
+  maximumScale: 5,
 }
 
 export default function RootLayout({

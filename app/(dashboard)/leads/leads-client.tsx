@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Upload, UserPlus, Download, Table2, LayoutGrid } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks'
 import { Button } from '@/components/ui/button'
 
 import { LeadStatusBar }        from '@/components/leads/lead-status-bar'
@@ -164,6 +165,10 @@ export function LeadsClient({
       return 'table'
     }
   })
+  // On phones/tablets the wide table is unusable (min-w-760px → horizontal
+  // scroll), so force the card view. Desktop (≥ lg) keeps the saved preference.
+  const isMobile = useIsMobile()
+  const effectiveLeadView = isMobile ? 'cards' : leadView
 
   // ── Keep in sync with server ───────────────────────────────────────────
   // When router.refresh() re-runs the server component, initialLeads gets a
@@ -674,7 +679,7 @@ export function LeadsClient({
 
       {/* ── Toolbar: results count + per-page + columns ── */}
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             {selectedIds.size > 0 ? (
               <span className="font-medium text-foreground">{selectedIds.size.toLocaleString()} selected</span>
@@ -685,7 +690,8 @@ export function LeadsClient({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex rounded-lg border border-border overflow-hidden">
+            {/* Table/Cards toggle is desktop-only — mobile is always cards */}
+            <div className="hidden lg:flex rounded-lg border border-border overflow-hidden">
               <button
                 type="button"
                 onClick={() => setViewMode('table')}
@@ -729,13 +735,16 @@ export function LeadsClient({
                 ))}
               </div>
             </div>
-            <ColumnVisibilityMenu
-              visibleColumns={visibleColumns}
-              columnOrder={columnOrder}
-              onToggle={handleToggleColumn}
-              onReorder={handleReorderColumns}
-              onSave={handleSaveColumns}
-            />
+            {/* Column controls only apply to the table (desktop) */}
+            <div className="hidden lg:block">
+              <ColumnVisibilityMenu
+                visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                onToggle={handleToggleColumn}
+                onReorder={handleReorderColumns}
+                onSave={handleSaveColumns}
+              />
+            </div>
           </div>
         </div>
 
@@ -778,7 +787,7 @@ export function LeadsClient({
       </div>
 
       {/* ── Lead view ── */}
-      {leadView === 'table' ? (
+      {effectiveLeadView === 'table' ? (
         <LeadTable
           leads={pageLeads}
           selectedIds={visualSelectedIds}

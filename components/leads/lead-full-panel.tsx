@@ -369,10 +369,10 @@ export function LeadFullPanel({
 
       {/* ── Content ── */}
       {!loading && lead && data && (
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
 
-          {/* Profile card — fixed-width left column */}
-          <div className="w-72 xl:w-80 shrink-0 overflow-y-auto border-r border-border bg-card">
+          {/* Profile card — stacks on top on mobile, fixed-width left column on desktop */}
+          <div className="w-full lg:w-72 xl:w-80 shrink-0 max-h-[45vh] lg:max-h-none overflow-y-auto border-b lg:border-b-0 lg:border-r border-border bg-card">
             <LeadProfileCard
               lead={lead}
               teamMembers={teamMembers}

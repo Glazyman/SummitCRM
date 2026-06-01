@@ -220,7 +220,7 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -370,8 +370,75 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
         />
       </div>
 
-      {/* Table */}
-      <div className="rounded-xl border border-border overflow-hidden">
+      {/* Mobile card list — replaces the wide table below lg */}
+      <div className="space-y-2 lg:hidden">
+        {filtered.length === 0 && (
+          <div className="rounded-xl border border-border py-12 text-center text-muted-foreground text-sm">
+            {activities.length === 0 ? 'No tasks yet.' : 'No tasks match the current filters.'}
+          </div>
+        )}
+        {filtered.map((a) => {
+          const due  = fmtDate(a.due_at)
+          const done = !!a.completed_at
+          const assignee = teamMembers.find((m) => m.id === a.assigned_to)
+          return (
+            <div
+              key={a.id}
+              onClick={() => setSelectedActivity(a)}
+              className={cn(
+                'rounded-xl border border-border bg-card p-3.5 transition-colors',
+                done ? 'opacity-50' : 'active:bg-muted/40',
+                !done && due.bucket === 'past'  && 'border-l-2 border-l-red-500',
+                !done && due.bucket === 'today' && 'border-l-2 border-l-amber-500',
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleDone(a) }}
+                  className={cn('mt-0.5 shrink-0', done ? 'text-emerald-500' : 'text-muted-foreground')}
+                  title={done ? 'Mark open' : 'Mark done'}
+                >
+                  {done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap',
+                      a.type === 'callback' ? 'bg-blue-500/10 text-blue-600' : 'bg-violet-500/10 text-violet-600'
+                    )}>
+                      {a.type === 'callback' ? <Phone className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+                      {a.type === 'callback' ? 'Call Back' : 'Follow-up'}
+                    </span>
+                    <span className={cn('ml-auto flex items-center gap-1 text-[11px] font-medium', due.bucket === 'past' ? 'text-red-500' : 'text-muted-foreground')}>
+                      <Clock className="h-3 w-3 shrink-0" />{due.label}
+                    </span>
+                  </div>
+                  <p className={cn('mt-1.5 font-medium text-sm', done && 'line-through text-muted-foreground')}>{a.title}</p>
+                  {a.lead && (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {leadName(a.lead)}{a.lead.company ? ` · ${a.lead.company}` : ''}
+                    </p>
+                  )}
+                  {a.lead?.phone && <p className="mt-0.5 text-xs text-muted-foreground font-mono">{a.lead.phone}</p>}
+                  {isAdmin && assignee && (
+                    <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"><User className="h-3 w-3" />{assignee.name}</p>
+                  )}
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteActivity(a.id) }}
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  title="Delete"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Table — desktop only (mobile uses the card list above) */}
+      <div className="hidden lg:block rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40">
@@ -635,7 +702,7 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
             {/* Day detail panel */}
             <div
               className="fixed top-0 right-0 z-50 flex h-full flex-col border-l border-border bg-card shadow-2xl"
-              style={{ width: panelW }}
+              style={{ width: panelW, maxWidth: '100vw' }}
             >
               <div className="flex items-center justify-between border-b border-border px-5 py-4">
                 <div>
