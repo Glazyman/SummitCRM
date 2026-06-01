@@ -57,6 +57,9 @@ export default async function ImportPage() {
     leadCount: 0,
   }))
 
+  const isAdmin = ['admin', 'super_admin'].includes(memberData?.role ?? '')
+  const currentUserId = user?.id ?? ''
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -73,7 +76,7 @@ export default async function ImportPage() {
         </p>
       </div>
 
-      <ImportPageClient batches={formattedBatches} teamMembers={teamMembers} />
+      <ImportPageClient batches={formattedBatches} teamMembers={teamMembers} isAdmin={isAdmin} currentUserId={currentUserId} />
     </div>
   )
 }

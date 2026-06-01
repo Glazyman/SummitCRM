@@ -582,10 +582,16 @@ The only surviving AI feature. Flow:
 
 ### Analytics
 
-- Batch comparison (deleteable rows, admin-only trash, progress bar for leads)
+- **Batches: MOVED to the Import page** (2026-06-01). The `BatchComparisonTable` now lives on `/leads/import` under the "Import History" tab (stacked below Import History), not on Analytics. Analytics tabs are now just Overview + Rep Performance.
 - Email metrics (aggregate RPCs bypass 1000-row cap)
 - Time-series charts
-- Rep performance: Day/Week/Month nav with date stepper, "Today/Target" column with emerald progress bar, auto-step-back if period is empty and at/past today
+- Rep performance: Day/Week/Month nav with date stepper, "Today/Target" column with emerald progress bar. (Auto-step-back on empty period was REMOVED 2026-06-01 — it bounced "Today" to yesterday; now defaults to today and sticks.)
+
+### Import page (`/leads/import`)
+
+- Tabs: "New Import" (wizard) and "Import History".
+- The Import History tab shows **Import History** and, stacked below it, the **Batches** section (`BatchComparisonTable` — expand a batch to see its leads, delete is admin-only). Both fetch on tab open. Batches data comes from `/api/analytics/batches`.
+- Server passes `isAdmin` + `currentUserId` to the client for the batches table.
 - All analytics routes use SQL aggregate RPCs (not raw row fetches) to bypass PostgREST 1000-row cap
 
 ### Admin Dashboard
@@ -969,4 +975,13 @@ UI gating (added 2026-06-01 — the server checks existed but the buttons were s
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix)*
+### Session 2026-06-01 (batches moved to Import page)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | Moved the Batches section out of Analytics into the Import page, stacked under Import History on the "Import History" tab. All features preserved (expand batch → leads, admin delete). | `app/(dashboard)/leads/import/import-page-client.tsx`, `import/page.tsx` |
+| 2 | Removed the "Batches" tab + state/fetch from Analytics (now Overview + Rep Performance only). | `app/(dashboard)/analytics/analytics-client.tsx` |
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page)*

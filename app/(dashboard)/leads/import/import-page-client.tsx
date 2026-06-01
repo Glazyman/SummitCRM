@@ -4,23 +4,30 @@ import { useState, useCallback } from 'react'
 import { History, Upload }       from 'lucide-react'
 import { ImportWizard }   from '@/components/leads/import/import-wizard'
 import { ImportHistory }  from '@/components/leads/import/import-history'
+import { BatchComparisonTable } from '@/components/analytics'
 import { cn }             from '@/lib/utils'
 import type {
   ExistingBatch, ParsedFile, FieldMapping, ImportOptions, ImportResult, CustomFieldNames,
 } from '@/components/leads/import/types'
 import type { ImportRecord } from '@/components/leads/import/import-history'
+import type { BatchRow } from '@/components/analytics'
 
 interface ImportPageClientProps {
-  batches:     ExistingBatch[]
-  teamMembers: { id: string; name: string }[]
+  batches:        ExistingBatch[]
+  teamMembers:    { id: string; name: string }[]
+  isAdmin:        boolean
+  currentUserId:  string
 }
 
 type Tab = 'import' | 'history'
 
-export function ImportPageClient({ batches, teamMembers }: ImportPageClientProps) {
+export function ImportPageClient({ batches, teamMembers, isAdmin, currentUserId }: ImportPageClientProps) {
   const [activeTab, setActiveTab]       = useState<Tab>('import')
   const [historyRecords, setHistoryRecords] = useState<ImportRecord[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  // Batch stats (moved here from the Analytics page) — shown alongside history.
+  const [batchStats, setBatchStats]         = useState<BatchRow[]>([])
+  const [batchStatsLoading, setBatchStatsLoading] = useState(false)
 
   // ── Real import handler ──────────────────────────────────────────────────
   async function handleImport({
@@ -144,9 +151,22 @@ export function ImportPageClient({ batches, teamMembers }: ImportPageClientProps
     }
   }, [])
 
+  // ── Fetch batch stats ────────────────────────────────────────────────────
+  const fetchBatchStats = useCallback(async () => {
+    setBatchStatsLoading(true)
+    try {
+      const res = await fetch('/api/analytics/batches')
+      if (res.ok) { const d = await res.json(); setBatchStats(d.batches ?? []) }
+    } catch (err) {
+      console.error('[Batches] fetch failed:', err)
+    } finally {
+      setBatchStatsLoading(false)
+    }
+  }, [])
+
   function handleTabChange(tab: Tab) {
     setActiveTab(tab)
-    if (tab === 'history') fetchHistory()
+    if (tab === 'history') { fetchHistory(); fetchBatchStats() }
   }
 
   return (
@@ -175,18 +195,38 @@ export function ImportPageClient({ batches, teamMembers }: ImportPageClientProps
           onImport={handleImport}
         />
       ) : (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold">Import History</h2>
-            <p className="text-sm text-muted-foreground">
-              All lead imports for your workspace. Expand any row to see details.
-            </p>
+        <div className="space-y-8">
+          {/* Import History */}
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">Import History</h2>
+              <p className="text-sm text-muted-foreground">
+                All lead imports for your workspace. Expand any row to see details.
+              </p>
+            </div>
+            <ImportHistory
+              records={historyRecords}
+              loading={historyLoading}
+              onRefresh={fetchHistory}
+            />
           </div>
-          <ImportHistory
-            records={historyRecords}
-            loading={historyLoading}
-            onRefresh={fetchHistory}
-          />
+
+          {/* Batches (moved here from Analytics) */}
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">Batches</h2>
+              <p className="text-sm text-muted-foreground">
+                Every lead batch in your workspace. Expand a batch to see its leads.
+              </p>
+            </div>
+            <BatchComparisonTable
+              batches={batchStats}
+              loading={batchStatsLoading}
+              isAdmin={isAdmin}
+              currentUserId={currentUserId}
+              onDelete={id => setBatchStats(prev => prev.filter(b => b.id !== id))}
+            />
+          </div>
         </div>
       )}
     </div>

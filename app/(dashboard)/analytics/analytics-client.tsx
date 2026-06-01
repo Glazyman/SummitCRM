@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
-  RepPerformanceTable, BatchComparisonTable, AnalyticsExportButton,
+  RepPerformanceTable, AnalyticsExportButton,
 } from '@/components/analytics'
-import type { RepRow, BatchRow, CallOverview, AnalyticsTab } from '@/components/analytics'
+import type { RepRow, CallOverview, AnalyticsTab } from '@/components/analytics'
 import { DateRangePicker } from '@/components/admin/date-range-picker'
 import type { DateRangePreset } from '@/components/admin/types'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,7 +22,6 @@ interface TabConfig { id: AnalyticsTab; label: string; minRole: string }
 const TABS: TabConfig[] = [
   { id: 'overview', label: 'Overview',         minRole: 'rep'   },
   { id: 'reps',     label: 'Rep Performance',  minRole: 'admin' },
-  { id: 'batches',  label: 'Batches',          minRole: 'rep'   },
 ]
 
 const ROLE_RANK: Record<string, number> = { rep: 1, admin: 2, super_admin: 3 }
@@ -157,7 +156,7 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
 // ── Main analytics component ──────────────────────────────────────────────
 interface Props { userRole: string; userId: string }
 
-function AnalyticsContent({ userRole, userId }: Props) {
+function AnalyticsContent({ userRole }: Props) {
   const router       = useRouter()
   const pathname     = usePathname()
   const searchParams = useSearchParams()
@@ -183,10 +182,8 @@ function AnalyticsContent({ userRole, userId }: Props) {
 
   const [overview,  setOverview]  = useState<CallOverview>(EMPTY_OVERVIEW)
   const [reps,      setReps]      = useState<RepRow[]>([])
-  const [batches,   setBatches]   = useState<BatchRow[]>([])
 
   const [loadingReps,    setLR] = useState(false)
-  const [loadingBatches, setLB] = useState(false)
 
   const fetchReps = useCallback(async () => {
     if (!isAdmin) return
@@ -201,18 +198,9 @@ function AnalyticsContent({ userRole, userId }: Props) {
     } catch {} finally { setLR(false) }
   }, [start, end, isAdmin])
 
-  const fetchBatches = useCallback(async () => {
-    setLB(true)
-    try {
-      const res = await fetch('/api/analytics/batches')
-      if (res.ok) { const d = await res.json(); setBatches(d.batches ?? []) }
-    } catch {} finally { setLB(false) }
-  }, [])
-
   useEffect(() => {
     void fetchReps()
-    void fetchBatches()
-  }, [fetchReps, fetchBatches])
+  }, [fetchReps])
 
   const setParam = (key: string, value: string) => {
     const p = new URLSearchParams(searchParams.toString())
@@ -242,7 +230,7 @@ function AnalyticsContent({ userRole, userId }: Props) {
             <div className="flex items-center gap-2 shrink-0">
               <DateRangePicker value={range} onChange={v => setParam('range', v)} className="hidden md:flex" />
               <AnalyticsExportButton view={activeTab} start={start} end={end} />
-              <Button variant="outline" size="sm" onClick={() => { void fetchReps(); void fetchBatches() }}
+              <Button variant="outline" size="sm" onClick={() => { void fetchReps() }}
                 disabled={isLoading} className="gap-1.5 h-9">
                 <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
                 <span className="hidden sm:inline">Refresh</span>
@@ -277,15 +265,6 @@ function AnalyticsContent({ userRole, userId }: Props) {
           <RepPerformanceTable reps={reps} loading={loadingReps} start={start} end={end} />
         )}
 
-        {activeTab === 'batches' && (
-          <BatchComparisonTable
-            batches={batches}
-            loading={loadingBatches}
-            isAdmin={isAdmin}
-            currentUserId={userId}
-            onDelete={id => setBatches(prev => prev.filter(b => b.id !== id))}
-          />
-        )}
       </div>
     </div>
   )
