@@ -2,11 +2,11 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getUsersById } from '@/lib/users'
-import { ActivitiesClient } from './activities-client'
+import { TasksClient } from './tasks-client'
 
-export const metadata: Metadata = { title: 'Activities' }
+export const metadata: Metadata = { title: 'Tasks' }
 
-export default async function ActivitiesPage() {
+export default async function TasksPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -50,7 +50,7 @@ export default async function ActivitiesPage() {
   }
 
   return (
-    <ActivitiesClient
+    <TasksClient
       initialActivities={activities}
       teamMembers={teamMembers}
       currentUserId={user?.id ?? ''}

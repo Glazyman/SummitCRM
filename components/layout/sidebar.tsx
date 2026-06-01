@@ -37,7 +37,7 @@ const mainNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Leads',     href: '/leads',     icon: Users },
   { label: 'Pipeline',  href: '/pipeline',  icon: Kanban },
-  { label: 'Activities',href: '/activities',icon: ListChecks },
+  { label: 'Tasks',    href: '/tasks',     icon: ListChecks },
 ]
 
 const bottomNav: NavItem[] = [
@@ -94,7 +94,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
   }
 
   React.useEffect(() => {
-    fetch('/api/activities/due')
+    fetch('/api/tasks/due')
       .then((r) => r.ok ? r.json() : null)
       .then((d) => d && setActivitiesDue(d.count ?? 0))
       .catch(() => {})
@@ -107,7 +107,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
   }
 
   const visibleMain = mainNav.map((item) => {
-    if (item.href === '/activities' && activitiesDue && activitiesDue > 0) {
+    if (item.href === '/tasks' && activitiesDue && activitiesDue > 0) {
       return { ...item, badge: activitiesDue }
     }
     return item

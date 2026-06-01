@@ -56,7 +56,7 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
       setLoading(true)
       try {
         // Query follow-ups directly — filter to due today or overdue
-        const res  = await fetch('/api/activities?done=false')
+        const res  = await fetch('/api/tasks?done=false')
         if (!res.ok || cancelled) return
 
         const json = await res.json() as {
@@ -118,7 +118,7 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
           )}
         </div>
         <Link
-          href="/activities"
+          href="/tasks"
           className="text-xs text-primary hover:underline flex items-center gap-0.5"
         >
           View all <ChevronRight className="w-3.5 h-3.5" />

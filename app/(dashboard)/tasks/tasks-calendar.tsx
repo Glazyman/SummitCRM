@@ -90,7 +90,7 @@ export function leadName(lead: Lead | null) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function ActivitiesCalendar({ activities, onDayOpen, onActivityClick, selectedDay }: Props) {
+export function TasksCalendar({ activities, onDayOpen, onActivityClick, selectedDay }: Props) {
   const [view, setView] = useState<ViewMode>('month')
   const [cursor, setCursor] = useState(() => {
     const d = new Date(); d.setHours(0,0,0,0); return d
@@ -407,7 +407,7 @@ function DayView({
           {cursor.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </span>
         <span className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-          {acts.length} {acts.length === 1 ? 'activity' : 'activities'}
+          {acts.length} {acts.length === 1 ? 'task' : 'tasks'}
         </span>
       </div>
       <div className="flex flex-1">
@@ -452,7 +452,7 @@ function DayView({
           })}
           {acts.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">No activities scheduled</p>
+              <p className="text-sm text-muted-foreground">No tasks scheduled</p>
             </div>
           )}
         </div>
