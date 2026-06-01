@@ -91,7 +91,7 @@ async function DashboardStats({
           href="/leads?status=new"
         />
         <StatCard
-          title="Follow-ups Due"
+          title="Tasks Due"
           value={formatNumber(metrics.followUpsDue)}
           description="pending today"
           icon={Bell}
@@ -132,7 +132,7 @@ async function DashboardStats({
         color="purple"
       />
       <StatCard
-        title="Follow-ups Due"
+        title="Tasks Due"
         value={formatNumber(metrics.followUpsDue)}
         description="pending today"
         icon={Bell}

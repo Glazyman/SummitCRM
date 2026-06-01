@@ -953,4 +953,13 @@ UI gating (added 2026-06-01 — the server checks existed but the buttons were s
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal)*
+### Session 2026-06-01 (dashboard "Tasks" widget)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | Dashboard follow-ups widget renamed **"Follow-ups" → "Tasks"**; now shows **all** of the day's tasks (overdue + due today, removed the 5-item cap; list scrolls); untimed tasks show "Due today"; link to `/tasks` ("All tasks"). | `components/notifications/overdue-followups-widget.tsx` |
+| 2 | KPI stat cards "Follow-ups Due" → "Tasks Due" (rep + admin). | `app/(dashboard)/dashboard/page.tsx` |
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget)*

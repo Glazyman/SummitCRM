@@ -22,15 +22,14 @@ function getDueLabel(due_at: string): { label: string; urgent: boolean; overdue:
   const dueMidnight   = new Date(d.getFullYear(), d.getMonth(), d.getDate())
   const diffDays = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / 86400000)
 
+  const untimed = d.getHours() === 0 && d.getMinutes() === 0 // 00:00 = no time slot
   if (diffDays < 0) {
     const days = Math.abs(diffDays)
     return { label: `${days}d overdue`, urgent: true, overdue: true }
   }
-  if (d < now) {
-    // Today but time has already passed
-    return { label: 'Due now', urgent: true, overdue: false }
-  }
   if (diffDays === 0) {
+    if (untimed) return { label: 'Due today', urgent: false, overdue: false }
+    if (d < now) return { label: 'Due now', urgent: true, overdue: false } // time already passed
     return {
       label: `Due today · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`,
       urgent: false,
@@ -42,10 +41,9 @@ function getDueLabel(due_at: string): { label: string; urgent: boolean; overdue:
 
 interface Props {
   className?: string
-  limit?: number
 }
 
-export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
+export function OverdueFollowUpsWidget({ className }: Props) {
   const [followUps, setFollowUps] = useState<FollowUp[]>([])
   const [loading,   setLoading]   = useState(true)
 
@@ -75,10 +73,10 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
         const endOfToday = new Date()
         endOfToday.setHours(23, 59, 59, 999)
 
+        // Show ALL of the day's tasks (overdue + due today), not just a few.
         const due = activities
           .filter(a => a.lead && new Date(a.due_at) <= endOfToday)
           .sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime())
-          .slice(0, limit)
           .map(a => ({
             id:        a.id,
             lead_id:   a.lead!.id,
@@ -99,7 +97,7 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
 
     void load()
     return () => { cancelled = true }
-  }, [limit])
+  }, [])
 
   const overdueCount = followUps.filter(f => getDueLabel(f.due_at).overdue).length
 
@@ -109,7 +107,7 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center gap-2">
           <CalendarClock className="w-4 h-4 text-muted-foreground" />
-          <span className="font-semibold text-sm">Follow-ups</span>
+          <span className="font-semibold text-sm">Tasks</span>
           {overdueCount > 0 && (
             <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-destructive/10 text-destructive text-[10px] font-semibold">
               <AlertCircle className="w-3 h-3" />
@@ -121,7 +119,7 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
           href="/tasks"
           className="text-xs text-primary hover:underline flex items-center gap-0.5"
         >
-          View all <ChevronRight className="w-3.5 h-3.5" />
+          All tasks <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>
 
@@ -136,10 +134,10 @@ export function OverdueFollowUpsWidget({ className, limit = 5 }: Props) {
             <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
               <CalendarClock className="w-5 h-5 text-foreground" />
             </div>
-            <p className="text-sm text-muted-foreground">No follow-ups due today</p>
+            <p className="text-sm text-muted-foreground">No tasks due today</p>
           </div>
         ) : (
-          <ul>
+          <ul className="max-h-80 overflow-y-auto">
             {followUps.map((f, i) => {
               const due = getDueLabel(f.due_at)
               return (
