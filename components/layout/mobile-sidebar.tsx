@@ -62,7 +62,7 @@ export function MobileSidebar({ workspaceName, role, userEmail, userName }: Mobi
           <X className="h-4 w-4" />
         </button>
 
-        <Sidebar workspaceName={workspaceName} role={role} userEmail={userEmail} userName={userName} />
+        <Sidebar workspaceName={workspaceName} role={role} userEmail={userEmail} userName={userName} hideCollapse />
       </div>
     </>
   )

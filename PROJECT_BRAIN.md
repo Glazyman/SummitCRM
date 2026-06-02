@@ -1018,4 +1018,13 @@ Admin dashboard 4 cards now mirror the rep layout, workspace-wide:
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards)*
+### Session 2026-06-01 (mobile header + drawer polish)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | Mobile header layout: the right-action icons bunched on the left because `ml-auto` was on the search pill (hidden < md). Moved it: search pill → `md:ml-auto`, right actions → `ml-auto md:ml-2`. Desktop unchanged (resolves to old values at ≥md). | `components/layout/header.tsx` |
+| 2 | Hid the sidebar collapse/expand arrow inside the **mobile drawer** (collapsing a drawer makes no sense). Added `hideCollapse` prop to `Sidebar`; `MobileSidebar` passes it. Desktop sidebar still shows the arrow (doesn't pass the prop). | `components/layout/sidebar.tsx`, `mobile-sidebar.tsx` |
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish)*

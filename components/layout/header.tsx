@@ -177,7 +177,7 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
         </button>
 
         {/* Search pill */}
-        <div ref={searchBoxRef} className="relative ml-auto hidden md:block w-64 lg:w-80">
+        <div ref={searchBoxRef} className="relative hidden md:block md:ml-auto w-64 lg:w-80">
           <form
             onSubmit={handleSearch}
             className="flex h-11 items-center gap-2 rounded-full border border-border bg-card px-4 text-muted-foreground"
@@ -228,8 +228,9 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
           )}
         </div>
 
-        {/* Right actions */}
-        <div className="flex shrink-0 items-center gap-2 ml-2">
+        {/* Right actions — pushed to the right edge (ml-auto on mobile where the
+            search pill that normally does this is hidden). */}
+        <div className="flex shrink-0 items-center gap-2 ml-auto md:ml-2">
           {/* Mobile search button */}
           <button
             type="button"

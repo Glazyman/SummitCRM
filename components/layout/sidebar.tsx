@@ -61,6 +61,9 @@ interface SidebarProps {
   role?: WorkspaceRole | null
   userEmail?: string | null
   userName?: string | null
+  /** Hide the collapse/expand arrow (used inside the mobile drawer where
+   *  collapsing makes no sense). */
+  hideCollapse?: boolean
 }
 
 function getInitials(name: string | null | undefined, email: string | null | undefined): string {
@@ -73,7 +76,7 @@ function getInitials(name: string | null | undefined, email: string | null | und
   return 'U'
 }
 
-export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarProps) {
+export function Sidebar({ workspaceName, role, userEmail, userName, hideCollapse }: SidebarProps) {
   const pathname     = usePathname()
   const searchParams = useSearchParams()
   const router       = useRouter()
@@ -130,19 +133,21 @@ export function Sidebar({ workspaceName, role, userEmail, userName }: SidebarPro
       'relative border-r border-border',
       collapsed ? 'w-[64px]' : 'w-[var(--sidebar-width)]'
     )}>
-      <button
-        type="button"
-        onClick={toggleCollapsed}
-        className={cn(
-          'absolute -right-3 top-[68px] z-30',
-          'flex h-6 w-6 items-center justify-center',
-          'text-muted-foreground transition-colors hover:text-foreground'
-        )}
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      >
-        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-      </button>
+      {!hideCollapse && (
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          className={cn(
+            'absolute -right-3 top-[68px] z-30',
+            'flex h-6 w-6 items-center justify-center',
+            'text-muted-foreground transition-colors hover:text-foreground'
+          )}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
+      )}
 
       {/* Brand */}
       {collapsed ? (
