@@ -6,10 +6,14 @@ import { DocxEditorClient } from './docx-editor-client'
 
 export const metadata = { title: 'Edit document — Summit CRM' }
 
-type Params = { params: Promise<{ id: string }> }
+type Params = {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ mode?: string }>
+}
 
-export default async function DocxEditPage({ params }: Params) {
+export default async function DocxEditPage({ params, searchParams }: Params) {
   const { id } = await params
+  const { mode } = await searchParams
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -38,5 +42,12 @@ export default async function DocxEditPage({ params }: Params) {
   const ext = (doc.file_path.split('.').pop() ?? '').toLowerCase()
   if (!['docx', 'doc'].includes(ext)) redirect('/documents')
 
-  return <DocxEditorClient docId={doc.id} docName={doc.name} fileExt={ext} />
+  return (
+    <DocxEditorClient
+      docId={doc.id}
+      docName={doc.name}
+      fileExt={ext}
+      initialMode={mode === 'edit' ? 'editing' : 'viewing'}
+    />
+  )
 }

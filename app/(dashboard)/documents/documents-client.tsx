@@ -132,11 +132,16 @@ export function DocumentsClient() {
     setViewing(d); setError(null)
   }
 
-  // Word docs open in the full editor (renders + edits, like Pages); everything
-  // else (PDF/image/.pages) uses the read-only popup viewer.
+  // Clicking a file VIEWS it. Word docs render in the editor page (in viewing
+  // mode, with an Edit toggle); PDF/image/.pages use the read-only popup.
   function openDoc(d: DocRow) {
     if (EDITABLE_EXTS.includes(extOf(d))) { router.push(`/documents/${d.id}/edit`); return }
     openViewer(d)
+  }
+
+  // The explicit Edit button opens the editor straight in editing mode.
+  function editDoc(d: DocRow) {
+    router.push(`/documents/${d.id}/edit?mode=edit`)
   }
 
   function download(d: DocRow) {
@@ -308,11 +313,16 @@ export function DocumentsClient() {
                     <td className="px-4 py-3 text-muted-foreground">{dateFmt.format(new Date(d.created_at))}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8"
-                          title={EDITABLE_EXTS.includes(extOf(d)) ? 'Open & edit' : 'View'}
+                        <Button variant="ghost" size="icon" className="h-8 w-8" title="View"
                           disabled={busyId === d.id} onClick={() => openDoc(d)}>
-                          {EDITABLE_EXTS.includes(extOf(d)) ? <PenLine className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          <Eye className="h-4 w-4" />
                         </Button>
+                        {EDITABLE_EXTS.includes(extOf(d)) && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit"
+                            disabled={busyId === d.id} onClick={() => editDoc(d)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-8 w-8" title="Download"
                           disabled={busyId === d.id} onClick={() => download(d)}>
                           {busyId === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -329,7 +339,7 @@ export function DocumentsClient() {
                               Edit details
                             </DropdownMenuItem>
                             {EDITABLE_EXTS.includes(extOf(d)) && (
-                              <DropdownMenuItem onClick={() => router.push(`/documents/${d.id}/edit`)}
+                              <DropdownMenuItem onClick={() => editDoc(d)}
                                 icon={<PenLine className="h-3.5 w-3.5" />}>
                                 Edit contents
                               </DropdownMenuItem>
