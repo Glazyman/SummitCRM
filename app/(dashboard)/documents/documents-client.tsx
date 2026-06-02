@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import {
   FileText, FileSpreadsheet, FileImage, File as FileIcon,
-  Upload, Download, Eye, Trash2, Loader2, Pencil, Copy, MoreHorizontal, ExternalLink, PenLine,
+  Upload, Download, Eye, Trash2, Loader2, Pencil, Copy, CopyPlus, MoreHorizontal, ExternalLink, PenLine,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -200,6 +200,23 @@ export function DocumentsClient() {
     }
   }
 
+  // Copy a Word doc, then jump straight into the editor on the new copy —
+  // one-click "new agreement from this template".
+  async function duplicateAndEdit(d: DocRow) {
+    setBusyId(d.id); setError(null)
+    try {
+      const r = await fetch(`/api/documents/${d.id}/duplicate`, { method: 'POST' })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j.error ?? 'Duplicate failed')
+      const newId = j.data?.id as string | undefined
+      if (newId) router.push(`/documents/${newId}/edit`)
+      else { await load(); setBusyId(null) }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Duplicate failed')
+      setBusyId(null)
+    }
+  }
+
   async function confirmDelete() {
     if (!toDelete) return
     const d = toDelete
@@ -315,6 +332,11 @@ export function DocumentsClient() {
                               <DropdownMenuItem onClick={() => router.push(`/documents/${d.id}/edit`)}
                                 icon={<PenLine className="h-3.5 w-3.5" />}>
                                 Edit contents
+                              </DropdownMenuItem>
+                            )}
+                            {EDITABLE_EXTS.includes(extOf(d)) && (
+                              <DropdownMenuItem onClick={() => duplicateAndEdit(d)} icon={<CopyPlus className="h-3.5 w-3.5" />}>
+                                Duplicate &amp; edit
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem onClick={() => duplicate(d)} icon={<Copy className="h-3.5 w-3.5" />}>
