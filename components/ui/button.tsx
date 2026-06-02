@@ -4,20 +4,21 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold tracking-[-0.01em] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  // reui aesthetic: rounded-md, subtle shadow, 3px ring focus (no offset), medium weight.
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium tracking-[-0.01em] transition-all duration-150 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:border-ring disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-primary-glow hover:bg-primary/90',
+          'bg-primary text-primary-foreground shadow-xs shadow-black/5 hover:bg-primary/90',
         destructive:
-          'bg-destructive text-destructive-foreground hover:bg-destructive/95 hover:shadow-md',
+          'bg-destructive text-destructive-foreground shadow-xs shadow-black/5 hover:bg-destructive/95',
         outline:
-          'border border-border bg-card text-foreground shadow-card hover:bg-secondary',
+          'border border-input bg-background text-foreground shadow-xs shadow-black/5 hover:bg-accent hover:text-accent-foreground',
         secondary:
-          'bg-card text-foreground border border-border shadow-card hover:bg-secondary',
+          'border border-input bg-background text-foreground shadow-xs shadow-black/5 hover:bg-accent hover:text-accent-foreground',
         ghost:
-          'text-muted-foreground hover:bg-secondary hover:text-foreground',
+          'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
         link:
           'text-foreground underline-offset-4 hover:underline rounded-none',
       },
