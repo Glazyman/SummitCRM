@@ -30,9 +30,9 @@ interface DocRow {
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif']
 const DOCX_EXTS = ['doc', 'docx']
-// Files the desktop Word app can open via the ms-word: protocol (Word also
-// opens/converts PDFs).
-const WORD_OPENABLE = ['doc', 'docx', 'pdf']
+// Files Microsoft's Office web viewer can open (Word for the web). Office
+// formats only — not PDF.
+const WORD_OPENABLE = ['doc', 'docx']
 
 function extOf(d: DocRow): string {
   const m = d.file_path.match(/\.([^.]+)$/)
@@ -128,17 +128,23 @@ export function DocumentsClient() {
     a.remove()
   }
 
-  // Launch the desktop Word app via the Office URI scheme. Word needs a
-  // publicly-fetchable URL, so use the short-lived signed URL (not the
-  // cookie-protected raw proxy).
+  // Open the doc in Word for the web (Microsoft's Office viewer) in a NEW TAB.
+  // Office fetches the URL itself, so we hand it the short-lived signed URL
+  // (not the cookie-protected raw proxy). The tab is opened synchronously
+  // first to dodge the popup blocker, then pointed at the viewer once we have
+  // the URL.
   async function openInWord(d: DocRow) {
+    const tab = window.open('about:blank', '_blank')
     setError(null)
     try {
       const res = await fetch(`/api/documents/${d.id}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Could not open in Word')
-      window.location.href = `ms-word:ofe|u|${json.data.url}`
+      const officeUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(json.data.url)}`
+      if (tab) tab.location.href = officeUrl
+      else window.open(officeUrl, '_blank', 'noopener,noreferrer')
     } catch (e) {
+      if (tab) tab.close()
       setError(e instanceof Error ? e.message : 'Could not open in Word')
     }
   }
