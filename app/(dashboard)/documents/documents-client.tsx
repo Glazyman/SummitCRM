@@ -30,9 +30,9 @@ interface DocRow {
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif']
 const DOCX_EXTS = ['doc', 'docx']
-// Files Microsoft's Office web viewer can open (Word for the web). Office
-// formats only — not PDF.
-const WORD_OPENABLE = ['doc', 'docx']
+// Files that can open in Word for the web. Office files open directly; PDFs
+// are converted to a Word doc first (text only, in-house).
+const WORD_OPENABLE = ['doc', 'docx', 'pdf']
 
 function extOf(d: DocRow): string {
   const m = d.file_path.match(/\.([^.]+)$/)
@@ -129,18 +129,27 @@ export function DocumentsClient() {
   }
 
   // Open the doc in Word for the web (Microsoft's Office viewer) in a NEW TAB.
-  // Office fetches the URL itself, so we hand it the short-lived signed URL
-  // (not the cookie-protected raw proxy). The tab is opened synchronously
-  // first to dodge the popup blocker, then pointed at the viewer once we have
-  // the URL.
+  // Office files open directly via their signed URL; PDFs are converted to a
+  // Word doc first (returns a signed URL of the temp .docx). The tab is opened
+  // synchronously to dodge the popup blocker, then pointed at the viewer.
   async function openInWord(d: DocRow) {
     const tab = window.open('about:blank', '_blank')
+    if (tab) tab.document.write('<p style="font:15px system-ui;padding:28px;color:#555">Preparing this document for Word…</p>')
     setError(null)
     try {
-      const res = await fetch(`/api/documents/${d.id}`)
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Could not open in Word')
-      const officeUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(json.data.url)}`
+      let fileUrl: string
+      if (extOf(d) === 'pdf') {
+        const res = await fetch(`/api/documents/${d.id}/convert`, { method: 'POST' })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error ?? 'Could not convert this PDF to Word')
+        fileUrl = json.data.url
+      } else {
+        const res = await fetch(`/api/documents/${d.id}`)
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error ?? 'Could not open in Word')
+        fileUrl = json.data.url
+      }
+      const officeUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fileUrl)}`
       if (tab) tab.location.href = officeUrl
       else window.open(officeUrl, '_blank', 'noopener,noreferrer')
     } catch (e) {
