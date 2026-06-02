@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils'
 
 export interface SelectOption {
   value: string
-  label: string
+  /** Rich label allowed (e.g. a colored status dot + text). */
+  label: React.ReactNode
 }
 
 export interface SelectMenuProps {
@@ -106,7 +107,7 @@ export function SelectMenu({
   const hasValue      = Boolean(value)
 
   const filtered = searchable && query
-    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+    ? options.filter((o) => typeof o.label === 'string' && o.label.toLowerCase().includes(query.toLowerCase()))
     : options
 
   const h = size === 'sm' ? 'h-9' : 'h-10'

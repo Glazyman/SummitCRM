@@ -4,17 +4,14 @@ import * as React from 'react'
 import {
   Mail, Phone, Building2, Globe, MapPin,
   Package, UserRound, Sparkles,
-  Pencil, Check, X, ExternalLink, ChevronDown,
+  Pencil, Check, X, ExternalLink,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu'
-import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } from '@/components/leads/status-config'
+import { STATUS_CONFIG, INTEREST_CONFIG } from '@/components/leads/status-config'
+import { StatusSelect, InterestSelect } from '@/components/leads/status-select'
 import { US_STATES } from '@/lib/us-states'
 import { CopyableContact } from './copyable-contact'
 import type { LeadDetail, TeamMember, LeadStatus, InterestStatus } from './types'
@@ -220,30 +217,7 @@ export function LeadProfileCard({
       <div className="grid grid-cols-2 gap-2 border-b border-border px-5 py-3">
         {/* Status */}
         {onStatusChange ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="h-9 w-full justify-between gap-2 px-3 text-xs font-medium">
-                <span className="flex items-center gap-1.5 min-w-0">
-                  <span className={cn('h-2 w-2 shrink-0 rounded-full', statusMeta.dot)} />
-                  <span className="truncate">{statusMeta.label}</span>
-                </span>
-                <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" minWidth="170px">
-              <DropdownMenuLabel>Status</DropdownMenuLabel>
-              {ALL_STATUSES.map((s) => {
-                const m = STATUS_CONFIG[s]
-                return (
-                  <DropdownMenuItem key={s} onClick={() => onStatusChange(s)} className={cn(s === lead.status && 'opacity-50 cursor-default')}>
-                    <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
-                    {m.label}
-                    {s === lead.status && <span className="ml-auto text-xs text-muted-foreground">current</span>}
-                  </DropdownMenuItem>
-                )
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <StatusSelect value={lead.status} onChange={onStatusChange} />
         ) : (
           <div className="flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium">
             <span className={cn('h-2 w-2 shrink-0 rounded-full', statusMeta.dot)} />
@@ -253,30 +227,7 @@ export function LeadProfileCard({
 
         {/* Interest */}
         {onInterestChange ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="h-9 w-full justify-between gap-2 px-3 text-xs font-medium">
-                <span className="flex items-center gap-1.5 min-w-0">
-                  {interestMeta && <span className={cn('h-2 w-2 shrink-0 rounded-full', interestMeta.dot)} />}
-                  <span className="truncate">{interestMeta?.label ?? 'Interest'}</span>
-                </span>
-                <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" minWidth="160px">
-              <DropdownMenuLabel>Interest</DropdownMenuLabel>
-              {ALL_INTEREST_STATUSES.map((s) => {
-                const m = INTEREST_CONFIG[s]
-                return (
-                  <DropdownMenuItem key={s} onClick={() => onInterestChange(s)} className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}>
-                    <span className={cn('h-2 w-2 rounded-full shrink-0', m.dot)} />
-                    {m.label}
-                    {s === lead.interest_status && <span className="ml-auto text-xs text-muted-foreground">current</span>}
-                  </DropdownMenuItem>
-                )
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <InterestSelect value={(lead.interest_status ?? 'pending') as InterestStatus} onChange={onInterestChange} />
         ) : (
           <div className="flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-muted-foreground">
             {interestMeta

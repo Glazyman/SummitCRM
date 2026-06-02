@@ -12,7 +12,8 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } from '@/components/leads/status-config'
+import { STATUS_CONFIG } from '@/components/leads/status-config'
+import { StatusSelect, InterestSelect } from '@/components/leads/status-select'
 import type { LeadDetail, TeamMember, LeadStatus } from './types'
 import type { InterestStatus } from '@/types/database'
 
@@ -40,7 +41,6 @@ export function LeadActionBar({
   const router       = useRouter()
   const name         = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email
   const meta         = STATUS_CONFIG[lead.status]
-  const interestMeta = lead.interest_status ? INTEREST_CONFIG[lead.interest_status as InterestStatus] : null
 
   return (
     <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
@@ -80,60 +80,16 @@ export function LeadActionBar({
 
         {/* Action buttons */}
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* Change Status */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
-                Status <ChevronDown className="h-3 w-3 opacity-60" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" minWidth="170px">
-              <DropdownMenuLabel>Change status</DropdownMenuLabel>
-              {ALL_STATUSES.map((s) => {
-                const m = STATUS_CONFIG[s]
-                return (
-                  <DropdownMenuItem
-                    key={s}
-                    onClick={() => onStatusChange(s)}
-                    className={cn(s === lead.status && 'opacity-50 cursor-default')}
-                  >
-                    <span className={cn('h-2 w-2 rounded-full', m.dot)} />
-                    {m.label}
-                  </DropdownMenuItem>
-                )
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Status — reui-style select (current value + colored dot) */}
+          <div className="w-36 sm:w-40">
+            <StatusSelect value={lead.status} onChange={onStatusChange} />
+          </div>
 
-          {/* Interest Status */}
+          {/* Interest — reui-style select */}
           {onInterestChange && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className={cn(
-                  'h-8 gap-1.5 text-xs',
-                  interestMeta && `${interestMeta.badge} border`
-                )}>
-                  {interestMeta?.label ?? 'Interest'}
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" minWidth="160px">
-                <DropdownMenuLabel>Interest level</DropdownMenuLabel>
-                {ALL_INTEREST_STATUSES.map((s) => {
-                  const m = INTEREST_CONFIG[s]
-                  return (
-                    <DropdownMenuItem
-                      key={s}
-                      onClick={() => onInterestChange(s)}
-                      className={cn(s === lead.interest_status && 'opacity-50 cursor-default')}
-                    >
-                      <span className={cn('h-2 w-2 rounded-full', m.dot)} />
-                      {m.label}
-                    </DropdownMenuItem>
-                  )
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="w-32 sm:w-36">
+              <InterestSelect value={(lead.interest_status ?? 'pending') as InterestStatus} onChange={onInterestChange} />
+            </div>
           )}
 
           {/* Assign — admin only */}
