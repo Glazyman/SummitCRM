@@ -56,7 +56,8 @@ export async function createServerClient(
  * tables that are not yet fully represented in types/database.ts.
  */
 export function createAdminClient() {
-  return _createBrowserClient<Database>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return _createBrowserClient<any>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
