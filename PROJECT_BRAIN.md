@@ -65,8 +65,8 @@
 | Date utils | date-fns 4 | |
 | CSV parsing | Papaparse 5 | Client-side only, for import preview |
 | Excel export | xlsx 0.18.5 | |
-| Docx editor | superdoc 1.38.0 (+ peers pdfjs-dist, prosemirror-*, yjs, y-prosemirror, @hocuspocus/provider) | Client-side in-browser `.docx` editing on `/documents/[id]/edit`. Dynamic-imported (no SSR). Added 2026-06-02. |
-| PDF→Word | pdfjs-dist (text extract, server-side) + docx 9.7.1 (Word build) | In-house PDF→editable-`.docx` text conversion (`lib/documents/pdf-to-docx.ts`). `serverExternalPackages: ['pdfjs-dist']` in next.config. Text only — no layout/OCR. Added 2026-06-02. |
+| Docx viewer | superdoc 1.38.0 (+ peers pdfjs-dist, prosemirror-*, yjs, y-prosemirror, @hocuspocus/provider) | **Read-only** `.docx` rendering in the Documents popup (`docx-viewer.tsx`, `documentMode:'viewing'`, lazy `next/dynamic ssr:false`). Editing was added then removed 2026-06-02. |
+| ~~PDF→Word~~ | docx 9.7.1 (installed, **unused**) | In-house PDF→docx convert was added then **removed 2026-06-02** (view-only revert). `docx` dep left in package.json but no longer imported. |
 | Database | Supabase (Postgres) + RLS | Multi-tenant via workspace_id on every table |
 | Auth | Supabase Auth (email/password + magic link) | JWT with custom claims (workspace_id, role) |
 | Storage | Supabase Storage | `lead-imports` bucket for CSV uploads |
@@ -284,12 +284,10 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 │   │   ├── analytics/
 │   │   │   ├── page.tsx
 │   │   │   └── analytics-client.tsx
-│   │   ├── documents/                 ← admin-only document library
+│   │   ├── documents/                 ← admin-only VIEW-ONLY document library
 │   │   │   ├── page.tsx               ← server: admin gate (redirect non-admins → /dashboard)
-│   │   │   ├── documents-client.tsx   ← table + drag/drop upload + viewer/edit/replace/duplicate/delete
-│   │   │   └── [id]/edit/
-│   │   │       ├── page.tsx           ← server: admin gate, .docx-only (else redirect)
-│   │   │       └── docx-editor-client.tsx  ← SuperDoc in-browser .docx editor (save version / save as copy)
+│   │   │   ├── documents-client.tsx   ← table + drag/drop upload + popup viewer + download/delete
+│   │   │   └── docx-viewer.tsx        ← read-only .docx render (SuperDoc viewing mode), lazy-loaded in the popup
 │   │   ├── tasks/page.tsx             ← "Tasks" (formerly Activities); color-coded (past=red, today=amber, future=none)
 │   │   ├── notifications/page.tsx
 │   │   ├── admin/page.tsx             ← admin dashboard
@@ -345,9 +343,8 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 │   │   ├── documents/
 │   │   │   ├── route.ts                       ← GET list / POST upload (multipart), admin-only
 │   │   │   └── [id]/
-│   │   │       ├── route.ts                   ← GET signed URL (?download=1) / PATCH rename+desc / DELETE
-│   │   │       ├── duplicate/route.ts         ← POST: copy file + new "Copy of …" row
-│   │   │       └── replace/route.ts           ← POST: replace file with new version (multipart)
+│   │   │       ├── route.ts                   ← GET signed URL (legacy) / DELETE, admin-only
+│   │   │       └── raw/route.ts               ← GET same-origin byte proxy for the viewer (?download=1)
 │   │   ├── team/
 │   │   │   ├── route.ts
 │   │   │   ├── invite/route.ts
@@ -478,8 +475,7 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 | `/leads/[id]` | (dashboard)/leads/[id] | All roles | Full lead detail + timeline |
 | `/leads/import` | (dashboard)/leads/import | admin+ | CSV import wizard |
 | `/analytics` | (dashboard)/analytics | manager+ | Batches, email metrics, time-series, reps |
-| `/documents` | (dashboard)/documents | admin+ | Document library; non-admins redirected to /dashboard |
-| `/documents/[id]/edit` | (dashboard)/documents/[id]/edit | admin+ | In-browser .docx editor (SuperDoc); non-.docx & non-admins redirected |
+| `/documents` | (dashboard)/documents | admin+ | View-only document library; non-admins redirected to /dashboard |
 | `/tasks` | (dashboard)/tasks | All roles | "Tasks" page (renamed from Activities); color-coded follow-up/callback list + calendar |
 | `/notifications` | (dashboard)/notifications | All roles | Notification center |
 | `/admin` | (dashboard)/admin | admin+ | Team stats, rep performance, account health |
@@ -533,17 +529,14 @@ All API routes require authentication. Role checks are in-route.
 **AI**
 - `POST /api/ai/snapshot-email` — admin only, gpt-4o, logs to ai_usage_logs
 
-**Documents** (admin only)
+**Documents** (admin only — **view-only library**)
 - `GET /api/documents` — list workspace documents (newest first, + uploader name)
 - `POST /api/documents` — upload (multipart/form-data `file`); streams to `documents` bucket, inserts row
-- `GET /api/documents/[id]` — 120s signed URL; `?download=1` forces attachment download
-- `PATCH /api/documents/[id]` — rename + edit description (JSON `{name?, description?}`)
+- `GET /api/documents/[id]` — 120s signed URL (legacy; the viewer now uses `/raw`)
 - `DELETE /api/documents/[id]` — remove storage object + row
-- `POST /api/documents/[id]/duplicate` — storage `.copy()` + new "Copy of …" row
-- `POST /api/documents/[id]/replace` — replace file with a new version (multipart), repoint row, delete old object
-- `GET /api/documents/[id]/raw` — **same-origin** byte proxy for the in-app viewer (CSP blocks cross-origin iframes); inline by default, `?download=1` = attachment. Framing headers relaxed for this route in middleware.
-- `POST /api/documents/[id]/convert` — PDF → editable `.docx` (in-house text extraction), saved as a NEW "… (editable)" doc; returns the new row. Admin only, `runtime='nodejs'`.
-- Shared admin gate + loader: `lib/documents/context.ts` (`requireDocumentAdmin`, `loadDocument`)
+- `GET /api/documents/[id]/raw` — **same-origin** byte proxy for the in-app viewer (CSP blocks cross-origin iframes, quirk 19); inline by default, `?download=1` = attachment. Framing headers relaxed for this route in middleware.
+- Shared loader: `lib/documents/context.ts` (`requireDocumentAdmin`, `loadDocument`) — used by `/raw`.
+- *(Removed 2026-06-02 in the view-only revert: `PATCH [id]`, `[id]/duplicate`, `[id]/replace`, `[id]/convert`.)*
 
 **Team**
 - `GET /api/team`
@@ -662,14 +655,12 @@ Admin-only document library at `/documents` for contracts, templates, and signed
 - **Storage**: private `documents` bucket, path `<workspace_id>/<uuid>.<ext>`, 25 MB/file cap. Any file type (PDF, .docx, .pages, …).
 - **Upload**: click Upload or drag-and-drop (multiple files). `POST /api/documents` multipart → server streams bytes to the bucket via the service role → inserts a `documents` row. Orphaned object rolled back if the insert fails.
 - **List**: table with file-type icon, name, ext, size, uploaded-by (display name via `getUsersById`), date. Newest first.
-- **Pop-up viewer** (added 2026-06-02): clicking a row name / the eye icon opens an in-app modal (`size="full"`). PDFs render in an `<iframe>`, images in `<img>` (both via the inline 120s signed URL); non-renderable types (.docx/.pages) show file info + a Download button **in-house only** (nothing sent to third-party viewers — user choice). Footer has "Open in new tab" + Download.
-- **Edit details** (added 2026-06-02): ⋯ menu → Edit opens a dialog to **rename** + edit a **description** (`PATCH /api/documents/[id]`) and optionally **Replace file** with a new version (`POST .../replace` — uploads new object, repoints row, deletes old). Description shows under the name in the list.
-- **View vs Edit split** (2026-06-02): **clicking a file = View** (read-only). PDF/image → popup; Word docs → the editor page in **viewing** mode (so docx is now viewable in-CRM, not just downloadable); `.pages` → popup download. Every row has an **eye (View)**; Word rows also get a **pencil (Edit)** → editor in **editing** mode (`?mode=edit`). The editor page (`/documents/[id]/edit`) takes `?mode=view|edit` and has an in-page **View/Edit toggle** (SuperDoc `setDocumentMode`); Save version / Save as copy show only in edit mode; the SuperDoc toolbar is hidden in view mode.
-- **PDF → editable Word (in-house, added 2026-06-02)**: PDFs can't be edited directly, but the Edit pencil (and ⋯ "Convert to editable Word") on a PDF opens a confirm dialog → `POST /api/documents/[id]/convert` extracts the text (pdfjs, server-side) → builds a `.docx` (docx lib) → saves a NEW "… (editable)" doc → opens it in the editor. **Text only** — formatting/logos/signatures lost, scanned PDFs come out blank (no OCR). Original PDF kept. `.pages` still can't be converted in-house (proprietary). User chose this in-house route over CloudConvert (free, nothing leaves the server). Loads the file via the same-origin raw route, dynamic-imported client-side (no SSR). Two saves: **Save version** (`POST .../replace`, overwrites the file on the same row) or **Save as copy** (`POST /api/documents` with name "Copy of …"). PDFs and `.pages` can't be content-edited (only download/replace). Build-verified `next build` green.
-- **Duplicate** (added 2026-06-02): ⋯ menu → Duplicate (`POST .../duplicate`) storage-copies the file into a new "Copy of …" row.
-- **Duplicate & edit** (added 2026-06-02, .docx/.doc only): ⋯ → "Duplicate & edit" copies the doc then routes straight to `/documents/[newId]/edit` — one-click "new agreement from this template". Uses the new id returned by the duplicate route.
-- **Download**: `?download=1` signed URL (Content-Disposition attachment with the doc's name+ext).
-- **Delete**: ⋯ menu → confirm dialog → `DELETE /api/documents/[id]` removes the storage object then the row.
+> **VIEW-ONLY as of 2026-06-02 (final).** All editing was added then **removed per user request** — the library is now strictly view + upload + download + delete. The editing history (in-browser SuperDoc editor, rename/description, replace-version, duplicate, duplicate&edit, PDF→Word convert) is preserved in the session log for context, but those routes/pages were deleted. See the "reverted to view-only" session entry.
+
+- **Pop-up viewer (view-only)**: clicking a row name / the eye icon opens an in-app modal (`size="full"`). PDFs → `<iframe>`, images → `<img>` (both via the **same-origin raw proxy** `/api/documents/[id]/raw` — CSP blocks cross-origin iframes, quirk 19). **.docx/.doc → rendered read-only via SuperDoc viewing mode** (`docx-viewer.tsx`, lazy `next/dynamic` `ssr:false`, `documentMode:'viewing'`) — so Word docs are viewable in-CRM. `.pages` and other non-renderables → file info + Download. Footer: Open in new tab + Download.
+- **Download**: `/api/documents/[id]/raw?download=1` (Content-Disposition attachment).
+- **Delete**: confirm dialog → `DELETE /api/documents/[id]` (storage object + row). Row actions are just View / Download / Delete.
+- **Upload** stays (drag/drop + button) — adding docs isn't "editing". No rename/replace/duplicate/edit/convert.
 - **Access**: server page redirects non-admins to `/dashboard`; all API routes gate on `admin`/`super_admin`. Sidebar link sits in the Admin group.
 - **Seeding**: `scripts/seed-documents.mjs` (service-role, idempotent by name) ensures the bucket and uploads the initial 5 agreements/templates.
 
@@ -1213,4 +1204,15 @@ Pipeline page 2nd stat card "Hot Leads" (interested count) → **"Needs Buyer"**
 
 ---
 
-*Last updated: 2026-06-02 — covers all sessions through 2026-06-02 (Documents library extended: in-app pop-up viewer (PDF/image inline via same-origin raw proxy — CSP blocks cross-origin iframes, quirk 19; .docx/.pages download-only), edit name+description, replace-with-new-version, duplicate, and **in-browser .docx editing via SuperDoc** at /documents/[id]/edit (next build verified green). Earlier same day: admin-only Documents library — page + upload/preview/download/delete API + `documents` table/bucket migration + seeder, shipped to main (`ade4679`); reui design pass across UI primitives + preview-env 500 gotcha; reui button + radix status/interest select; analytics sized-pie reverted to donut; dashboard rep-performance switched to Today/7d/30d/All-time presets; admin-only pipeline rep/batch/date filters; **repo migrated off iCloud Desktop → `~/Developer/SummitCRM` after local `.git` corruption; native git restored; global git identity + lfs fixed**; **Vercel build break fixed — `types/database.ts` was a failed supabase-gen capture, restored the 276-line manual file**; all three features deployed green to prod). Earlier: 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card; lead-status %; mini-chart moved to analytics (unique leads/day); Call Summary sized pie; recharts 3.8 chart-type gotcha)*
+### Session 2026-06-02 (Documents → reverted to VIEW-ONLY)
+
+User reversed course: **strip all editing, make every doc viewable in a popup.** Final state of the Documents library:
+- **Kept**: list, upload (drag/drop), **pop-up viewer for all types** (PDF iframe, image img, **.docx via SuperDoc viewing mode** in `docx-viewer.tsx` — lazy `next/dynamic ssr:false`; `.pages`/other → download), download, delete.
+- **Deleted**: the editor page `app/(dashboard)/documents/[id]/edit/*`, and API routes `[id]/convert`, `[id]/replace`, `[id]/duplicate`, plus the `PATCH [id]` (rename/description) handler and `lib/documents/pdf-to-docx.ts`. Reverted `serverExternalPackages` in next.config.
+- **Deps left installed but now only used for viewing**: `superdoc` (docx read-only render) + its `pdfjs-dist` peer. `docx` (Word gen) is now **unused** (left in package.json; harmless).
+- `next build` green. Row actions are just View / Download / Delete.
+- The intermediate editing features (SuperDoc editor, rename, replace, duplicate, duplicate&edit, in-house PDF→Word convert) all shipped earlier this same day then were removed — see the prior 2026-06-02 session blocks for how they worked if ever needed again (git history: commits `9a56007`…`be2a59c`).
+
+---
+
+*Last updated: 2026-06-02 — Documents library **reverted to VIEW-ONLY** (popup view for all types incl .docx via SuperDoc viewing mode; upload/download/delete; all editing — editor, rename, replace, duplicate, PDF→Word convert — removed per user). Earlier same day, since superseded: Documents library extended: in-app pop-up viewer (PDF/image inline via same-origin raw proxy — CSP blocks cross-origin iframes, quirk 19; .docx/.pages download-only), edit name+description, replace-with-new-version, duplicate, and **in-browser .docx editing via SuperDoc** at /documents/[id]/edit (next build verified green). Earlier same day: admin-only Documents library — page + upload/preview/download/delete API + `documents` table/bucket migration + seeder, shipped to main (`ade4679`); reui design pass across UI primitives + preview-env 500 gotcha; reui button + radix status/interest select; analytics sized-pie reverted to donut; dashboard rep-performance switched to Today/7d/30d/All-time presets; admin-only pipeline rep/batch/date filters; **repo migrated off iCloud Desktop → `~/Developer/SummitCRM` after local `.git` corruption; native git restored; global git identity + lfs fixed**; **Vercel build break fixed — `types/database.ts` was a failed supabase-gen capture, restored the 276-line manual file**; all three features deployed green to prod). Earlier: 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card; lead-status %; mini-chart moved to analytics (unique leads/day); Call Summary sized pie; recharts 3.8 chart-type gotcha)*

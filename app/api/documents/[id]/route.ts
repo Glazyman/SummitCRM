@@ -13,7 +13,7 @@ import { NextRequest } from 'next/server'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiServerError } from '@/lib/utils/api'
+import { apiSuccess, apiUnauthorized, apiForbidden, apiNotFound, apiServerError } from '@/lib/utils/api'
 
 const BUCKET = 'documents'
 type Params = { params: Promise<{ id: string }> }
@@ -68,46 +68,6 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     if (error || !data) return apiServerError(error)
     return apiSuccess({ url: data.signedUrl })
-  } catch (err) {
-    return apiServerError(err)
-  }
-}
-
-export async function PATCH(request: NextRequest, { params }: Params) {
-  try {
-    const ctx = await requireAdmin()
-    if ('error' in ctx) return ctx.error
-    const { admin, workspaceId } = ctx
-    const { id } = await params
-
-    const doc = await loadDoc(admin, workspaceId, id)
-    if (!doc) return apiNotFound('Document')
-
-    let body: any
-    try { body = await request.json() } catch { return apiError('Invalid JSON body') }
-
-    const patch: Record<string, unknown> = {}
-    if (typeof body.name === 'string') {
-      const name = body.name.trim()
-      if (!name) return apiError('Name cannot be empty')
-      patch.name = name.slice(0, 255)
-    }
-    if ('description' in body) {
-      const d = body.description == null ? null : String(body.description).trim()
-      patch.description = d ? d.slice(0, 2000) : null
-    }
-    if (Object.keys(patch).length === 0) return apiError('Nothing to update')
-
-    const { data: row, error } = await (admin as any)
-      .from('documents')
-      .update(patch)
-      .eq('id', id)
-      .eq('workspace_id', workspaceId)
-      .select('id, name, description, file_path, mime_type, size_bytes, uploaded_by, created_at')
-      .single() as { data: any; error: unknown }
-
-    if (error || !row) return apiServerError(error)
-    return apiSuccess(row)
   } catch (err) {
     return apiServerError(err)
   }
