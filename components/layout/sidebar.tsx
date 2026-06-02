@@ -16,6 +16,7 @@ import {
   ChevronRight,
   LogOut,
   UserCog,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -203,6 +204,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName, hideCollapse
             <div className="flex flex-col gap-1">
               <NavLink item={{ label: 'Import',       href: '/leads/import',  icon: PlusCircle }} active={isActive('/leads/import')} />
               <NavLink item={{ label: 'Analytics',    href: '/analytics',     icon: BarChart2 }}  active={isActive('/analytics')} />
+              <NavLink item={{ label: 'Documents',    href: '/documents',     icon: FileText }}   active={isActive('/documents')} />
               <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }}      active={isActive('/settings/team')} />
             </div>
           </div>
@@ -211,6 +213,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName, hideCollapse
           <div className="mt-4 flex flex-col gap-1">
             <NavLink item={{ label: 'Import',       href: '/leads/import',  icon: PlusCircle }} active={isActive('/leads/import')} collapsed />
             <NavLink item={{ label: 'Analytics',    href: '/analytics',     icon: BarChart2 }}  active={isActive('/analytics')} collapsed />
+            <NavLink item={{ label: 'Documents',    href: '/documents',     icon: FileText }}   active={isActive('/documents')} collapsed />
             <NavLink item={{ label: 'Team Members', href: '/settings/team', icon: Users }}      active={isActive('/settings/team')} collapsed />
           </div>
         )}
