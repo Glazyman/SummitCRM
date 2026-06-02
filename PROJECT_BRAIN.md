@@ -1049,8 +1049,8 @@ Admin dashboard 4 cards now mirror the rep layout, workspace-wide:
 ### Session 2026-06-01 (analytics per-person + lead-status stats)
 
 Final state of the analytics overview + rep performance (admin/team analytics; the reps route is admin-only):
-- **Overview Call Summary** is consistently about **calls**: donut center = total calls, answer rate is of total calls (no more per-person/per-call clash). The **per-person number is its own "Leads Called" stat** (`unique_leads`, prominent, top of the stats column). Page subtitle shows `{unique_leads} called · {total} calls · {leads_total} leads`.
-- **New "Lead Status" card** on the overview: Interested / Not interested / Bad leads (`status='do_not_contact'`). These are a **current** workspace snapshot (lead states, not date-filtered).
+- **Overview Call Summary** donut center = **`unique_leads`** ("leads called", per person — the 54). The breakdown column lists the call outcomes (answered/voicemail/…) AND, under a small "Lead status" divider, **Interested / Not interested / Bad leads** (`status='do_not_contact'`). Lead-status counts are a **current** workspace snapshot (not date-filtered). No separate Lead Status / Leads Called cards. Page subtitle: `{unique_leads} called · {total} calls · {leads_total} leads`.
+- **Answer Rate** stays a per-call metric (answered / total calls) in its own card — there's no per-person answer rate, so it's intentionally of total calls.
 - **Rep Performance**: each rep card's headline KPI toggles via a section-level **"Per person / All calls"** control (default Per person = `rep.unique_leads`; ranking + the KPI tile follow it). The per-rep outcome donut stays all-calls.
 - Backend (`GET /api/analytics/reps`): overview gained `unique_leads` (`count(leads WHERE last_contacted_at in range)`, exact for presets) + `interested`/`not_interested`/`bad_leads` (current counts); each rep gained `unique_leads` via `get_unique_leads_called_by_rep_range`. No migration — denormalized fields + existing RPC.
 - `CallOverview` + `RepRow` types and `EMPTY_OVERVIEW` updated accordingly.

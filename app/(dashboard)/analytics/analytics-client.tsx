@@ -78,8 +78,8 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold">{overview.total}</span>
-                  <span className="text-[11px] text-muted-foreground">calls</span>
+                  <span className="text-3xl font-bold">{overview.unique_leads}</span>
+                  <span className="text-[11px] text-muted-foreground text-center px-2 leading-tight">leads called</span>
                 </div>
               </div>
               {/* Breakdown */}
@@ -101,6 +101,32 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
                 {overview.total === 0 && (
                   <p className="text-sm text-muted-foreground">No calls in this period.</p>
                 )}
+
+                {/* Lead status — current snapshot, not call outcomes */}
+                <div className="mt-1 border-t border-border pt-2.5 space-y-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Lead status</p>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      <span className="text-muted-foreground">Interested</span>
+                    </div>
+                    <span className="font-semibold tabular-nums">{overview.interested}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/50" />
+                      <span className="text-muted-foreground">Not interested</span>
+                    </div>
+                    <span className="font-semibold tabular-nums">{overview.not_interested}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
+                      <span className="text-muted-foreground">Bad leads</span>
+                    </div>
+                    <span className="font-semibold tabular-nums">{overview.bad_leads}</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -109,46 +135,6 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
 
       {/* Stats column */}
       <div className="space-y-4">
-        {/* Leads called (per person) — the unique-lead headline. */}
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Phone className="h-3.5 w-3.5 text-primary" />
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Leads Called</span>
-            </div>
-            {loading ? <div className="h-12 animate-pulse bg-muted rounded" /> : (
-              <>
-                <p className="text-4xl font-bold">{overview.unique_leads}</p>
-                <p className="text-xs text-muted-foreground mt-1">unique leads · {overview.total} calls total</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        {/* Lead status snapshot */}
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lead Status</span>
-            </div>
-            {loading ? <div className="h-12 animate-pulse bg-muted rounded" /> : (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Interested</span>
-                  <span className="font-bold">{overview.interested}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-muted-foreground/50" /> Not interested</span>
-                  <span className="font-bold">{overview.not_interested}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-destructive" /> Bad leads</span>
-                  <span className="font-bold">{overview.bad_leads}</span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
         <Card>
           <CardContent className="pt-5">
             <div className="flex items-center gap-2 mb-3">
