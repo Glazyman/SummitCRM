@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
     // is the single source of truth; the old activity_logs synthetic count was
     // removed because it double-counted bulk calls.
     const [membersRes, callStatsRes, followUpsRes, leadsRes,
-           leadsCalledInPeriodRes, workspaceRes] = await Promise.all([
+           leadsCalledInPeriodRes, workspaceRes, uniqueLeadsRes] = await Promise.all([
       admin.from('workspace_members').select('user_id, role').eq('workspace_id', wsId).eq('is_active', true),
       // RPC aggregate — bypasses PostgREST row limit; returns [{logged_by, outcome, cnt}]
       admin.rpc('get_call_stats_by_rep', {
@@ -117,7 +117,17 @@ export async function GET(req: NextRequest) {
       }),
       // Workspace settings → default daily target + per-rep overrides
       admin.from('workspaces').select('settings').eq('id', wsId).single(),
+      // Workspace-level UNIQUE leads called in the range (one per lead, NOT raw
+      // call count) — the "per person" headline figure, matches the analytics
+      // page. Uses the denormalized last_contacted_at. count(leads) avoids the
+      // double-count you'd get summing per-rep uniques.
+      admin.from('leads').select('id', { count: 'exact', head: true })
+        .eq('workspace_id', wsId)
+        .gte('last_contacted_at', range.start)
+        .lt('last_contacted_at', range.end)
+        .is('deleted_at', null),
     ])
+    const uniqueLeads = (uniqueLeadsRes as { count: number | null }).count ?? 0
 
     const leadsCalledRows = (leadsCalledInPeriodRes.data ?? []) as Array<{ user_id: string; leads_called: number }>
     const leadsCalledByUser = new Map(leadsCalledRows.map((r) => [r.user_id, Number(r.leads_called)]))
@@ -193,7 +203,7 @@ export async function GET(req: NextRequest) {
       })
       .sort((a, b) => b.calls - a.calls)
 
-    return NextResponse.json({ reps, range })
+    return NextResponse.json({ reps, range, uniqueLeads })
   } catch (err) {
     console.error('[GET /api/admin/rep-performance]', err)
     return NextResponse.json({ error: 'Failed to load rep performance' }, { status: 500 })

@@ -55,7 +55,10 @@ const OUTCOME_META: Record<string, { label: string; color: string }> = {
 }
 
 // ── Donut chart for call outcomes ─────────────────────────────────────────
-function CallDonut({ reps }: { reps: RepStat[] }) {
+// Center = UNIQUE leads called (one per lead, "per person") to match the
+// analytics page; the slices are call outcomes (which sum to raw calls), and
+// raw call count is shown as a small secondary line.
+function CallDonut({ reps, uniqueLeads }: { reps: RepStat[]; uniqueLeads: number }) {
   const totals: Record<string, number> = {}
   for (const rep of reps) {
     for (const [outcome, count] of Object.entries(rep.callsByOutcome)) {
@@ -101,10 +104,11 @@ function CallDonut({ reps }: { reps: RepStat[] }) {
           />
         </PieChart>
       </ResponsiveContainer>
-      {/* Center label */}
+      {/* Center label — unique leads called (per person), raw calls secondary */}
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold">{total}</span>
-        <span className="text-[11px] text-muted-foreground">calls</span>
+        <span className="text-2xl font-bold leading-none">{uniqueLeads}</span>
+        <span className="text-[11px] text-muted-foreground">leads called</span>
+        <span className="mt-0.5 text-[10px] text-muted-foreground/70">{total} calls</span>
       </div>
       {/* Legend */}
       <div className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1">
@@ -131,7 +135,10 @@ function RepCallBars({ reps }: { reps: RepStat[] }) {
           <div key={rep.id} className="space-y-1">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium truncate max-w-[120px]">{rep.name.split(' ')[0]}</span>
-              <span className="text-muted-foreground">{rep.calls} calls</span>
+              <span className="text-muted-foreground">
+                <span className="font-medium text-foreground">{rep.leadsCalledInPeriod}</span> leads
+                <span className="text-muted-foreground/60"> · {rep.calls} calls</span>
+              </span>
             </div>
             {rep.calls > 0 ? (
               <div className="flex h-5 w-full overflow-hidden rounded-full bg-muted">
@@ -181,6 +188,7 @@ export function RepPerformancePanel() {
   // recent activity without aging out as aggressively as a single day.
   const [preset, setPreset]   = React.useState<Preset>('30d')
   const [reps, setReps]       = React.useState<RepStat[]>([])
+  const [uniqueLeads, setUniqueLeads] = React.useState(0)   // unique leads called in range (per person)
   const [loading, setLoading] = React.useState(true)
   const [error, setError]     = React.useState<string | null>(null)
 
@@ -192,6 +200,7 @@ export function RepPerformancePanel() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setReps(json.reps ?? [])
+      setUniqueLeads(json.uniqueLeads ?? 0)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
@@ -254,7 +263,7 @@ export function RepPerformancePanel() {
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
                 <Phone className="h-3 w-3" /> Call Outcomes
               </p>
-              <CallDonut reps={reps} />
+              <CallDonut reps={reps} uniqueLeads={uniqueLeads} />
             </div>
             <div className="p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Calls per Rep</p>

@@ -15,6 +15,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
+import { SelectMenu } from '@/components/ui/select-menu'
 import { INTEREST_CONFIG } from '@/components/leads/status-config'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
 import type { InterestStatus } from '@/types/database'
@@ -95,8 +96,8 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
   // the loaded set (top-100 per stage). Pipelines are small enough that this is
   // accurate in practice; when a filter is active we hide the per-stage
   // overflow ("+N more") and recompute counts from the filtered set.
-  const [repFilter,      setRepFilter]      = React.useState<string>('all')
-  const [batchFilter,    setBatchFilter]    = React.useState<string>('all')
+  const [repFilter,      setRepFilter]      = React.useState<string>('')   // '' = all reps
+  const [batchFilter,    setBatchFilter]    = React.useState<string>('')   // '' = all batches
   const [dateFilter,     setDateFilter]     = React.useState<DatePreset>('all')
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
   const [pipelineView,   setPipelineView]   = React.useState<'kanban' | 'list'>(() => {
@@ -147,14 +148,14 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
     return () => window.clearTimeout(handle)
   }, [search, initialLeads, initialStageCounts, initialTotals])
 
-  const filtersActive = isAdmin && (repFilter !== 'all' || batchFilter !== 'all' || dateFilter !== 'all')
+  const filtersActive = isAdmin && (!!repFilter || !!batchFilter || dateFilter !== 'all')
 
   const filteredLeads = React.useMemo(() => {
     if (!filtersActive) return leads
     const cutoff = dateFilter === 'all' ? 0 : Date.now() - { '7d': 7, '30d': 30, '90d': 90 }[dateFilter] * 86400000
     return leads.filter((l) => {
-      if (repFilter !== 'all' && l.assigned_to !== repFilter) return false
-      if (batchFilter !== 'all' && l.batch_id !== batchFilter) return false
+      if (repFilter && l.assigned_to !== repFilter) return false
+      if (batchFilter && l.batch_id !== batchFilter) return false
       if (cutoff > 0) {
         const activityIso = l.last_activity_at ?? l.last_contacted_at ?? l.created_at
         if (new Date(activityIso).getTime() < cutoff) return false
@@ -187,7 +188,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
     return counts
   }, [filtersActive, stageCounts, leadsByStage])
 
-  function clearFilters() { setRepFilter('all'); setBatchFilter('all'); setDateFilter('all') }
+  function clearFilters() { setRepFilter(''); setBatchFilter(''); setDateFilter('all') }
 
   // Load the next 100 leads for a stage when "+N more" is clicked.
   async function loadStageOverflow(stageId: string) {
@@ -334,24 +335,32 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground">
               <Filter className="h-3.5 w-3.5" /> Filters
             </span>
-            <FilterSelect
-              label="Rep"
-              value={repFilter}
-              onChange={setRepFilter}
-              options={[{ id: 'all', name: 'All reps' }, ...repOptions]}
-            />
-            <FilterSelect
-              label="Batch"
-              value={batchFilter}
-              onChange={setBatchFilter}
-              options={[{ id: 'all', name: 'All batches' }, ...batchOptions]}
-            />
-            <FilterSelect
-              label="Date"
-              value={dateFilter}
-              onChange={(v) => setDateFilter(v as DatePreset)}
-              options={(Object.keys(DATE_PRESET_LABELS) as DatePreset[]).map(k => ({ id: k, name: DATE_PRESET_LABELS[k] }))}
-            />
+            <div className="w-44">
+              <SelectMenu
+                value={repFilter}
+                onChange={setRepFilter}
+                options={repOptions.map(r => ({ value: r.id, label: r.name }))}
+                nullable nullLabel="All reps" placeholder="All reps"
+                searchable size="sm"
+              />
+            </div>
+            <div className="w-44">
+              <SelectMenu
+                value={batchFilter}
+                onChange={setBatchFilter}
+                options={batchOptions.map(b => ({ value: b.id, label: b.name }))}
+                nullable nullLabel="All batches" placeholder="All batches"
+                searchable size="sm"
+              />
+            </div>
+            <div className="w-40">
+              <SelectMenu
+                value={dateFilter}
+                onChange={(v) => setDateFilter((v || 'all') as DatePreset)}
+                options={(Object.keys(DATE_PRESET_LABELS) as DatePreset[]).map(k => ({ value: k, label: DATE_PRESET_LABELS[k] }))}
+                size="sm"
+              />
+            </div>
             {filtersActive && (
               <button
                 type="button"
@@ -716,29 +725,6 @@ function KanbanCard({
   )
 }
 
-// ── Filter dropdown (admin pipeline filters) ──────────────────────────────────
-function FilterSelect({
-  label, value, onChange, options,
-}: {
-  label: string; value: string; onChange: (v: string) => void; options: FilterOption[]
-}) {
-  const active = value !== 'all'
-  return (
-    <label className={cn(
-      'inline-flex items-center gap-2 h-[34px] rounded-xl border bg-card px-3 text-[12.5px] cursor-pointer transition-colors',
-      active ? 'border-primary/50 bg-primary/5' : 'border-border',
-    )}>
-      <span className="text-muted-foreground">{label}</span>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="bg-transparent text-foreground font-medium outline-none cursor-pointer max-w-[150px]"
-      >
-        {options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-      </select>
-    </label>
-  )
-}
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({
