@@ -46,8 +46,8 @@ export function AnalyticsExportButton({ view, start, end }: Props) {
       className="gap-2 h-9"
     >
       {done
-        ? <><Check className="h-3.5 w-3.5 text-foreground" /> Exported</>
-        : <><Download className="h-3.5 w-3.5" /> Export CSV</>
+        ? <><Check className="h-3.5 w-3.5 text-foreground" /> <span className="hidden sm:inline">Exported</span></>
+        : <><Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Export CSV</span></>
       }
     </Button>
   )

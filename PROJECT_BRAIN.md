@@ -1036,4 +1036,13 @@ Admin dashboard 4 cards now mirror the rep layout, workspace-wide:
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered)*
+### Session 2026-06-01 (analytics + team mobile layout)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | Team page mobile: header stacks (`flex-col sm:flex-row`); member/invite/inactive rows use `px-4 sm:px-6` + `min-w-0`/`truncate` so names/emails don't overflow; **Daily Call Targets** grid was `grid-cols-[1fr_130px_130px]` (260px of fixed cols, too wide for phones) → `grid-cols-[1fr_76px_64px] sm:grid-cols-[1fr_130px_130px]`. | `app/(dashboard)/settings/team/team-settings-client.tsx` |
+| 2 | Analytics "Export CSV" button → icon-only below `sm` (text was crowding the mobile header). Overview/rep-performance were already responsive (stacking grids), so no other analytics change. | `components/analytics/analytics-export-button.tsx` |
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout)*

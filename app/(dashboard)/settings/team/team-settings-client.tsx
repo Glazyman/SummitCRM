@@ -316,7 +316,7 @@ export default function TeamSettingsClient({
   return (
     <div className="max-w-4xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Users className="w-5 h-5" /> Team Members
@@ -366,14 +366,14 @@ export default function TeamSettingsClient({
           <CardContent className="p-0">
             <div className="divide-y divide-border">
               {invites.map((invite) => (
-                <div key={invite.id} className="flex items-center justify-between px-6 py-3">
-                  <div>
-                    <p className="text-sm font-medium">{invite.email}</p>
+                <div key={invite.id} className="flex items-center justify-between gap-2 px-4 sm:px-6 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{invite.email}</p>
                     <p className="text-xs text-muted-foreground">
                       Expires {new Date(invite.expires_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 shrink-0">
                     <span className={cn(
                       'px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide border',
                       ROLE_COLORS[invite.role as WorkspaceRole] ?? 'bg-muted text-muted-foreground border-border'
@@ -438,14 +438,14 @@ export default function TeamSettingsClient({
               <div className="text-sm text-muted-foreground">No reps found yet.</div>
             ) : (
               <div className="rounded-lg border border-border overflow-hidden">
-                <div className="grid grid-cols-[1fr_130px_130px] gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border bg-muted/40">
+                <div className="grid grid-cols-[1fr_76px_64px] sm:grid-cols-[1fr_130px_130px] gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border bg-muted/40">
                   <span>Rep</span>
                   <span>Override</span>
                   <span>Effective</span>
                 </div>
                 <div className="divide-y divide-border">
                   {repTargetRows.map((rep) => (
-                    <div key={rep.user_id} className="grid grid-cols-[1fr_130px_130px] gap-2 px-3 py-2 items-center">
+                    <div key={rep.user_id} className="grid grid-cols-[1fr_76px_64px] sm:grid-cols-[1fr_130px_130px] gap-2 px-3 py-2 items-center">
                       {(() => {
                         const draft = (repTargetDrafts[rep.user_id] ?? '').trim()
                         const draftNum = Number.parseInt(draft, 10)
@@ -527,25 +527,25 @@ export default function TeamSettingsClient({
           ) : (
             <div className="divide-y divide-border">
               {activeMembers.map((member) => (
-                <div key={member.id} className="flex items-center justify-between px-6 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold">
+                <div key={member.id} className="flex items-center justify-between gap-2 px-4 sm:px-6 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-8 w-8 shrink-0 rounded-full bg-muted flex items-center justify-center text-xs font-semibold">
                       {(member.full_name ?? member.email ?? '?')[0].toUpperCase()}
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
                         {member.full_name ?? member.email ?? 'Unknown'}
                         {member.is_me && (
                           <span className="ml-2 text-[10px] text-muted-foreground">(you)</span>
                         )}
                       </p>
                       {member.full_name && (
-                        <p className="text-xs text-muted-foreground">{member.email}</p>
+                        <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     {isAdmin && !member.is_me && !member.is_protected_owner ? (
                       <>
                         <SelectMenu
@@ -600,8 +600,8 @@ export default function TeamSettingsClient({
           <CardContent className="p-0">
             <div className="divide-y divide-border">
               {inactiveMembers.map((member) => (
-                <div key={member.id} className="flex items-center justify-between px-6 py-3 opacity-50">
-                  <div className="flex items-center gap-3">
+                <div key={member.id} className="flex items-center justify-between gap-2 px-4 sm:px-6 py-3 opacity-50">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs">
                       {(member.full_name ?? member.email ?? '?')[0].toUpperCase()}
                     </div>
