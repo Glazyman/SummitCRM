@@ -44,7 +44,7 @@ export function LeadActionBar({
 
   return (
     <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-6">
+      <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:px-6">
 
         {/* ← Back + breadcrumb */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -79,7 +79,7 @@ export function LeadActionBar({
         </div>
 
         {/* Action buttons */}
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
           {/* Status — reui-style select (current value + colored dot) */}
           <div className="w-36 sm:w-40">
             <StatusSelect value={lead.status} onChange={onStatusChange} />

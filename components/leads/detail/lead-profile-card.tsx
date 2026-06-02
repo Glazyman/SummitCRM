@@ -186,31 +186,37 @@ export function LeadProfileCard({
               )
             )}
           </div>
-        </div>
 
-        {/* Edit button row */}
-        <div className="mt-3 flex items-center justify-end">
-          {!editing ? (
-            <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1.5 px-3 text-xs font-medium" onClick={startEdit}>
-              <Pencil className="h-3.5 w-3.5" /> Edit
-            </Button>
-          ) : (
-            <div className="flex flex-col items-end gap-1">
-              <div className="flex gap-1.5">
-                <Button size="sm" variant="ghost" className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground" onClick={cancelEdit} disabled={saving}>
-                  <X className="h-3.5 w-3.5 mr-1" /> Cancel
-                </Button>
-                <Button size="sm" className="h-8 gap-1.5 px-3 text-xs font-medium" onClick={handleSave} disabled={saving}>
-                  <Check className="h-3.5 w-3.5" />
-                  {saving ? 'Saving…' : 'Save'}
-                </Button>
-              </div>
-              {saveError && (
-                <p className="text-xs text-destructive">{saveError}</p>
-              )}
-            </div>
+          {/* Edit — compact icon (mobile + desktop), no dedicated row */}
+          {!editing && (
+            <button
+              type="button"
+              onClick={startEdit}
+              aria-label="Edit lead"
+              className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
           )}
         </div>
+
+        {/* Save / Cancel — only while editing */}
+        {editing && (
+          <div className="mt-3 flex flex-col items-end gap-1">
+            <div className="flex gap-1.5">
+              <Button size="sm" variant="ghost" className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground" onClick={cancelEdit} disabled={saving}>
+                <X className="h-3.5 w-3.5 mr-1" /> Cancel
+              </Button>
+              <Button size="sm" className="h-8 gap-1.5 px-3 text-xs font-medium" onClick={handleSave} disabled={saving}>
+                <Check className="h-3.5 w-3.5" />
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+            {saveError && (
+              <p className="text-xs text-destructive">{saveError}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Status + Interest ── */}
