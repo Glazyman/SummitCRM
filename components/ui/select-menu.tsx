@@ -168,8 +168,8 @@ export function SelectMenu({
                 className={cn(
                   'flex w-full items-center justify-between px-3 py-1.5 text-sm transition-colors',
                   !value
-                    ? 'bg-primary text-primary-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-muted',
+                    ? 'bg-accent text-foreground'
+                    : 'text-foreground hover:bg-accent',
                 )}
               >
                 {nullLabel}
@@ -191,8 +191,8 @@ export function SelectMenu({
                   className={cn(
                     'flex w-full items-center justify-between gap-2 px-3 py-1.5 text-sm transition-colors',
                     sel
-                      ? 'bg-primary text-primary-foreground font-medium'
-                      : 'text-foreground hover:bg-muted',
+                      ? 'bg-accent text-foreground'
+                      : 'text-foreground hover:bg-accent',
                   )}
                 >
                   <span className="truncate">{opt.label}</span>
