@@ -128,7 +128,7 @@ function ChartTooltipContent({
       payload: { fill?: string; [k: string]: unknown }
       [k: string]: unknown
     }>
-    label?: unknown
+    label?: React.ReactNode
     labelFormatter?: (label: unknown, payload: unknown) => React.ReactNode
     labelClassName?: string
     formatter?: (
