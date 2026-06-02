@@ -219,17 +219,19 @@ function OverviewCards({ overview, loading, reps }: { overview: CallOverview; lo
 
 // ── Calls-by-rep bar chart (reui/shadcn chart style) ──────────────────────
 function RepCallsChart({ reps, loading }: { reps: RepRow[]; loading: boolean }) {
+  // y-axis = UNIQUE leads called per rep (one per lead, the "54" logic), not
+  // raw call dials (the "65"). Matches the per-person framing elsewhere.
   const data = [...reps]
-    .map(r => ({ rep: (r.full_name ?? r.user_email)?.split(' ')[0] ?? '—', calls: r.calls }))
-    .sort((a, b) => b.calls - a.calls)
-  const chartConfig = { calls: { label: 'Calls', color: '#4b8f7a' } } satisfies ChartConfig
+    .map(r => ({ rep: (r.full_name ?? r.user_email)?.split(' ')[0] ?? '—', leads: r.unique_leads }))
+    .sort((a, b) => b.leads - a.leads)
+  const chartConfig = { leads: { label: 'Leads called', color: '#4b8f7a' } } satisfies ChartConfig
 
   return (
     <Card>
       <CardContent className="pt-5">
         <div className="flex items-center gap-2 mb-4">
           <Phone className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Calls by Rep</span>
+          <span className="text-sm font-semibold">Leads Called by Rep</span>
         </div>
         {loading ? (
           <div className="h-[260px] animate-pulse bg-muted rounded-xl" />
@@ -239,8 +241,8 @@ function RepCallsChart({ reps, loading }: { reps: RepRow[]; loading: boolean }) 
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis dataKey="rep" tickLine={false} axisLine={false} tickMargin={8} interval={0} angle={data.length > 6 ? -30 : 0} textAnchor={data.length > 6 ? 'end' : 'middle'} height={data.length > 6 ? 48 : 24} />
               <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
-              <ChartTooltip content={<ChartTooltipContent nameKey="calls" />} />
-              <Bar dataKey="calls" fill="var(--color-calls)" radius={[6, 6, 0, 0]} maxBarSize={64} />
+              <ChartTooltip content={<ChartTooltipContent nameKey="leads" />} />
+              <Bar dataKey="leads" fill="var(--color-leads)" radius={[6, 6, 0, 0]} maxBarSize={64} />
             </BarChart>
           </ChartContainer>
         )}
