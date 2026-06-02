@@ -348,7 +348,6 @@ function InterestDropdown({
 }) {
   return <InterestSelect value={value ?? 'pending'} onChange={onChange} size="sm" className="w-full min-w-[112px]" />
 }
-}
 
 // ── Multi-contact hover cell ──────────────────────────────────────────────
 function MultiContactCell({
