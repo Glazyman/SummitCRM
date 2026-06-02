@@ -423,11 +423,11 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
 
                   {/* Column = one reui-style Frame: header + content in a bordered card */}
                   <div className={cn(
-                    'flex h-full flex-col rounded-xl border border-border bg-card shadow-xs shadow-black/5 transition-colors',
+                    'flex h-full flex-col rounded-xl border border-border bg-muted/40 shadow-xs shadow-black/5 transition-colors',
                     isOver && 'border-primary/40 ring-2 ring-primary/15 ring-inset',
                   )}>
                     {/* Header */}
-                    <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5">
+                    <div className="flex items-center gap-2 px-3.5 py-2.5">
                       <span className="size-2 shrink-0 rounded-full" style={{ background: stage.color }} />
                       <span className="truncate text-sm font-medium capitalize">{stage.name}</span>
                       {stage.is_won  && <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white">WON</span>}
