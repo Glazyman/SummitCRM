@@ -14,10 +14,7 @@ import { Button }  from '@/components/ui/button'
 import { Badge }   from '@/components/ui/badge'
 import { RefreshCw, BarChart2, Phone, Calendar, Users, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { PieChart, Pie, Cell, LabelList } from 'recharts'
-import {
-  ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig,
-} from '@/components/ui/pie-chart'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from 'recharts'
 
 interface TabConfig { id: AnalyticsTab; label: string; minRole: string }
 
@@ -45,63 +42,37 @@ const OUTCOME_COLORS: Record<string, string> = {
   callback:  '#f59e0b',
 }
 
-// ── Sized pie (21st.dev "sized pie chart" look) ───────────────────────────
-// One donut: each outcome is an angular slice sized by its share of total
-// calls, but each slice extends to a different OUTER radius — bigger outcomes
-// read as both wider AND longer wedges. Smallest value sits closest in.
-const SIZED_BASE = 50   // outer radius of the smallest slice
-const SIZED_INC  = 12   // radius added per larger slice
-const SIZED_HOLE = 32   // shared inner radius (the centre hole)
-
-function SizedPie({
+// ── Call-outcome donut ────────────────────────────────────────────────────
+// A clean donut wheel: each outcome is one ring slice, sized by its share of
+// total calls. Centre shows the headline figure (unique leads called).
+function CallDonut({
   data, centerValue, centerLabel,
 }: {
   data: { name: string; value: number; color: string }[]
   centerValue: React.ReactNode
   centerLabel: string
 }) {
-  // ascending so the smallest slice has the smallest radius (the reference look)
-  const sorted = [...data].sort((a, b) => a.value - b.value)
-  const sum    = sorted.reduce((s, d) => s + d.value, 0) || 1
-  const config = Object.fromEntries(sorted.map(d => [d.name, { label: d.name }])) as ChartConfig
-
   return (
-    <div className="relative">
-      <ChartContainer
-        config={config}
-        className="[&_.recharts-text]:fill-background mx-auto aspect-square w-full max-h-[210px]"
-      >
+    <div className="relative [&_path]:!outline-none">
+      <ResponsiveContainer width="100%" height={196}>
         <PieChart>
-          <ChartTooltip content={<ChartTooltipContent nameKey="name" hideLabel />} />
-          {sorted.map((entry, index) => {
-            const start = (sorted.slice(0, index).reduce((s, d) => s + d.value, 0) / sum) * 360
-            const end   = (sorted.slice(0, index + 1).reduce((s, d) => s + d.value, 0) / sum) * 360
-            return (
-              <Pie
-                key={entry.name}
-                data={[entry]}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={SIZED_HOLE}
-                outerRadius={SIZED_BASE + index * SIZED_INC}
-                cornerRadius={4}
-                startAngle={start}
-                endAngle={end}
-              >
-                <Cell fill={entry.color} />
-                <LabelList
-                  dataKey="value"
-                  stroke="none"
-                  fontSize={11}
-                  fontWeight={600}
-                  fill="currentColor"
-                  formatter={(v: unknown) => (Number(v) > 0 ? String(v) : '')}
-                />
-              </Pie>
-            )
-          })}
+          <Pie
+            data={data}
+            cx="50%" cy="50%"
+            innerRadius={56} outerRadius={80}
+            paddingAngle={2}
+            dataKey="value"
+            nameKey="name"
+            strokeWidth={0}
+          >
+            {data.map((d, i) => <Cell key={i} fill={d.color} />)}
+          </Pie>
+          <RTooltip
+            formatter={(v, n) => [String(v), String(n)]}
+            contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', background: 'hsl(var(--popover))' }}
+          />
         </PieChart>
-      </ChartContainer>
+      </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-xl font-bold leading-none">{centerValue}</span>
         <span className="mt-0.5 text-[10px] text-muted-foreground text-center px-2 leading-tight">{centerLabel}</span>
@@ -134,9 +105,9 @@ function OverviewCards({ overview, loading, start, end }: { overview: CallOvervi
             <div className="h-[200px] animate-pulse bg-muted rounded-xl" />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* Sized pie */}
+              {/* Call-outcome donut */}
               {donutData.length > 0 ? (
-                <SizedPie
+                <CallDonut
                   data={donutData}
                   centerValue={overview.unique_leads}
                   centerLabel="leads called"

@@ -1,6 +1,7 @@
 /**
- * GET /api/admin/rep-performance?period=today|week|month
- * Per-rep performance: calls, follow-ups, leads.
+ * GET /api/admin/rep-performance?start=<iso>&end=<iso>
+ * Per-rep performance: calls, follow-ups, leads, over a rolling date range.
+ * (Legacy fallback: ?period=today|week|month&date=YYYY-MM-DD.)
  * Admins only. Returns live data — no caching.
  */
 import { NextRequest, NextResponse } from 'next/server'
@@ -71,11 +72,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Admin required' }, { status: 403 })
     }
 
-    const rawPeriod = req.nextUrl.searchParams.get('period') ?? 'week'
-    const period    = rawPeriod === 'today' ? 'day' : rawPeriod
-    const anchor    = parseAnchor(req.nextUrl.searchParams.get('date'))
-    const range     = periodRange(period, anchor)
-    const wsId      = member.workspace_id
+    const sp = req.nextUrl.searchParams
+    // Preferred: explicit rolling range (start/end ISO), matching the
+    // analytics page presets (today / last 7d / last 30d / all time).
+    // Legacy fallback: calendar period + anchor date.
+    const startParam = sp.get('start')
+    const endParam   = sp.get('end')
+    let range: { start: string; end: string }
+    if (startParam && endParam) {
+      range = { start: startParam, end: endParam }
+    } else {
+      const rawPeriod = sp.get('period') ?? 'week'
+      const period    = rawPeriod === 'today' ? 'day' : rawPeriod
+      const anchor    = parseAnchor(sp.get('date'))
+      range = periodRange(period, anchor)
+    }
+    const wsId = member.workspace_id
 
     // Fetch everything in parallel.
     // Call stats use get_call_stats_by_rep — a SQL aggregate RPC that returns a
@@ -181,7 +193,7 @@ export async function GET(req: NextRequest) {
       })
       .sort((a, b) => b.calls - a.calls)
 
-    return NextResponse.json({ reps, period, range, anchor: anchor.toISOString().slice(0, 10) })
+    return NextResponse.json({ reps, range })
   } catch (err) {
     console.error('[GET /api/admin/rep-performance]', err)
     return NextResponse.json({ error: 'Failed to load rep performance' }, { status: 500 })

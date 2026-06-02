@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Plus, Search, Columns3, List,
   MoreHorizontal, TrendingUp, Calendar, Phone,
-  BarChart3, Trophy, Users,
+  BarChart3, Trophy, Users, Filter, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks'
@@ -41,11 +41,19 @@ interface PipelineTotals {
   deals_won:         number
   deals_in_progress: number
 }
+interface FilterOption { id: string; name: string }
 interface Props {
   stages: PipelineStage[]; initialLeads: PipelineLead[]
   initialStageCounts: Record<string, number>
   initialTotals:      PipelineTotals
   workspaceId: string; isAdmin: boolean; currentUserId: string
+  repOptions?:   FilterOption[]
+  batchOptions?: FilterOption[]
+}
+
+type DatePreset = 'all' | '7d' | '30d' | '90d'
+const DATE_PRESET_LABELS: Record<DatePreset, string> = {
+  all: 'Any time', '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days',
 }
 
 function fmtMoney(n: number): string {
@@ -74,7 +82,7 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[(name.charCodeAt(0) ?? 0) % AVATAR_COLORS.length]
 }
 
-export default function PipelineClient({ stages, initialLeads, initialStageCounts, initialTotals, isAdmin, currentUserId }: Props) {
+export default function PipelineClient({ stages, initialLeads, initialStageCounts, initialTotals, isAdmin, currentUserId, repOptions = [], batchOptions = [] }: Props) {
   const router = useRouter()
   const [leads,          setLeads]          = React.useState<PipelineLead[]>(initialLeads)
   const [stageCounts,    setStageCounts]    = React.useState<Record<string, number>>(initialStageCounts)
@@ -83,6 +91,13 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
   const [dragOverStage,  setDragOverStage]  = React.useState<string | null>(null)
   const [search,         setSearch]         = React.useState('')
   const [searching,      setSearching]      = React.useState(false)
+  // Admin-only filters (rep / batch / activity date). Applied client-side over
+  // the loaded set (top-100 per stage). Pipelines are small enough that this is
+  // accurate in practice; when a filter is active we hide the per-stage
+  // overflow ("+N more") and recompute counts from the filtered set.
+  const [repFilter,      setRepFilter]      = React.useState<string>('all')
+  const [batchFilter,    setBatchFilter]    = React.useState<string>('all')
+  const [dateFilter,     setDateFilter]     = React.useState<DatePreset>('all')
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
   const [pipelineView,   setPipelineView]   = React.useState<'kanban' | 'list'>(() => {
     try { return localStorage.getItem('pipeline_view_mode') === 'list' ? 'list' : 'kanban' } catch { return 'kanban' }
@@ -132,17 +147,47 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
     return () => window.clearTimeout(handle)
   }, [search, initialLeads, initialStageCounts, initialTotals])
 
+  const filtersActive = isAdmin && (repFilter !== 'all' || batchFilter !== 'all' || dateFilter !== 'all')
+
+  const filteredLeads = React.useMemo(() => {
+    if (!filtersActive) return leads
+    const cutoff = dateFilter === 'all' ? 0 : Date.now() - { '7d': 7, '30d': 30, '90d': 90 }[dateFilter] * 86400000
+    return leads.filter((l) => {
+      if (repFilter !== 'all' && l.assigned_to !== repFilter) return false
+      if (batchFilter !== 'all' && l.batch_id !== batchFilter) return false
+      if (cutoff > 0) {
+        const activityIso = l.last_activity_at ?? l.last_contacted_at ?? l.created_at
+        if (new Date(activityIso).getTime() < cutoff) return false
+      }
+      return true
+    })
+  }, [leads, filtersActive, repFilter, batchFilter, dateFilter])
+
   const leadsByStage = React.useMemo(() => {
     const map = new Map<string | null, PipelineLead[]>()
     for (const s of stages) map.set(s.id, [])
     map.set(null, [])
-    for (const lead of leads) {
+    for (const lead of filteredLeads) {
       const sid = lead.pipeline_stage_id
       if (sid && map.has(sid)) map.get(sid)!.push(lead)
       else map.get(null)!.push(lead)
     }
     return map
-  }, [leads, stages])
+  }, [filteredLeads, stages])
+
+  // When filtering, per-stage counts + the stat cards reflect the filtered
+  // (loaded) set, so headers and totals stay consistent with what's shown.
+  const effectiveStageCounts = React.useMemo(() => {
+    if (!filtersActive) return stageCounts
+    const counts: Record<string, number> = {}
+    for (const [sid, arr] of leadsByStage) {
+      if (sid === null) counts['__unassigned__'] = arr.length
+      else counts[sid] = arr.length
+    }
+    return counts
+  }, [filtersActive, stageCounts, leadsByStage])
+
+  function clearFilters() { setRepFilter('all'); setBatchFilter('all'); setDateFilter('all') }
 
   // Load the next 100 leads for a stage when "+N more" is clicked.
   async function loadStageOverflow(stageId: string) {
@@ -215,17 +260,19 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
     }
   }
 
-  // All four numbers come from the server (accurate across the full
-  // workspace, not just the trimmed top-100-per-stage visible set).
-  const totalLeads      = totals.total_leads
-  const dealsWon        = totals.deals_won
-  const dealsInProgress = totals.deals_in_progress
-  const unassigned      = stageCounts['__unassigned__'] ?? 0
-
   const wonStageIds = new Set(stages.filter(s => s.is_won).map(s => s.id))
+  const lostStageIds = new Set(stages.filter(s => s.is_lost).map(s => s.id))
   // Leads currently in the "Needs Buyer" pipeline stage.
   const needsBuyerStage = stages.find(s => s.name.trim().toLowerCase() === 'needs buyer')
-  const needsBuyer = needsBuyerStage ? (stageCounts[needsBuyerStage.id] ?? 0) : 0
+
+  // Without filters, the four numbers come from the server (accurate across the
+  // full workspace). With a filter active, recompute from the filtered set so
+  // the cards match the filtered board.
+  const totalLeads      = filtersActive ? filteredLeads.length : totals.total_leads
+  const dealsWon        = filtersActive ? filteredLeads.filter(l => l.pipeline_stage_id && wonStageIds.has(l.pipeline_stage_id)).length : totals.deals_won
+  const dealsInProgress = filtersActive ? filteredLeads.filter(l => l.pipeline_stage_id && !wonStageIds.has(l.pipeline_stage_id) && !lostStageIds.has(l.pipeline_stage_id)).length : totals.deals_in_progress
+  const unassigned      = effectiveStageCounts['__unassigned__'] ?? 0
+  const needsBuyer = needsBuyerStage ? (effectiveStageCounts[needsBuyerStage.id] ?? 0) : 0
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
@@ -281,6 +328,43 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
           </Button>
         </div>
 
+        {/* Filter bar — admin only */}
+        {isAdmin && (
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground">
+              <Filter className="h-3.5 w-3.5" /> Filters
+            </span>
+            <FilterSelect
+              label="Rep"
+              value={repFilter}
+              onChange={setRepFilter}
+              options={[{ id: 'all', name: 'All reps' }, ...repOptions]}
+            />
+            <FilterSelect
+              label="Batch"
+              value={batchFilter}
+              onChange={setBatchFilter}
+              options={[{ id: 'all', name: 'All batches' }, ...batchOptions]}
+            />
+            <FilterSelect
+              label="Date"
+              value={dateFilter}
+              onChange={(v) => setDateFilter(v as DatePreset)}
+              options={(Object.keys(DATE_PRESET_LABELS) as DatePreset[]).map(k => ({ id: k, name: DATE_PRESET_LABELS[k] }))}
+            />
+            {filtersActive && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-3.5 w-3.5" /> Clear
+                <span className="ml-1 text-muted-foreground/70">· {filteredLeads.length} shown</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Stat cards — below toolbar */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
@@ -321,7 +405,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             style={{ minWidth: `${stages.length * 320 + 96}px` }}>
             {stages.map(stage => {
               const stageLeads = leadsByStage.get(stage.id) ?? []
-              const stageTotal = stageCounts[stage.id] ?? stageLeads.length
+              const stageTotal = effectiveStageCounts[stage.id] ?? stageLeads.length
               const hasMore    = stageTotal > stageLeads.length
               const isOver     = dragOverStage === stage.id
 
@@ -404,7 +488,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {stages.map((stage) => {
             const stageLeads = leadsByStage.get(stage.id) ?? []
-            const stageTotal = stageCounts[stage.id] ?? stageLeads.length
+            const stageTotal = effectiveStageCounts[stage.id] ?? stageLeads.length
             const hasMore    = stageTotal > stageLeads.length
             const isOver = dragOverStage === stage.id
             return (
@@ -629,6 +713,30 @@ function KanbanCard({
         </div>
       </div>
     </div>
+  )
+}
+
+// ── Filter dropdown (admin pipeline filters) ──────────────────────────────────
+function FilterSelect({
+  label, value, onChange, options,
+}: {
+  label: string; value: string; onChange: (v: string) => void; options: FilterOption[]
+}) {
+  const active = value !== 'all'
+  return (
+    <label className={cn(
+      'inline-flex items-center gap-2 h-[34px] rounded-xl border bg-card px-3 text-[12.5px] cursor-pointer transition-colors',
+      active ? 'border-primary/50 bg-primary/5' : 'border-border',
+    )}>
+      <span className="text-muted-foreground">{label}</span>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="bg-transparent text-foreground font-medium outline-none cursor-pointer max-w-[150px]"
+      >
+        {options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+      </select>
+    </label>
   )
 }
 

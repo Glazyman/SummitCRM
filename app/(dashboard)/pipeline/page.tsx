@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getUsersById } from '@/lib/users'
 import type { Metadata } from 'next'
 import PipelineClient from './pipeline-client'
 
@@ -96,6 +97,24 @@ export default async function PipelinePage() {
     pipeline_value:    revenueMap.get(lead.id) ?? 0,
   }))
 
+  // Filter options for the toolbar (admin only — reps don't filter by rep,
+  // and only see their own leads). Reps/batches power the pipeline filter bar.
+  let repOptions: Array<{ id: string; name: string }> = []
+  let batchOptions: Array<{ id: string; name: string }> = []
+  if (isAdminRole) {
+    const [membersRes, batchesRes] = await Promise.all([
+      admin.from('workspace_members').select('user_id').eq('workspace_id', member.workspace_id).eq('is_active', true),
+      admin.from('lead_batches').select('id, name').eq('workspace_id', member.workspace_id).order('created_at', { ascending: false }),
+    ])
+    const memberIds = ((membersRes.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
+    const nameById  = await getUsersById(admin, member.workspace_id, memberIds)
+    repOptions = memberIds
+      .map((id) => ({ id, name: nameById.get(id) ?? 'Unknown' }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    batchOptions = ((batchesRes.data ?? []) as Array<{ id: string; name: string }>)
+      .map((b) => ({ id: b.id, name: b.name }))
+  }
+
   const defaultStages = stages.length === 0 ? [
     { id: 'new-lead',    workspace_id: member.workspace_id, name: 'New Lead',      color: '#6366f1', position: 0, is_won: false, is_lost: false, created_at: '', updated_at: '' },
     { id: 'contacted',   workspace_id: member.workspace_id, name: 'Contacted',     color: '#f59e0b', position: 1, is_won: false, is_lost: false, created_at: '', updated_at: '' },
@@ -115,6 +134,8 @@ export default async function PipelinePage() {
       workspaceId={member.workspace_id}
       isAdmin={isAdminRole}
       currentUserId={user.id}
+      repOptions={repOptions}
+      batchOptions={batchOptions}
     />
   )
 }
