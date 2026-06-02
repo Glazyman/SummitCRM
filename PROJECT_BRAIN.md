@@ -1027,4 +1027,13 @@ Admin dashboard 4 cards now mirror the rep layout, workspace-wide:
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish)*
+### Session 2026-06-01 (mobile header dropdowns centered)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | Notification bell panel overflowed off the left on phones (380px panel anchored to the bell's right edge). Below `sm`, now hugs the right with a 12px margin + capped to `100vw-1.5rem` → centered with even gutters. Desktop unchanged (still bell-anchored, 380px). | `components/notifications/notification-panel.tsx` |
+| 2 | Profile (user) dropdown: on mobile now `fixed inset-x-3 top-[68px]` (centered, full-width, even 12px gutters); `sm:` restores the original right-aligned `absolute … w-56` desktop dropdown. | `components/layout/header.tsx` |
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered)*

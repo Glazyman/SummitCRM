@@ -272,7 +272,12 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
             {dropdownOpen && (
               <div
                 role="menu"
-                className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-border bg-popover shadow-card"
+                className={cn(
+                  // Mobile: fixed, centered below the header with even 12px gutters.
+                  'fixed inset-x-3 top-[68px] z-50 w-auto overflow-hidden rounded-2xl border border-border bg-popover shadow-card',
+                  // Desktop (≥sm): original right-aligned dropdown anchored to the avatar.
+                  'sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-56'
+                )}
               >
                 <div className="px-3.5 py-3">
                   <div className="flex items-center gap-2.5">

@@ -76,9 +76,13 @@ export function NotificationPanel({ open, anchorRef, onClose }: Props) {
     const update = () => {
       if (!anchorRef.current) return
       const r = anchorRef.current.getBoundingClientRect()
+      // On phones the 380px panel anchored to the bell overflows off the left
+      // edge. Below `sm`, hug the right with a 12px margin so the panel (capped
+      // to the viewport width) sits centered with even 12px gutters.
+      const narrow = window.innerWidth < 640
       setPos({
-        top:   r.bottom + 8,                          // 8 px gap below the bell
-        right: window.innerWidth - r.right,           // distance from viewport's right edge
+        top:   r.bottom + 8,                                   // 8 px gap below the bell
+        right: narrow ? 12 : window.innerWidth - r.right,      // viewport edge vs bell-aligned
       })
     }
     update()
@@ -124,7 +128,7 @@ export function NotificationPanel({ open, anchorRef, onClose }: Props) {
       ref={panelRef}
       style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 100 }}
       className={cn(
-        'w-[380px] max-w-[calc(100vw-2rem)]',
+        'w-[380px] max-w-[calc(100vw-1.5rem)]',
         'rounded-xl border bg-popover shadow-card',
         'flex flex-col overflow-hidden',
         'animate-in fade-in slide-in-from-top-2 duration-150'
