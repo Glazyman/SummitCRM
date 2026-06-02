@@ -4,12 +4,13 @@ import * as React from 'react'
 import dynamic from 'next/dynamic'
 import {
   FileText, FileSpreadsheet, FileImage, File as FileIcon,
-  Upload, Download, Eye, Trash2, ExternalLink,
+  Upload, Download, Eye, Trash2, ExternalLink, Pencil,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 
@@ -67,6 +68,10 @@ export function DocumentsClient() {
   const [busyId, setBusyId] = React.useState<string | null>(null)
   const [toDelete, setToDelete] = React.useState<DocRow | null>(null)
   const [viewing, setViewing] = React.useState<DocRow | null>(null)
+  const [renaming, setRenaming] = React.useState<DocRow | null>(null)
+  const [renameValue, setRenameValue] = React.useState('')
+  const [renameSaving, setRenameSaving] = React.useState(false)
+  const [renameError, setRenameError] = React.useState<string | null>(null)
   const fileInput = React.useRef<HTMLInputElement>(null)
 
   const load = React.useCallback(async () => {
@@ -118,6 +123,32 @@ export function DocumentsClient() {
     document.body.appendChild(a)
     a.click()
     a.remove()
+  }
+
+  function openRename(d: DocRow) {
+    setRenaming(d); setRenameValue(d.name); setRenameError(null)
+  }
+
+  async function saveRename() {
+    if (!renaming) return
+    const name = renameValue.trim()
+    if (!name) { setRenameError('Name cannot be empty'); return }
+    setRenameSaving(true); setRenameError(null)
+    try {
+      const res = await fetch(`/api/documents/${renaming.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Rename failed')
+      setDocs((prev) => prev.map((x) => (x.id === renaming.id ? { ...x, name } : x)))
+      setRenaming(null)
+    } catch (e) {
+      setRenameError(e instanceof Error ? e.message : 'Rename failed')
+    } finally {
+      setRenameSaving(false)
+    }
   }
 
   async function confirmDelete() {
@@ -219,6 +250,10 @@ export function DocumentsClient() {
                           onClick={() => download(d)}>
                           <Download className="h-4 w-4" />
                         </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Rename"
+                          onClick={() => openRename(d)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
                           title="Delete" disabled={busyId === d.id} onClick={() => setToDelete(d)}>
                           <Trash2 className="h-4 w-4" />
@@ -277,6 +312,29 @@ export function DocumentsClient() {
               </Button>
             )}
             <Button variant="secondary" onClick={() => setViewing(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename */}
+      <Dialog open={!!renaming} onClose={() => (renameSaving ? null : setRenaming(null))}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>Rename document</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <Input
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') saveRename() }}
+              placeholder="Document name"
+            />
+            {renameError && <p className="mt-2 text-[13px] text-destructive">{renameError}</p>}
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenaming(null)} disabled={renameSaving}>Cancel</Button>
+            <Button onClick={saveRename} loading={renameSaving}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

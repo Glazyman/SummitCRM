@@ -343,7 +343,7 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 │   │   ├── documents/
 │   │   │   ├── route.ts                       ← GET list / POST upload (multipart), admin-only
 │   │   │   └── [id]/
-│   │   │       ├── route.ts                   ← GET signed URL (legacy) / DELETE, admin-only
+│   │   │       ├── route.ts                   ← GET signed URL (legacy) / PATCH rename / DELETE, admin-only
 │   │   │       └── raw/route.ts               ← GET same-origin byte proxy for the viewer (?download=1)
 │   │   ├── team/
 │   │   │   ├── route.ts
@@ -533,10 +533,11 @@ All API routes require authentication. Role checks are in-route.
 - `GET /api/documents` — list workspace documents (newest first, + uploader name)
 - `POST /api/documents` — upload (multipart/form-data `file`); streams to `documents` bucket, inserts row
 - `GET /api/documents/[id]` — 120s signed URL (legacy; the viewer now uses `/raw`)
+- `PATCH /api/documents/[id]` — **rename only** (JSON `{name}`); the one allowed edit in the view-only library
 - `DELETE /api/documents/[id]` — remove storage object + row
 - `GET /api/documents/[id]/raw` — **same-origin** byte proxy for the in-app viewer (CSP blocks cross-origin iframes, quirk 19); inline by default, `?download=1` = attachment. Framing headers relaxed for this route in middleware.
 - Shared loader: `lib/documents/context.ts` (`requireDocumentAdmin`, `loadDocument`) — used by `/raw`.
-- *(Removed 2026-06-02 in the view-only revert: `PATCH [id]`, `[id]/duplicate`, `[id]/replace`, `[id]/convert`.)*
+- *(Removed 2026-06-02 in the view-only revert: `[id]/duplicate`, `[id]/replace`, `[id]/convert`. `PATCH` was re-added later, rename-only.)*
 
 **Team**
 - `GET /api/team`
@@ -659,8 +660,9 @@ Admin-only document library at `/documents` for contracts, templates, and signed
 
 - **Pop-up viewer (view-only)**: clicking a row name / the eye icon opens an in-app modal (`size="full"`). PDFs → `<iframe>`, images → `<img>` (both via the **same-origin raw proxy** `/api/documents/[id]/raw` — CSP blocks cross-origin iframes, quirk 19). **.docx/.doc → rendered read-only via SuperDoc viewing mode** (`docx-viewer.tsx`, lazy `next/dynamic` `ssr:false`, `documentMode:'viewing'`) — so Word docs are viewable in-CRM. `.pages` and other non-renderables → file info + Download. Footer: Open in new tab + Download.
 - **Download**: `/api/documents/[id]/raw?download=1` (Content-Disposition attachment).
-- **Delete**: confirm dialog → `DELETE /api/documents/[id]` (storage object + row). Row actions are just View / Download / Delete.
-- **Upload** stays (drag/drop + button) — adding docs isn't "editing". No rename/replace/duplicate/edit/convert.
+- **Rename** (name only): pencil icon → small dialog with a name input → `PATCH /api/documents/[id]` `{name}`. The only allowed edit. Row actions: **View / Download / Rename / Delete**.
+- **Delete**: confirm dialog → `DELETE /api/documents/[id]` (storage object + row).
+- **Upload** stays (drag/drop + button). No content editing / replace / duplicate / convert — just rename.
 - **Access**: server page redirects non-admins to `/dashboard`; all API routes gate on `admin`/`super_admin`. Sidebar link sits in the Admin group.
 - **Seeding**: `scripts/seed-documents.mjs` (service-role, idempotent by name) ensures the bucket and uploads the initial 5 agreements/templates.
 
