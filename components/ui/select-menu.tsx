@@ -120,10 +120,11 @@ export function SelectMenu({
         disabled={disabled}
         onClick={() => { if (!disabled) setOpen((o) => !o) }}
         className={cn(
-          'flex w-full items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 text-sm transition-colors',
+          // reui trigger look: rounded-md, subtle shadow, 3px ring focus
+          'flex w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-sm shadow-xs shadow-black/5 outline-none transition-shadow',
           h,
-          'hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring',
-          open     && 'ring-2 ring-ring border-ring',
+          'focus:ring-[3px] focus:ring-ring/30 focus:border-ring',
+          open     && 'ring-[3px] ring-ring/30 border-ring',
           !hasValue && 'text-muted-foreground',
           hasValue  && 'text-foreground',
           disabled  && 'cursor-not-allowed opacity-50',
@@ -141,7 +142,7 @@ export function SelectMenu({
         <div
           ref={menuRef}
           style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999 }}
-          className="rounded-xl border border-border bg-popover shadow-card overflow-hidden"
+          className="rounded-md border border-border bg-popover shadow-md shadow-black/5 overflow-hidden"
         >
           {/* Search */}
           {searchable && (
