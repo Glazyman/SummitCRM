@@ -335,7 +335,7 @@ function StatusDropdown({
   value:    LeadRow['status']
   onChange: (s: LeadRow['status']) => void
 }) {
-  return <StatusSelect value={value} onChange={onChange} size="sm" className="w-full min-w-[124px]" />
+  return <StatusSelect value={value} onChange={onChange} size="sm" className="w-full min-w-[150px]" />
 }
 
 // ── Inline interest dropdown ──────────────────────────────────────────────
@@ -346,7 +346,7 @@ function InterestDropdown({
   value:    InterestStatus
   onChange: (s: InterestStatus) => void
 }) {
-  return <InterestSelect value={value ?? 'pending'} onChange={onChange} size="sm" className="w-full min-w-[112px]" />
+  return <InterestSelect value={value ?? 'pending'} onChange={onChange} size="sm" className="w-full min-w-[144px]" />
 }
 
 // ── Multi-contact hover cell ──────────────────────────────────────────────

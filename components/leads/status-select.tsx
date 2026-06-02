@@ -13,7 +13,7 @@ import type { LeadStatus, InterestStatus } from '@/types/database'
 // Colored dot inside the item text so it also shows in the trigger value.
 function dotLabel(dotClass: string, text: string) {
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex items-center gap-2 whitespace-nowrap">
       <span className={cn('h-2 w-2 shrink-0 rounded-full', dotClass)} />
       {text}
     </span>
