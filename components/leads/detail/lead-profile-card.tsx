@@ -127,7 +127,7 @@ export function LeadProfileCard({
     setDraft((d) => ({ ...d, [f]: v }))
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs shadow-black/5">
 
       {/* ── Avatar + name header ── */}
       <div className="relative border-b border-border bg-secondary/50 px-5 pb-4 pt-6">

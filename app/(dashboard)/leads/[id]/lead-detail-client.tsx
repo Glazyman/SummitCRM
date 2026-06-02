@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Activity, Clock, Phone, ClipboardList } from 'lucide-react'
+import { Activity, Clock, Phone, ClipboardList, ChevronDown, UserRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LeadActionBar }    from '@/components/leads/detail/lead-action-bar'
 import { LeadProfileCard }  from '@/components/leads/detail/lead-profile-card'
@@ -70,6 +70,10 @@ export default function LeadDetailClient({
   const [activeTab,         setActiveTab]         = React.useState<TabId>('activity')
   const [followUpPrompt,    setFollowUpPrompt]    = React.useState<FollowUpSuggestion | null>(null)
   const [questionnaireData, setQuestionnaireData] = React.useState<QuestionnaireData | null>(null)
+  // Mobile: profile card collapsed by default so the tabs/content sit right
+  // under the action bar (which already shows name/company/status). Desktop
+  // always shows the card (lg:block).
+  const [detailsOpen,       setDetailsOpen]       = React.useState(false)
 
   // Load questionnaire on mount
   React.useEffect(() => {
@@ -449,18 +453,32 @@ export default function LeadDetailClient({
       <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
 
-          {/* ── Left: Profile card (sticky on lg) ── */}
+          {/* ── Left: Profile card (sticky on lg; collapsible on mobile) ── */}
           <div className="lg:sticky lg:top-[121px] lg:w-80 xl:w-96 shrink-0">
-            <LeadProfileCard
-              lead={lead}
-              teamMembers={teamMembers}
-              onSave={handleSaveProfile}
-              onRenameBatch={canEditBatch ? handleRenameBatch : undefined}
-              onMoveBatch={canEditBatch ? handleMoveBatch : undefined}
-              canEditBatch={canEditBatch}
-              onStatusChange={handleStatusChange}
-              onInterestChange={handleInterestChange}
-            />
+            {/* Mobile toggle — desktop always shows the card */}
+            <button
+              type="button"
+              onClick={() => setDetailsOpen((o) => !o)}
+              aria-expanded={detailsOpen}
+              className="mb-3 flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium shadow-xs shadow-black/5 lg:hidden"
+            >
+              <span className="flex items-center gap-2">
+                <UserRound className="h-4 w-4 text-muted-foreground" /> Lead details
+              </span>
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', detailsOpen && 'rotate-180')} />
+            </button>
+            <div className={cn(detailsOpen ? 'block' : 'hidden', 'lg:block')}>
+              <LeadProfileCard
+                lead={lead}
+                teamMembers={teamMembers}
+                onSave={handleSaveProfile}
+                onRenameBatch={canEditBatch ? handleRenameBatch : undefined}
+                onMoveBatch={canEditBatch ? handleMoveBatch : undefined}
+                canEditBatch={canEditBatch}
+                onStatusChange={handleStatusChange}
+                onInterestChange={handleInterestChange}
+              />
+            </div>
           </div>
 
           {/* ── Right: Tabbed content ── */}
@@ -616,7 +634,7 @@ function Section({
 }) {
   return (
     <div className={cn(
-      'rounded-2xl border border-border bg-card',
+      'rounded-xl border border-border bg-card shadow-xs shadow-black/5',
       // On mobile: show only active section; on desktop: always show all
       visible ? 'block' : 'hidden',
       alwaysVisible && 'lg:block'
