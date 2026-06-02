@@ -13,7 +13,8 @@ import { Button }  from '@/components/ui/button'
 import { Badge }   from '@/components/ui/badge'
 import { RefreshCw, BarChart2, Phone, Calendar, Users, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/pie-chart'
 
 interface TabConfig { id: AnalyticsTab; label: string; minRole: string }
 
@@ -81,7 +82,7 @@ function CallDonut({
 }
 
 // ── Overview summary cards ────────────────────────────────────────────────
-function OverviewCards({ overview, loading }: { overview: CallOverview; loading: boolean }) {
+function OverviewCards({ overview, loading, reps }: { overview: CallOverview; loading: boolean; reps: RepRow[] }) {
   const answerRate = overview.total > 0 ? Math.round(overview.answered / overview.total * 100) : 0
   const donutData = [
     { name: 'Answered',  value: overview.answered,     color: OUTCOME_COLORS.answered  },
@@ -92,7 +93,8 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
   ].filter(d => d.value > 0)
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Call summary + donut */}
       <Card className="lg:col-span-2">
         <CardContent className="pt-5">
@@ -207,7 +209,43 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
           </CardContent>
         </Card>
       </div>
+      </div>
+
+      {/* Calls by rep — bar chart (reps on x-axis, calls on y-axis) */}
+      {reps.length > 0 && <RepCallsChart reps={reps} loading={loading} />}
     </div>
+  )
+}
+
+// ── Calls-by-rep bar chart (reui/shadcn chart style) ──────────────────────
+function RepCallsChart({ reps, loading }: { reps: RepRow[]; loading: boolean }) {
+  const data = [...reps]
+    .map(r => ({ rep: (r.full_name ?? r.user_email)?.split(' ')[0] ?? '—', calls: r.calls }))
+    .sort((a, b) => b.calls - a.calls)
+  const chartConfig = { calls: { label: 'Calls', color: '#4b8f7a' } } satisfies ChartConfig
+
+  return (
+    <Card>
+      <CardContent className="pt-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Phone className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-semibold">Calls by Rep</span>
+        </div>
+        {loading ? (
+          <div className="h-[260px] animate-pulse bg-muted rounded-xl" />
+        ) : (
+          <ChartContainer config={chartConfig} className="aspect-auto h-[260px] w-full">
+            <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis dataKey="rep" tickLine={false} axisLine={false} tickMargin={8} interval={0} angle={data.length > 6 ? -30 : 0} textAnchor={data.length > 6 ? 'end' : 'middle'} height={data.length > 6 ? 48 : 24} />
+              <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+              <ChartTooltip content={<ChartTooltipContent nameKey="calls" />} />
+              <Bar dataKey="calls" fill="var(--color-calls)" radius={[6, 6, 0, 0]} maxBarSize={64} />
+            </BarChart>
+          </ChartContainer>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -316,7 +354,7 @@ function AnalyticsContent({ userRole }: Props) {
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
         {activeTab === 'overview' && (
-          <OverviewCards overview={overview} loading={isAdmin ? loadingReps : false} />
+          <OverviewCards overview={overview} loading={isAdmin ? loadingReps : false} reps={reps} />
         )}
 
         {activeTab === 'reps' && isAdmin && (
