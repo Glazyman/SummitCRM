@@ -339,7 +339,10 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 │   │   │   └── snapshot-email/route.ts        ← POST, admin-only, gpt-4o
 │   │   ├── documents/
 │   │   │   ├── route.ts                       ← GET list / POST upload (multipart), admin-only
-│   │   │   └── [id]/route.ts                  ← GET signed URL (?download=1) / DELETE, admin-only
+│   │   │   └── [id]/
+│   │   │       ├── route.ts                   ← GET signed URL (?download=1) / PATCH rename+desc / DELETE
+│   │   │       ├── duplicate/route.ts         ← POST: copy file + new "Copy of …" row
+│   │   │       └── replace/route.ts           ← POST: replace file with new version (multipart)
 │   │   ├── team/
 │   │   │   ├── route.ts
 │   │   │   ├── invite/route.ts
@@ -402,6 +405,8 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 │   │   ├── usage.ts           ← calcCostUsd() + logUsage()
 │   │   └── index.ts
 │   ├── import/                ← CSV import pipeline (processor, validator, mapper, inserter)
+│   ├── documents/
+│   │   └── context.ts         ← requireDocumentAdmin() + loadDocument() (shared by duplicate/replace routes)
 │   ├── users.ts               ← getUsersById, getUsersByIdsFull, findUserByEmail (wraps RPCs)
 │   ├── us-states.ts           ← 50 US states + DC for dropdowns
 │   ├── intake-snapshot.ts     ← prepareSnapshotEmail() → Outlook deeplink URL, styleSnapshotBody()
@@ -526,7 +531,11 @@ All API routes require authentication. Role checks are in-route.
 - `GET /api/documents` — list workspace documents (newest first, + uploader name)
 - `POST /api/documents` — upload (multipart/form-data `file`); streams to `documents` bucket, inserts row
 - `GET /api/documents/[id]` — 120s signed URL; `?download=1` forces attachment download
+- `PATCH /api/documents/[id]` — rename + edit description (JSON `{name?, description?}`)
 - `DELETE /api/documents/[id]` — remove storage object + row
+- `POST /api/documents/[id]/duplicate` — storage `.copy()` + new "Copy of …" row
+- `POST /api/documents/[id]/replace` — replace file with a new version (multipart), repoint row, delete old object
+- Shared admin gate + loader: `lib/documents/context.ts` (`requireDocumentAdmin`, `loadDocument`)
 
 **Team**
 - `GET /api/team`
@@ -645,8 +654,11 @@ Admin-only document library at `/documents` for contracts, templates, and signed
 - **Storage**: private `documents` bucket, path `<workspace_id>/<uuid>.<ext>`, 25 MB/file cap. Any file type (PDF, .docx, .pages, …).
 - **Upload**: click Upload or drag-and-drop (multiple files). `POST /api/documents` multipart → server streams bytes to the bucket via the service role → inserts a `documents` row. Orphaned object rolled back if the insert fails.
 - **List**: table with file-type icon, name, ext, size, uploaded-by (display name via `getUsersById`), date. Newest first.
-- **Preview / Download**: both fetch a 120s signed URL from `GET /api/documents/[id]`. Preview (PDF/images only) opens inline in a new tab; Download adds `?download=1` (Content-Disposition attachment with the doc's name+ext). Non-previewable types (.docx/.pages) show Download only.
-- **Delete**: confirm dialog → `DELETE /api/documents/[id]` removes the storage object then the row.
+- **Pop-up viewer** (added 2026-06-02): clicking a row name / the eye icon opens an in-app modal (`size="full"`). PDFs render in an `<iframe>`, images in `<img>` (both via the inline 120s signed URL); non-renderable types (.docx/.pages) show file info + a Download button **in-house only** (nothing sent to third-party viewers — user choice). Footer has "Open in new tab" + Download.
+- **Edit details** (added 2026-06-02): ⋯ menu → Edit opens a dialog to **rename** + edit a **description** (`PATCH /api/documents/[id]`) and optionally **Replace file** with a new version (`POST .../replace` — uploads new object, repoints row, deletes old). Description shows under the name in the list.
+- **Duplicate** (added 2026-06-02): ⋯ menu → Duplicate (`POST .../duplicate`) storage-copies the file into a new "Copy of …" row.
+- **Download**: `?download=1` signed URL (Content-Disposition attachment with the doc's name+ext).
+- **Delete**: ⋯ menu → confirm dialog → `DELETE /api/documents/[id]` removes the storage object then the row.
 - **Access**: server page redirects non-admins to `/dashboard`; all API routes gate on `admin`/`super_admin`. Sidebar link sits in the Admin group.
 - **Seeding**: `scripts/seed-documents.mjs` (service-role, idempotent by name) ensures the bucket and uploads the initial 5 agreements/templates.
 
@@ -1156,6 +1168,16 @@ Pipeline page 2nd stat card "Hot Leads" (interested count) → **"Needs Buyer"**
 | 7 | **Shipped to `main`** (commit `ade4679`) → Vercel auto-deploy. Pre-push `tsc --noEmit` caught + fixed 6 errors in the new routes (`as const` can't apply to a function-call result — TS1355; dropped it). The 7 remaining tsc errors are pre-existing `radix-ui`-not-installed-locally noise in `status-select.tsx`/`select-radix.tsx` (already green on Vercel). | — |
 | — | **Push-auth gotcha (new repo)**: `git push` over HTTPS failed with "Password authentication is not supported" — a stale macOS-keychain credential shadows `gh`. `gh auth setup-git` alone didn't fix it; the working push was `git -c credential.helper='!gh auth git-credential' push origin main` (force gh's helper for the push). `gh` is authed as Glazyman with `repo` scope. | — |
 
+### Session 2026-06-02 (Documents: viewer + edit/replace + duplicate)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | **Pop-up viewer**: in-app modal; PDFs in `<iframe>`, images in `<img>` (inline signed URL); .docx/.pages show info + Download (in-house only, no 3rd-party viewer — user choice). | `app/(dashboard)/documents/documents-client.tsx` |
+| 2 | **Edit details**: rename + description via `PATCH /api/documents/[id]`; optional **Replace file** via `POST /api/documents/[id]/replace`. Covers the "edit names within the CRM" ask. | `app/api/documents/[id]/route.ts`, `app/api/documents/[id]/replace/route.ts` |
+| 3 | **Duplicate**: `POST /api/documents/[id]/duplicate` — storage `.copy()` + "Copy of …" row. | `app/api/documents/[id]/duplicate/route.ts` |
+| 4 | Shared admin gate + loader extracted for the sub-routes. | `lib/documents/context.ts` |
+| — | **Deferred — Phase 2 (requested)**: true in-browser **.docx content editing**. Only viable client-side path on Vercel is the open-source **SuperDoc** (no separate server). Applies to .docx only (PDFs/.pages can't be content-edited in a browser). Not yet started. | — |
+
 ---
 
-*Last updated: 2026-06-02 — covers all sessions through 2026-06-02 (admin-only Documents library — page + upload/preview/download/delete API + `documents` table/bucket migration + seeder, prod application pending; reui design pass across UI primitives + preview-env 500 gotcha; reui button + radix status/interest select; analytics sized-pie reverted to donut; dashboard rep-performance switched to Today/7d/30d/All-time presets; admin-only pipeline rep/batch/date filters; **repo migrated off iCloud Desktop → `~/Developer/SummitCRM` after local `.git` corruption; native git restored; global git identity + lfs fixed**; **Vercel build break fixed — `types/database.ts` was a failed supabase-gen capture, restored the 276-line manual file**; all three features deployed green to prod). Earlier: 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card; lead-status %; mini-chart moved to analytics (unique leads/day); Call Summary sized pie; recharts 3.8 chart-type gotcha)*
+*Last updated: 2026-06-02 — covers all sessions through 2026-06-02 (Documents library extended: in-app pop-up viewer (PDF/image inline, .docx/.pages download-only in-house), edit name+description, replace-with-new-version, duplicate; in-browser .docx editing via SuperDoc deferred to phase 2. Earlier same day: admin-only Documents library — page + upload/preview/download/delete API + `documents` table/bucket migration + seeder, shipped to main (`ade4679`); reui design pass across UI primitives + preview-env 500 gotcha; reui button + radix status/interest select; analytics sized-pie reverted to donut; dashboard rep-performance switched to Today/7d/30d/All-time presets; admin-only pipeline rep/batch/date filters; **repo migrated off iCloud Desktop → `~/Developer/SummitCRM` after local `.git` corruption; native git restored; global git identity + lfs fixed**; **Vercel build break fixed — `types/database.ts` was a failed supabase-gen capture, restored the 276-line manual file**; all three features deployed green to prod). Earlier: 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card; lead-status %; mini-chart moved to analytics (unique leads/day); Call Summary sized pie; recharts 3.8 chart-type gotcha)*
