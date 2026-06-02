@@ -93,6 +93,8 @@ export interface CallOverview {
   follow_ups_overdue: number
   leads_total:      number
   leads_active:     number
+  /** Leads contacted ever (last_contacted_at set) — denominator for lead-status %. */
+  contacted_total:  number
 }
 
 export type AnalyticsTab = 'overview' | 'reps' | 'funnel' | 'batches'

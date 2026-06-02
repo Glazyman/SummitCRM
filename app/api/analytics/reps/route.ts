@@ -93,7 +93,7 @@ export async function GET(req: Request) {
     // denormalized last_contacted_at — exact for the presets (all end "now").
     // The lead-status counts are a CURRENT workspace snapshot (lead states are
     // not call events, so they aren't date-filtered).
-    const [uniqRes, interestedRes, notInterestedRes, badLeadsRes] = await Promise.all([
+    const [uniqRes, interestedRes, notInterestedRes, badLeadsRes, contactedRes] = await Promise.all([
       admin.from('leads').select('id', { count: 'exact', head: true })
         .eq('workspace_id', wsId).gte('last_contacted_at', start).lte('last_contacted_at', end).is('deleted_at', null),
       admin.from('leads').select('id', { count: 'exact', head: true })
@@ -102,16 +102,22 @@ export async function GET(req: Request) {
         .eq('workspace_id', wsId).eq('interest_status', 'not_interested').is('deleted_at', null),
       admin.from('leads').select('id', { count: 'exact', head: true })
         .eq('workspace_id', wsId).eq('status', 'do_not_contact').is('deleted_at', null),
+      // Contacted leads (ever) — the meaningful denominator for the lead-status
+      // breakdown. "% of total leads" was ~0 because most leads are untouched
+      // "new"; lead-status % should be of the leads actually worked.
+      admin.from('leads').select('id', { count: 'exact', head: true })
+        .eq('workspace_id', wsId).not('last_contacted_at', 'is', null).is('deleted_at', null),
     ]) as Array<{ count: number | null }>
 
     return NextResponse.json({
       reps,
       overview: {
         ...(payload.overview ?? {}),
-        unique_leads:   uniqRes.count          ?? 0,
-        interested:     interestedRes.count    ?? 0,
-        not_interested: notInterestedRes.count ?? 0,
-        bad_leads:      badLeadsRes.count       ?? 0,
+        unique_leads:    uniqRes.count          ?? 0,
+        interested:      interestedRes.count    ?? 0,
+        not_interested:  notInterestedRes.count ?? 0,
+        bad_leads:       badLeadsRes.count       ?? 0,
+        contacted_total: contactedRes.count      ?? 0,
       },
       period: payload.period ?? { start, end },
     })

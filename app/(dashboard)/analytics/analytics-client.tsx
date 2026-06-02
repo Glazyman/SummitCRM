@@ -7,7 +7,6 @@ import {
 } from '@/components/analytics'
 import type { RepRow, CallOverview, AnalyticsTab } from '@/components/analytics'
 import { DateRangePicker } from '@/components/admin/date-range-picker'
-import { DailyCallsMiniChart } from '@/components/dashboard/daily-calls-mini-chart'
 import type { DateRangePreset } from '@/components/admin/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button }  from '@/components/ui/button'
@@ -31,7 +30,7 @@ function canSee(tabRole: string, userRole: string) {
 const EMPTY_OVERVIEW: CallOverview = {
   total: 0, unique_leads: 0, interested: 0, not_interested: 0, bad_leads: 0,
   answered: 0, voicemail: 0, no_answer: 0, wrong_number: 0, callback: 0,
-  follow_ups_due: 0, follow_ups_overdue: 0, leads_total: 0, leads_active: 0,
+  follow_ups_due: 0, follow_ups_overdue: 0, leads_total: 0, leads_active: 0, contacted_total: 0,
 }
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -82,7 +81,7 @@ function CallDonut({
 }
 
 // ── Overview summary cards ────────────────────────────────────────────────
-function OverviewCards({ overview, loading, start, end }: { overview: CallOverview; loading: boolean; start: string; end: string }) {
+function OverviewCards({ overview, loading }: { overview: CallOverview; loading: boolean }) {
   const answerRate = overview.total > 0 ? Math.round(overview.answered / overview.total * 100) : 0
   const donutData = [
     { name: 'Answered',  value: overview.answered,     color: OUTCOME_COLORS.answered  },
@@ -139,7 +138,7 @@ function OverviewCards({ overview, loading, start, end }: { overview: CallOvervi
 
                 {/* Lead status — current snapshot, not call outcomes */}
                 <div className="mt-1 border-t border-border pt-2.5 space-y-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Lead status · % of leads</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Lead status · % of contacted</p>
                   {([
                     { label: 'Interested',     value: overview.interested,     dot: 'bg-emerald-500' },
                     { label: 'Not interested', value: overview.not_interested, dot: 'bg-muted-foreground/50' },
@@ -153,7 +152,7 @@ function OverviewCards({ overview, loading, start, end }: { overview: CallOvervi
                       <div className="flex items-center gap-2">
                         <span className="font-semibold tabular-nums">{s.value}</span>
                         <span className="text-[10px] text-muted-foreground w-8 text-right">
-                          {overview.leads_total > 0 ? `${Math.round(s.value / overview.leads_total * 100)}%` : '0%'}
+                          {overview.contacted_total > 0 ? `${Math.min(100, Math.round(s.value / overview.contacted_total * 100))}%` : '—'}
                         </span>
                       </div>
                     </div>
@@ -207,9 +206,6 @@ function OverviewCards({ overview, loading, start, end }: { overview: CallOvervi
             )}
           </CardContent>
         </Card>
-
-        {/* Leads-called-per-day mini chart (honours the page's date range) */}
-        <DailyCallsMiniChart start={start} end={end} />
       </div>
     </div>
   )
@@ -320,7 +316,7 @@ function AnalyticsContent({ userRole }: Props) {
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
         {activeTab === 'overview' && (
-          <OverviewCards overview={overview} loading={isAdmin ? loadingReps : false} start={start} end={end} />
+          <OverviewCards overview={overview} loading={isAdmin ? loadingReps : false} />
         )}
 
         {activeTab === 'reps' && isAdmin && (
