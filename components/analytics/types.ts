@@ -55,6 +55,8 @@ export interface RepRow {
   full_name:           string | null
   role:                string
   calls:               number
+  /** Distinct leads this rep called in the period (one per lead). */
+  unique_leads:        number
   calls_answered:      number
   calls_voicemail:     number
   calls_no_answer:     number
@@ -78,6 +80,10 @@ export interface CallOverview {
   total:            number
   /** Distinct leads called in the period — one per lead (excludes repeat calls). */
   unique_leads:     number
+  /** Current workspace lead-status snapshot (not date-filtered). */
+  interested:       number
+  not_interested:   number
+  bad_leads:        number
   answered:         number
   voicemail:        number
   no_answer:        number

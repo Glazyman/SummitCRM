@@ -3,6 +3,7 @@
 import React from 'react'
 import { Phone, Calendar, AlertTriangle, CheckCircle2, Users, X } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
+import { cn } from '@/lib/utils'
 import type { RepRow } from './types'
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -56,7 +57,7 @@ function RepDonut({ rep }: { rep: RepRow }) {
 }
 
 // ── Single rep card ────────────────────────────────────────────────────────
-function RepCard({ rep, rank, onOpen }: { rep: RepRow; rank: number; onOpen: (rep: RepRow) => void }) {
+function RepCard({ rep, rank, callView, onOpen }: { rep: RepRow; rank: number; callView: 'unique' | 'all'; onOpen: (rep: RepRow) => void }) {
   const answerRate  = rep.calls > 0 ? Math.round(rep.calls_answered / rep.calls * 100) : 0
   const fuTotal     = rep.follow_ups_pending + rep.follow_ups_completed
   const fuPct       = fuTotal > 0 ? Math.round(rep.follow_ups_completed / fuTotal * 100) : 0
@@ -86,8 +87,8 @@ function RepCard({ rep, rank, onOpen }: { rep: RepRow; rank: number; onOpen: (re
       {/* KPI strip */}
       <div className="grid grid-cols-3 gap-2 px-4 py-3 border-b border-border bg-background">
         <div className="rounded-lg border border-border px-2.5 py-2">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Calls</p>
-          <p className="text-base font-bold tabular-nums">{rep.calls}</p>
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{callView === 'unique' ? 'Leads Called' : 'Calls'}</p>
+          <p className="text-base font-bold tabular-nums">{callView === 'unique' ? rep.unique_leads : rep.calls}</p>
         </div>
         <div className="rounded-lg border border-border px-2.5 py-2">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Answer Rate</p>
@@ -399,6 +400,9 @@ export function RepPerformanceTable({ reps, loading, start, end }: Props & { sta
   const [detailError, setDetailError] = React.useState<string | null>(null)
   const [showMoreFollowUps, setShowMoreFollowUps] = React.useState(false)
   const [showMoreCalls, setShowMoreCalls] = React.useState(false)
+  // Per-rep headline metric: "Per person" (unique leads called) by default,
+  // with an option to view raw "All calls".
+  const [callView, setCallView] = React.useState<'unique' | 'all'>('unique')
 
   React.useEffect(() => {
     async function loadDetail() {
@@ -444,14 +448,34 @@ export function RepPerformanceTable({ reps, loading, start, end }: Props & { sta
     )
   }
 
-  const sorted = [...reps].sort((a, b) => b.calls - a.calls)
+  const metric = (r: RepRow) => callView === 'unique' ? r.unique_leads : r.calls
+  const sorted = [...reps].sort((a, b) => metric(b) - metric(a))
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{reps.length} rep{reps.length !== 1 ? 's' : ''} · ranked by call volume</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          {reps.length} rep{reps.length !== 1 ? 's' : ''} · ranked by {callView === 'unique' ? 'leads called' : 'call volume'}
+        </p>
+        <div className="flex items-center rounded-lg border border-border p-0.5 text-xs font-medium">
+          {([['unique', 'Per person'], ['all', 'All calls']] as const).map(([v, lbl]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setCallView(v)}
+              className={cn(
+                'rounded-md px-2.5 py-1 transition-colors whitespace-nowrap',
+                callView === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {lbl}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {sorted.map((rep, i) => (
-          <RepCard key={rep.user_id} rep={rep} rank={i + 1} onOpen={setSelectedRep} />
+          <RepCard key={rep.user_id} rep={rep} rank={i + 1} callView={callView} onOpen={setSelectedRep} />
         ))}
       </div>
 

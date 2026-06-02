@@ -75,28 +75,45 @@ export async function GET(req: Request) {
       memberUsers.map(u => [u.id, { name: (u.user_metadata?.full_name as string | undefined) ?? null, email: u.email ?? '' }])
     )
 
+    // Per-rep unique leads called in the range (distinct lead_id per rep) — so
+    // each rep card can show "leads called" (one per lead) vs raw "calls".
+    const { data: uniqByRep } = await admin.rpc('get_unique_leads_called_by_rep_range', {
+      p_workspace_id: wsId, p_start: start, p_end: end,
+    }) as { data: Array<{ user_id: string; leads_called: number }> | null }
+    const uniqByRepMap = new Map((uniqByRep ?? []).map(u => [u.user_id, Number(u.leads_called)]))
+
     const reps = repsRaw.map((r) => ({
       ...r,
-      user_email: nameById.get(r.user_id)?.email ?? '',
-      full_name:  nameById.get(r.user_id)?.name  ?? null,
+      user_email:   nameById.get(r.user_id)?.email ?? '',
+      full_name:    nameById.get(r.user_id)?.name  ?? null,
+      unique_leads: uniqByRepMap.get(r.user_id) ?? 0,
     }))
 
-    // Unique leads called in the range — one per lead (a lead called multiple
-    // times counts once), via the denormalized `last_contacted_at`. Exact for
-    // the analytics presets (all end at "now": today/7d/30d/all). NOTE: a custom
-    // range ending in the past could miss leads also called after `end`.
-    const { count: uniqueLeads } = await admin
-      .from('leads')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', wsId)
-      .gte('last_contacted_at', start)
-      .lte('last_contacted_at', end)
-      .is('deleted_at', null) as { count: number | null }
+    // unique leads = distinct leads called in the range (one per lead) via the
+    // denormalized last_contacted_at — exact for the presets (all end "now").
+    // The lead-status counts are a CURRENT workspace snapshot (lead states are
+    // not call events, so they aren't date-filtered).
+    const [uniqRes, interestedRes, notInterestedRes, badLeadsRes] = await Promise.all([
+      admin.from('leads').select('id', { count: 'exact', head: true })
+        .eq('workspace_id', wsId).gte('last_contacted_at', start).lte('last_contacted_at', end).is('deleted_at', null),
+      admin.from('leads').select('id', { count: 'exact', head: true })
+        .eq('workspace_id', wsId).eq('interest_status', 'interested').is('deleted_at', null),
+      admin.from('leads').select('id', { count: 'exact', head: true })
+        .eq('workspace_id', wsId).eq('interest_status', 'not_interested').is('deleted_at', null),
+      admin.from('leads').select('id', { count: 'exact', head: true })
+        .eq('workspace_id', wsId).eq('status', 'do_not_contact').is('deleted_at', null),
+    ]) as Array<{ count: number | null }>
 
     return NextResponse.json({
       reps,
-      overview: { ...(payload.overview ?? {}), unique_leads: uniqueLeads ?? 0 },
-      period:   payload.period   ?? { start, end },
+      overview: {
+        ...(payload.overview ?? {}),
+        unique_leads:   uniqRes.count          ?? 0,
+        interested:     interestedRes.count    ?? 0,
+        not_interested: notInterestedRes.count ?? 0,
+        bad_leads:      badLeadsRes.count       ?? 0,
+      },
+      period: payload.period ?? { start, end },
     })
   } catch (err) {
     console.error('[GET /api/analytics/reps]', err)
