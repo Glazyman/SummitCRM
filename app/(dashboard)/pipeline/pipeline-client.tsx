@@ -419,36 +419,35 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
               const isOver     = dragOverStage === stage.id
 
               return (
-                <div key={stage.id} className="flex flex-col w-[300px] shrink-0 gap-3">
+                <div key={stage.id} className="flex w-[300px] shrink-0 flex-col">
 
-                  {/* Column header card */}
-                  <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-card">
-                    <div className="flex items-center gap-2.5">
-                      <span className="h-2 w-2 rounded-full shrink-0" style={{ background: stage.color }} />
-                      <span className="text-[13.5px] font-semibold">{stage.name}</span>
+                  {/* Column = one reui-style Frame: header + content in a bordered card */}
+                  <div className={cn(
+                    'flex h-full flex-col rounded-xl border border-border bg-card shadow-xs shadow-black/5 transition-colors',
+                    isOver && 'border-primary/40 ring-2 ring-primary/15 ring-inset',
+                  )}>
+                    {/* Header */}
+                    <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5">
+                      <span className="size-2 shrink-0 rounded-full" style={{ background: stage.color }} />
+                      <span className="truncate text-sm font-medium capitalize">{stage.name}</span>
                       {stage.is_won  && <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white">WON</span>}
                       {stage.is_lost && <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">LOST</span>}
+                      <span className="ml-auto inline-flex items-center rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                        {stageTotal}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {stageTotal} {stageTotal === 1 ? 'lead' : 'leads'}
-                    </span>
-                  </div>
 
-                  {/* Drop zone */}
-                  <div
-                    className={cn(
-                      'flex flex-col gap-2.5 flex-1 min-h-[120px] rounded-2xl p-1 transition-colors',
-                      isOver && 'bg-primary/5 ring-2 ring-primary/20 ring-inset',
-                    )}
-                    onDragOver={e => handleDragOver(e, stage.id)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={e => handleDrop(e, stage.id)}
-                  >
-                    <div className="flex flex-col gap-2.5 flex-1">
+                    {/* Drop zone / content */}
+                    <div
+                      className="flex min-h-[120px] flex-1 flex-col gap-2 p-2"
+                      onDragOver={e => handleDragOver(e, stage.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={e => handleDrop(e, stage.id)}
+                    >
                       {stageLeads.length === 0 && (
                         <div className={cn(
-                          'flex items-center justify-center h-20 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition-colors',
-                          isOver ? 'border-primary/40 text-primary' : 'border-border/50',
+                          'flex h-20 items-center justify-center rounded-md border-2 border-dashed text-xs transition-colors',
+                          isOver ? 'border-primary/40 bg-muted/10 text-primary' : 'border-border/60 text-muted-foreground',
                         )}>
                           {isOver ? 'Drop here' : 'No leads'}
                         </div>
@@ -466,26 +465,26 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
                           onMoveToStage={moveLeadToStage}
                         />
                       ))}
-                    </div>
 
-                    {/* Load more */}
-                    {hasMore && (
-                      <button
-                        type="button"
-                        onClick={() => loadStageOverflow(stage.id)}
-                        className="w-full px-3 py-2 mt-1 rounded-xl border border-border/70 text-[12px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
+                      {/* Load more */}
+                      {hasMore && (
+                        <button
+                          type="button"
+                          onClick={() => loadStageOverflow(stage.id)}
+                          className="mt-0.5 w-full rounded-md border border-border/70 px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        >
+                          + {stageTotal - stageLeads.length} more
+                        </button>
+                      )}
+
+                      {/* Add lead */}
+                      <Link
+                        href="/leads"
+                        className="mt-0.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border/70 px-3 py-2.5 text-[13px] font-medium text-muted-foreground transition-all hover:border-border hover:text-foreground"
                       >
-                        + {stageTotal - stageLeads.length} more
-                      </button>
-                    )}
-
-                    {/* Add lead */}
-                    <Link
-                      href="/leads"
-                      className="flex items-center justify-center gap-1.5 w-full px-3 py-2.5 mt-1 rounded-xl border border-dashed border-border/70 text-[13px] font-medium text-muted-foreground hover:border-border hover:text-foreground transition-all bg-background/50"
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Add lead
-                    </Link>
+                        <Plus className="h-3.5 w-3.5" /> Add lead
+                      </Link>
+                    </div>
                   </div>
                 </div>
               )
@@ -619,17 +618,17 @@ function KanbanCard({
       onDragEnd={onDragEnd}
       onClick={onOpen}
       className={cn(
-        'rounded-xl border border-border bg-card shadow-card cursor-pointer select-none',
+        'rounded-lg border border-border bg-card shadow-xs shadow-black/5 cursor-pointer select-none',
         'transition-all duration-150',
-        isDragging ? 'opacity-40 scale-[0.97] shadow-none cursor-grabbing' : 'hover:-translate-y-px hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-border',
+        isDragging ? 'opacity-40 scale-[0.97] shadow-none cursor-grabbing' : 'hover:-translate-y-px hover:shadow-md hover:border-border',
       )}
     >
-      <div className="p-3.5 flex flex-col gap-2.5">
+      <div className="p-3 flex flex-col gap-2.5">
 
         {/* Title + ··· */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[13.5px] font-semibold leading-snug truncate">{name}</p>
+            <p className="text-sm font-medium leading-snug truncate">{name}</p>
             <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{lead.company ?? <span className="italic opacity-50">No company</span>}</p>
           </div>
           <DropdownMenu>
