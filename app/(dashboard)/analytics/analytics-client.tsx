@@ -14,9 +14,10 @@ import { Button }  from '@/components/ui/button'
 import { Badge }   from '@/components/ui/badge'
 import { RefreshCw, BarChart2, Phone, Calendar, Users, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { PieChart, Pie, Cell, LabelList } from 'recharts'
 import {
-  PieChart, Pie, Cell, ResponsiveContainer,
-} from 'recharts'
+  ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig,
+} from '@/components/ui/pie-chart'
 
 interface TabConfig { id: AnalyticsTab; label: string; minRole: string }
 
@@ -45,57 +46,72 @@ const OUTCOME_COLORS: Record<string, string> = {
 }
 
 // ── Sized pie (21st.dev "sized pie chart" look) ───────────────────────────
-// Each outcome is its own concentric ring; the ring's arc length is its share
-// of total calls and its radius grows with the segment, so bigger slices read
-// as both longer AND larger rings. Smallest value sits innermost.
-const SIZED_BASE  = 42   // outer radius of the innermost ring
-const SIZED_INC   = 11   // radius added per ring outward
-const SIZED_THICK = 8    // ring band thickness
-const SIZED_GAP   = 3    // gap between bands
+// One donut: each outcome is an angular slice sized by its share of total
+// calls, but each slice extends to a different OUTER radius — bigger outcomes
+// read as both wider AND longer wedges. Smallest value sits closest in.
+const SIZED_BASE = 50   // outer radius of the smallest slice
+const SIZED_INC  = 12   // radius added per larger slice
+const SIZED_HOLE = 32   // shared inner radius (the centre hole)
 
 function SizedPie({
-  data, total, centerValue, centerLabel,
+  data, centerValue, centerLabel,
 }: {
   data: { name: string; value: number; color: string }[]
-  total: number
   centerValue: React.ReactNode
   centerLabel: string
 }) {
-  // ascending so the smallest arc is the inner ring, largest the outer ring
+  // ascending so the smallest slice has the smallest radius (the reference look)
   const sorted = [...data].sort((a, b) => a.value - b.value)
+  const sum    = sorted.reduce((s, d) => s + d.value, 0) || 1
+  const config: ChartConfig = Object.fromEntries(sorted.map(d => [d.name, { label: d.name }]))
+
   return (
     <div className="relative">
-      <ResponsiveContainer width="100%" height={196}>
+      <ChartContainer
+        config={config}
+        className="[&_.recharts-text]:fill-background mx-auto aspect-square w-full max-h-[210px]"
+      >
         <PieChart>
-          {sorted.flatMap((seg, i) => {
-            const outer = SIZED_BASE + i * SIZED_INC
-            const inner = outer - SIZED_THICK
-            const sweep = total > 0 ? (seg.value / total) * 360 : 0
-            return [
-              // faint full-circle track so each partial arc reads as a ring
-              <Pie key={`${seg.name}-track`} data={[{ value: 1 }]} dataKey="value"
-                cx="50%" cy="50%" innerRadius={inner + SIZED_GAP / 2} outerRadius={outer - SIZED_GAP / 2}
-                startAngle={90} endAngle={-270} isAnimationActive={false} strokeWidth={0} fill="hsl(var(--muted))" />,
-              // the value arc itself
-              <Pie key={seg.name} data={[seg]} dataKey="value" nameKey="name"
-                cx="50%" cy="50%" innerRadius={inner + SIZED_GAP / 2} outerRadius={outer - SIZED_GAP / 2}
-                startAngle={90} endAngle={90 - sweep} cornerRadius={3} strokeWidth={0}>
-                <Cell fill={seg.color} />
-              </Pie>,
-            ]
+          <ChartTooltip content={<ChartTooltipContent nameKey="name" hideLabel />} />
+          {sorted.map((entry, index) => {
+            const start = (sorted.slice(0, index).reduce((s, d) => s + d.value, 0) / sum) * 360
+            const end   = (sorted.slice(0, index + 1).reduce((s, d) => s + d.value, 0) / sum) * 360
+            return (
+              <Pie
+                key={entry.name}
+                data={[entry]}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={SIZED_HOLE}
+                outerRadius={SIZED_BASE + index * SIZED_INC}
+                cornerRadius={4}
+                startAngle={start}
+                endAngle={end}
+              >
+                <Cell fill={entry.color} />
+                <LabelList
+                  dataKey="value"
+                  stroke="none"
+                  fontSize={11}
+                  fontWeight={600}
+                  fill="currentColor"
+                  formatter={(v: number) => (v > 0 ? String(v) : '')}
+                />
+              </Pie>
+            )
           })}
         </PieChart>
-      </ResponsiveContainer>
+      </ChartContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold">{centerValue}</span>
-        <span className="text-[11px] text-muted-foreground text-center px-2 leading-tight">{centerLabel}</span>
+        <span className="text-xl font-bold leading-none">{centerValue}</span>
+        <span className="mt-0.5 text-[10px] text-muted-foreground text-center px-2 leading-tight">{centerLabel}</span>
       </div>
     </div>
   )
 }
 
 // ── Overview summary cards ────────────────────────────────────────────────
-function OverviewCards({ overview, loading }: { overview: CallOverview; loading: boolean }) {
+function OverviewCards({ overview, loading, start, end }: { overview: CallOverview; loading: boolean; start: string; end: string }) {
   const answerRate = overview.total > 0 ? Math.round(overview.answered / overview.total * 100) : 0
   const donutData = [
     { name: 'Answered',  value: overview.answered,     color: OUTCOME_COLORS.answered  },
@@ -122,7 +138,6 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
               {donutData.length > 0 ? (
                 <SizedPie
                   data={donutData}
-                  total={overview.total}
                   centerValue={overview.unique_leads}
                   centerLabel="leads called"
                 />
@@ -221,6 +236,9 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
             )}
           </CardContent>
         </Card>
+
+        {/* Leads-called-per-day mini chart (honours the page's date range) */}
+        <DailyCallsMiniChart start={start} end={end} />
       </div>
     </div>
   )
@@ -331,10 +349,7 @@ function AnalyticsContent({ userRole }: Props) {
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
         {activeTab === 'overview' && (
-          <>
-            <OverviewCards overview={overview} loading={isAdmin ? loadingReps : false} />
-            <DailyCallsMiniChart />
-          </>
+          <OverviewCards overview={overview} loading={isAdmin ? loadingReps : false} start={start} end={end} />
         )}
 
         {activeTab === 'reps' && isAdmin && (

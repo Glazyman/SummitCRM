@@ -1,21 +1,26 @@
 /**
- * GET /api/analytics/calls-7d
- * Per-day activity for the last 7 days. Reps see their own activity; admins
- * see the whole workspace. For each day we report:
+ * GET /api/analytics/calls-7d?start=ISO&end=ISO
+ * Per-day activity bar data. Reps see their own activity; admins see the whole
+ * workspace. For each day we report:
  *   - calls        : raw call_logs rows that day
  *   - leads_called : DISTINCT lead_id that day (the "per person / once each"
- *                    metric the analytics page is built around — a lead called
- *                    twice in a day counts once)
- * Buckets call_logs by UTC day in JS (low volume — for a busy workspace this
- * could hit PostgREST's 1000-row cap).
+ *                    metric the analytics page is built around)
+ *
+ * Window: if start/end are passed they define the range (so the chart matches
+ * whatever range the analytics page is showing, and its bars reconcile with the
+ * Call Summary total). Capped to the most recent 30 day-buckets so a wide range
+ * like "All" doesn't render hundreds of bars. Defaults to the last 7 days.
  */
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
 
+const DAY = 86_400_000
 const dayKey = (d: Date) => d.toISOString().slice(0, 10) // YYYY-MM-DD (UTC)
+const utcMidnight = (d: Date) =>
+  new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const cookieStore = await cookies()
     const supabase = await createServerClient(cookieStore)
@@ -29,28 +34,35 @@ export async function GET() {
       { data: { workspace_id: string; role: string } | null }
     if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
 
-    const now   = new Date()
-    const start = new Date(now)
-    start.setUTCDate(now.getUTCDate() - 6)
-    start.setUTCHours(0, 0, 0, 0)
+    const url      = new URL(req.url)
+    const endParam = url.searchParams.get('end')
+    const stParam  = url.searchParams.get('start')
+
+    const end   = endParam ? new Date(endParam) : new Date()
+    let   start = stParam  ? new Date(stParam)  : new Date(end.getTime() - 6 * DAY)
+    // cap to the most recent 30 days so wide ranges stay readable
+    const minStart = new Date(end.getTime() - 29 * DAY)
+    if (start < minStart) start = minStart
+
+    const dayStart = utcMidnight(start)
+    const dayEnd   = utcMidnight(end)
+    const nDays    = Math.max(1, Math.round((dayEnd.getTime() - dayStart.getTime()) / DAY) + 1)
 
     let q = admin
       .from('call_logs')
       .select('called_at, lead_id')
       .eq('workspace_id', member.workspace_id)
-      .gte('called_at', start.toISOString())
+      .gte('called_at', dayStart.toISOString())
+      .lte('called_at', end.toISOString())
     if (member.role === 'rep') q = q.eq('logged_by', user.id)
 
     const { data: rows } = await q as { data: Array<{ called_at: string; lead_id: string }> | null }
 
-    // Seed the 7 day buckets so empty days still render. Track distinct leads
-    // per day with a Set, raw calls with a counter.
+    // Seed buckets so empty days still render.
     const calls = new Map<string, number>()
     const leads = new Map<string, Set<string>>()
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(start)
-      d.setUTCDate(start.getUTCDate() + i)
-      const k = dayKey(d)
+    for (let i = 0; i < nDays; i++) {
+      const k = dayKey(new Date(dayStart.getTime() + i * DAY))
       calls.set(k, 0)
       leads.set(k, new Set())
     }
