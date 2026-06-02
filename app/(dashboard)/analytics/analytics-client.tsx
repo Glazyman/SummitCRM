@@ -63,7 +63,7 @@ function SizedPie({
   // ascending so the smallest slice has the smallest radius (the reference look)
   const sorted = [...data].sort((a, b) => a.value - b.value)
   const sum    = sorted.reduce((s, d) => s + d.value, 0) || 1
-  const config: ChartConfig = Object.fromEntries(sorted.map(d => [d.name, { label: d.name }]))
+  const config = Object.fromEntries(sorted.map(d => [d.name, { label: d.name }])) as ChartConfig
 
   return (
     <div className="relative">
@@ -95,7 +95,7 @@ function SizedPie({
                   fontSize={11}
                   fontWeight={600}
                   fill="currentColor"
-                  formatter={(v: number) => (v > 0 ? String(v) : '')}
+                  formatter={(v: unknown) => (Number(v) > 0 ? String(v) : '')}
                 />
               </Pie>
             )
