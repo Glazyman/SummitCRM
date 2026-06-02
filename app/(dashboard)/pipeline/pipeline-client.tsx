@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Plus, Search, Columns3, List,
   MoreHorizontal, TrendingUp, Calendar, Phone,
-  BarChart3, Trophy,
+  BarChart3, Trophy, Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks'
@@ -218,12 +218,14 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
   // All four numbers come from the server (accurate across the full
   // workspace, not just the trimmed top-100-per-stage visible set).
   const totalLeads      = totals.total_leads
-  const hotLeads        = totals.hot_leads
   const dealsWon        = totals.deals_won
   const dealsInProgress = totals.deals_in_progress
   const unassigned      = stageCounts['__unassigned__'] ?? 0
 
   const wonStageIds = new Set(stages.filter(s => s.is_won).map(s => s.id))
+  // Leads currently in the "Needs Buyer" pipeline stage.
+  const needsBuyerStage = stages.find(s => s.name.trim().toLowerCase() === 'needs buyer')
+  const needsBuyer = needsBuyerStage ? (stageCounts[needsBuyerStage.id] ?? 0) : 0
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
@@ -288,12 +290,12 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             sub={{ bold: `${stages.length} stages`, rest: `· ${unassigned} unassigned` }}
           />
           <StatCard
-            icon={<Trophy className="h-4 w-4" />}
-            label="Hot Leads"
-            value={hotLeads.toLocaleString()}
-            sub={{ bold: `${totalLeads > 0 ? Math.round((hotLeads / Math.max(totalLeads, 1)) * 100) : 0}%`, rest: 'marked interested' }}
-            deltaUp={hotLeads > 0}
-            accent={hotLeads > 0}
+            icon={<Users className="h-4 w-4" />}
+            label="Needs Buyer"
+            value={needsBuyer.toLocaleString()}
+            sub={{ bold: `${totalLeads > 0 ? Math.round((needsBuyer / Math.max(totalLeads, 1)) * 100) : 0}%`, rest: 'of pipeline' }}
+            deltaUp={needsBuyer > 0}
+            accent={needsBuyer > 0}
           />
           <StatCard
             icon={<Trophy className="h-4 w-4" />}

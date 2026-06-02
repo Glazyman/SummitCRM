@@ -1059,4 +1059,10 @@ The analytics Overview "calls" number counted raw calls (repeats included). Adde
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle)*
+### Session 2026-06-01 (pipeline "Needs Buyer" card)
+
+Pipeline page 2nd stat card "Hot Leads" (interested count) → **"Needs Buyer"**: counts leads in the **"Needs Buyer" pipeline stage** (a seeded stage, `20260508000002_activities_and_pipeline.sql` position 2). Computed client-side: `stages.find(name === 'needs buyer')` → `stageCounts[stage.id]`. Falls back to 0 if no such stage. `app/(dashboard)/pipeline/pipeline-client.tsx`.
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card)*
