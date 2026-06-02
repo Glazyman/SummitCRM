@@ -7,6 +7,7 @@ import {
 } from '@/components/analytics'
 import type { RepRow, CallOverview, AnalyticsTab } from '@/components/analytics'
 import { DateRangePicker } from '@/components/admin/date-range-picker'
+import { DailyCallsMiniChart } from '@/components/dashboard/daily-calls-mini-chart'
 import type { DateRangePreset } from '@/components/admin/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button }  from '@/components/ui/button'
@@ -14,7 +15,7 @@ import { Badge }   from '@/components/ui/badge'
 import { RefreshCw, BarChart2, Phone, Calendar, Users, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
-  PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, ResponsiveContainer,
 } from 'recharts'
 
 interface TabConfig { id: AnalyticsTab; label: string; minRole: string }
@@ -43,6 +44,56 @@ const OUTCOME_COLORS: Record<string, string> = {
   callback:  '#f59e0b',
 }
 
+// ── Sized pie (21st.dev "sized pie chart" look) ───────────────────────────
+// Each outcome is its own concentric ring; the ring's arc length is its share
+// of total calls and its radius grows with the segment, so bigger slices read
+// as both longer AND larger rings. Smallest value sits innermost.
+const SIZED_BASE  = 42   // outer radius of the innermost ring
+const SIZED_INC   = 11   // radius added per ring outward
+const SIZED_THICK = 8    // ring band thickness
+const SIZED_GAP   = 3    // gap between bands
+
+function SizedPie({
+  data, total, centerValue, centerLabel,
+}: {
+  data: { name: string; value: number; color: string }[]
+  total: number
+  centerValue: React.ReactNode
+  centerLabel: string
+}) {
+  // ascending so the smallest arc is the inner ring, largest the outer ring
+  const sorted = [...data].sort((a, b) => a.value - b.value)
+  return (
+    <div className="relative">
+      <ResponsiveContainer width="100%" height={196}>
+        <PieChart>
+          {sorted.flatMap((seg, i) => {
+            const outer = SIZED_BASE + i * SIZED_INC
+            const inner = outer - SIZED_THICK
+            const sweep = total > 0 ? (seg.value / total) * 360 : 0
+            return [
+              // faint full-circle track so each partial arc reads as a ring
+              <Pie key={`${seg.name}-track`} data={[{ value: 1 }]} dataKey="value"
+                cx="50%" cy="50%" innerRadius={inner + SIZED_GAP / 2} outerRadius={outer - SIZED_GAP / 2}
+                startAngle={90} endAngle={-270} isAnimationActive={false} strokeWidth={0} fill="hsl(var(--muted))" />,
+              // the value arc itself
+              <Pie key={seg.name} data={[seg]} dataKey="value" nameKey="name"
+                cx="50%" cy="50%" innerRadius={inner + SIZED_GAP / 2} outerRadius={outer - SIZED_GAP / 2}
+                startAngle={90} endAngle={90 - sweep} cornerRadius={3} strokeWidth={0}>
+                <Cell fill={seg.color} />
+              </Pie>,
+            ]
+          })}
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold">{centerValue}</span>
+        <span className="text-[11px] text-muted-foreground text-center px-2 leading-tight">{centerLabel}</span>
+      </div>
+    </div>
+  )
+}
+
 // ── Overview summary cards ────────────────────────────────────────────────
 function OverviewCards({ overview, loading }: { overview: CallOverview; loading: boolean }) {
   const answerRate = overview.total > 0 ? Math.round(overview.answered / overview.total * 100) : 0
@@ -67,21 +118,19 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
             <div className="h-[200px] animate-pulse bg-muted rounded-xl" />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* Donut */}
-              <div className="relative">
-                <ResponsiveContainer width="100%" height={180}>
-                  <PieChart>
-                    <Pie data={donutData} cx="50%" cy="50%" innerRadius={52} outerRadius={72} paddingAngle={2} dataKey="value" strokeWidth={0}>
-                      {donutData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                    </Pie>
-                    <RTooltip formatter={(v) => [String(v)]} contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', background: 'hsl(var(--popover))' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold">{overview.unique_leads}</span>
-                  <span className="text-[11px] text-muted-foreground text-center px-2 leading-tight">leads called</span>
+              {/* Sized pie */}
+              {donutData.length > 0 ? (
+                <SizedPie
+                  data={donutData}
+                  total={overview.total}
+                  centerValue={overview.unique_leads}
+                  centerLabel="leads called"
+                />
+              ) : (
+                <div className="flex h-[196px] items-center justify-center text-sm text-muted-foreground">
+                  No calls in this period.
                 </div>
-              </div>
+              )}
               {/* Breakdown */}
               <div className="flex flex-col justify-center space-y-2.5">
                 {donutData.map(d => (
@@ -282,7 +331,10 @@ function AnalyticsContent({ userRole }: Props) {
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
         {activeTab === 'overview' && (
-          <OverviewCards overview={overview} loading={isAdmin ? loadingReps : false} />
+          <>
+            <OverviewCards overview={overview} loading={isAdmin ? loadingReps : false} />
+            <DailyCallsMiniChart />
+          </>
         )}
 
         {activeTab === 'reps' && isAdmin && (

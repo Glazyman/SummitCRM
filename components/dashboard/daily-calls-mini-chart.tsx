@@ -6,10 +6,12 @@ import { cn } from '@/lib/utils'
 interface Point { label: string; value: number }
 
 /**
- * Mini bar chart of calls over the last 7 days — a TEST of the 21st.dev
+ * Mini bar chart of UNIQUE leads called over the last 7 days — the 21st.dev
  * "mini-chart" look (custom div bars, hover highlight + neighbour dimming,
  * animated heights) wired to our own data (GET /api/analytics/calls-7d,
- * which scopes a rep to their own calls and an admin to the workspace).
+ * which scopes a rep to their own activity and an admin to the workspace).
+ * Uses `leads_called` (DISTINCT lead per day) to match the per-person framing
+ * of the analytics page rather than raw call volume.
  */
 export function DailyCallsMiniChart({ className }: { className?: string }) {
   const [data,    setData]    = useState<Point[]>([])
@@ -23,10 +25,10 @@ export function DailyCallsMiniChart({ className }: { className?: string }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         if (cancelled || !j) return
-        const series = (j.series ?? []) as Array<{ date: string; calls?: number }>
+        const series = (j.series ?? []) as Array<{ date: string; calls?: number; leads_called?: number }>
         const pts = series.slice(-7).map((s) => ({
           label: new Date(s.date).toLocaleDateString('en-US', { weekday: 'short' }),
-          value: Number(s.calls ?? 0),
+          value: Number(s.leads_called ?? 0),
         }))
         setData(pts)
       })
@@ -44,7 +46,7 @@ export function DailyCallsMiniChart({ className }: { className?: string }) {
     <div className={cn('rounded-xl border bg-card p-5', className)}>
       <div className="mb-4 flex items-end justify-between">
         <div>
-          <p className="text-sm font-semibold">Calls · last 7 days</p>
+          <p className="text-sm font-semibold">Leads called · last 7 days</p>
           <p className="mt-0.5 text-2xl font-bold tabular-nums">
             {active ? active.value : total}
             <span className="ml-1.5 text-xs font-medium text-muted-foreground">
