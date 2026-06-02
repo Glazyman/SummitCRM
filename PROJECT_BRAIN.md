@@ -1042,6 +1042,7 @@ Admin dashboard 4 cards now mirror the rep layout, workspace-wide:
 |---|---|---|
 | 1 | Team page mobile: header stacks (`flex-col sm:flex-row`); member/invite/inactive rows use `px-4 sm:px-6` + `min-w-0`/`truncate` so names/emails don't overflow; **Daily Call Targets** grid was `grid-cols-[1fr_130px_130px]` (260px of fixed cols, too wide for phones) → `grid-cols-[1fr_76px_64px] sm:grid-cols-[1fr_130px_130px]`. | `app/(dashboard)/settings/team/team-settings-client.tsx` |
 | 2 | Analytics "Export CSV" button → icon-only below `sm` (text was crowding the mobile header). Overview/rep-performance were already responsive (stacking grids), so no other analytics change. | `components/analytics/analytics-export-button.tsx` |
+| 3 | **Date-range bar** (Today / Last 7 days / Last 30 days / All time) overflowed its rounded box on phones (single non-wrapping row). Now 4 equal-width segments that fill the row, shorter labels on mobile (`7 days`/`30 days`), calendar icon hidden < sm. Used on **both** Analytics + Admin dashboards (`hidden md:flex` desktop / `w-full` mobile). Desktop unchanged (`sm:` guards). | `components/admin/date-range-picker.tsx` |
 
 ---
 

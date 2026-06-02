@@ -17,13 +17,15 @@ import type { DateRangePreset } from './types'
 interface Preset {
   value: DateRangePreset
   label: string
+  /** Shorter label used on phones so all four fit in one row. */
+  short: string
 }
 
 const PRESETS: Preset[] = [
-  { value: 'today', label: 'Today'       },
-  { value: '7d',    label: 'Last 7 days'  },
-  { value: '30d',   label: 'Last 30 days' },
-  { value: 'all',   label: 'All time'     },
+  { value: 'today', label: 'Today',        short: 'Today'    },
+  { value: '7d',    label: 'Last 7 days',  short: '7 days'   },
+  { value: '30d',   label: 'Last 30 days', short: '30 days'  },
+  { value: 'all',   label: 'All time',     short: 'All time' },
 ]
 
 interface DateRangePickerProps {
@@ -35,19 +37,22 @@ interface DateRangePickerProps {
 export function DateRangePicker({ value, onChange, className }: DateRangePickerProps) {
   return (
     <div className={cn('flex items-center gap-1 rounded-lg border bg-background p-1', className)}>
-      <Calendar className="ml-2 h-4 w-4 text-muted-foreground shrink-0" />
+      {/* Calendar icon is decorative — hide it on phones to give the buttons room. */}
+      <Calendar className="ml-2 hidden h-4 w-4 shrink-0 text-muted-foreground sm:block" />
       {PRESETS.map((p) => (
         <button
           key={p.value}
           onClick={() => onChange(p.value)}
           className={cn(
-            'rounded-md px-3 py-1.5 text-sm font-medium transition-all whitespace-nowrap',
+            // Phones: equal-width segments that fill the row. Desktop: auto width.
+            'flex-1 rounded-md px-2 py-1.5 text-center text-sm font-medium transition-all whitespace-nowrap sm:flex-none sm:px-3',
             value === p.value
               ? 'bg-primary text-primary-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground hover:bg-muted',
           )}
         >
-          {p.label}
+          <span className="sm:hidden">{p.short}</span>
+          <span className="hidden sm:inline">{p.label}</span>
         </button>
       ))}
     </div>
