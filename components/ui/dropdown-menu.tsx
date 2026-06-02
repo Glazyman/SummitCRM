@@ -212,7 +212,7 @@ function DropdownMenuContent({
         transformOrigin,
       }}
       className={cn(
-        'flex flex-col rounded-xl border border-border bg-popover shadow-card',
+        'flex flex-col rounded-md border border-border bg-popover shadow-md shadow-black/5',
         'animate-dropdown-in',
         className
       )}
@@ -251,11 +251,11 @@ function DropdownMenuItem({
       role="menuitem"
       type="button"
       className={cn(
-        'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm',
+        'flex w-full items-center gap-2.5 rounded-sm px-2.5 py-1.5 text-sm',
         'text-left transition-colors',
         destructive
-          ? 'text-foreground hover:bg-secondary focus:bg-secondary'
-          : 'text-foreground hover:bg-secondary focus:bg-secondary',
+          ? 'text-destructive hover:bg-destructive/10 focus:bg-destructive/10'
+          : 'text-foreground hover:bg-accent focus:bg-accent',
         'focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
         className
       )}

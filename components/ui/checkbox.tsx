@@ -33,10 +33,10 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         <span
           aria-hidden="true"
           className={cn(
-            'pointer-events-none flex h-4 w-4 items-center justify-center rounded-sm border-2 transition-colors',
+            'pointer-events-none flex h-4 w-4 items-center justify-center rounded-[4px] border transition-colors',
             checked || indeterminate
-              ? 'border-foreground bg-foreground'
-              : 'border-border bg-background',
+              ? 'border-primary bg-primary'
+              : 'border-input bg-background',
           )}
         >
           {/* Indeterminate dash */}
