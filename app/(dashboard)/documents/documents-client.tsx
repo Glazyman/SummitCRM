@@ -132,6 +132,13 @@ export function DocumentsClient() {
     setViewing(d); setError(null)
   }
 
+  // Word docs open in the full editor (renders + edits, like Pages); everything
+  // else (PDF/image/.pages) uses the read-only popup viewer.
+  function openDoc(d: DocRow) {
+    if (EDITABLE_EXTS.includes(extOf(d))) { router.push(`/documents/${d.id}/edit`); return }
+    openViewer(d)
+  }
+
   function download(d: DocRow) {
     const a = document.createElement('a')
     a.href = rawUrl(d.id, true)
@@ -269,7 +276,7 @@ export function DocumentsClient() {
                 {docs.map((d) => (
                   <tr key={d.id} className="border-b border-border/60 last:border-0 hover:bg-accent/30">
                     <td className="px-4 py-3">
-                      <button type="button" onClick={() => openViewer(d)}
+                      <button type="button" onClick={() => openDoc(d)}
                         className="flex items-center gap-2.5 text-left hover:underline">
                         <DocTypeIcon d={d} />
                         <span className="font-medium">{d.name}</span>
@@ -284,9 +291,10 @@ export function DocumentsClient() {
                     <td className="px-4 py-3 text-muted-foreground">{dateFmt.format(new Date(d.created_at))}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="View"
-                          disabled={busyId === d.id} onClick={() => openViewer(d)}>
-                          <Eye className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="h-8 w-8"
+                          title={EDITABLE_EXTS.includes(extOf(d)) ? 'Open & edit' : 'View'}
+                          disabled={busyId === d.id} onClick={() => openDoc(d)}>
+                          {EDITABLE_EXTS.includes(extOf(d)) ? <PenLine className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8" title="Download"
                           disabled={busyId === d.id} onClick={() => download(d)}>
