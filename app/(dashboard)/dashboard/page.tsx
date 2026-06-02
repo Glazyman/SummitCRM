@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent } from '@/components/ui/card'
 import { OverdueFollowUpsWidget } from '@/components/notifications/overdue-followups-widget'
+import { DailyCallsMiniChart } from '@/components/dashboard/daily-calls-mini-chart'
 import { RepPerformancePanel } from '@/components/dashboard/rep-performance'
 import { MyActivityPanel }     from '@/components/dashboard/my-activity'
 import { CallsTodayCard }      from '@/components/dashboard/calls-today-card'
@@ -53,6 +54,9 @@ export default async function DashboardPage() {
       {role === 'rep' && <MyActivityPanel />}
       {role === 'rep' && <CallsTodayCard />}
       {(role === 'admin' || role === 'super_admin') && <RepPerformancePanel />}
+
+      {/* TEST: mini bar chart (21st.dev look) wired to our daily call data. */}
+      <DailyCallsMiniChart />
 
       <OverdueFollowUpsWidget />
     </div>

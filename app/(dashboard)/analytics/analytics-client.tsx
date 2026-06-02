@@ -104,28 +104,25 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
 
                 {/* Lead status — current snapshot, not call outcomes */}
                 <div className="mt-1 border-t border-border pt-2.5 space-y-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Lead status</p>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                      <span className="text-muted-foreground">Interested</span>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Lead status · % of leads</p>
+                  {([
+                    { label: 'Interested',     value: overview.interested,     dot: 'bg-emerald-500' },
+                    { label: 'Not interested', value: overview.not_interested, dot: 'bg-muted-foreground/50' },
+                    { label: 'Bad leads',      value: overview.bad_leads,      dot: 'bg-destructive' },
+                  ] as const).map(s => (
+                    <div key={s.label} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className={cn('h-2.5 w-2.5 rounded-full', s.dot)} />
+                        <span className="text-muted-foreground">{s.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold tabular-nums">{s.value}</span>
+                        <span className="text-[10px] text-muted-foreground w-8 text-right">
+                          {overview.leads_total > 0 ? `${Math.round(s.value / overview.leads_total * 100)}%` : '0%'}
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-semibold tabular-nums">{overview.interested}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/50" />
-                      <span className="text-muted-foreground">Not interested</span>
-                    </div>
-                    <span className="font-semibold tabular-nums">{overview.not_interested}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
-                      <span className="text-muted-foreground">Bad leads</span>
-                    </div>
-                    <span className="font-semibold tabular-nums">{overview.bad_leads}</span>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>

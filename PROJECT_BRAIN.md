@@ -1067,4 +1067,11 @@ Pipeline page 2nd stat card "Hot Leads" (interested count) → **"Needs Buyer"**
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card)*
+### Session 2026-06-01 (lead-status % + mini-chart test)
+
+- Lead-status rows in the analytics Call Summary now show **% of total leads** (`leads_total` denominator), matching the call-outcome row style.
+- **Mini bar chart TEST** (21st.dev "mini-chart" look — custom div bars, hover highlight + neighbour dim, animated) added to the **dashboard**: `components/dashboard/daily-calls-mini-chart.tsx`, fed by a new `GET /api/analytics/calls-7d` (buckets `call_logs` by UTC day for the last 7 days; rep → own calls, admin → workspace; client-side JS bucketing, low-volume — could hit the 1000-row cap on a busy workspace). NOTE: the legacy `get_time_series_analytics` RPC is **email**-only (`sent/opened/...`), no `calls` field — that's why a dedicated endpoint was needed. It's a test placement; remove `<DailyCallsMiniChart/>` from `dashboard/page.tsx` if not kept.
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card; lead-status % + mini-chart test)*
