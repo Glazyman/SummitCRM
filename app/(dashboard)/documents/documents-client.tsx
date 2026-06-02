@@ -1,9 +1,10 @@
 'use client'
 
 import * as React from 'react'
+import { useRouter } from 'next/navigation'
 import {
   FileText, FileSpreadsheet, FileImage, File as FileIcon,
-  Upload, Download, Eye, Trash2, Loader2, Pencil, Copy, MoreHorizontal, ExternalLink,
+  Upload, Download, Eye, Trash2, Loader2, Pencil, Copy, MoreHorizontal, ExternalLink, PenLine,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -60,7 +61,10 @@ function DocTypeIcon({ d, className }: { d: DocRow; className?: string }) {
   return <FileIcon className={cn(cls, 'text-muted-foreground')} />
 }
 
+const EDITABLE_EXTS = ['doc', 'docx']
+
 export function DocumentsClient() {
+  const router = useRouter()
   const [docs, setDocs] = React.useState<DocRow[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -299,6 +303,12 @@ export function DocumentsClient() {
                             <DropdownMenuItem onClick={() => openEdit(d)} icon={<Pencil className="h-3.5 w-3.5" />}>
                               Edit details
                             </DropdownMenuItem>
+                            {EDITABLE_EXTS.includes(extOf(d)) && (
+                              <DropdownMenuItem onClick={() => router.push(`/documents/${d.id}/edit`)}
+                                icon={<PenLine className="h-3.5 w-3.5" />}>
+                                Edit contents
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => duplicate(d)} icon={<Copy className="h-3.5 w-3.5" />}>
                               Duplicate
                             </DropdownMenuItem>
