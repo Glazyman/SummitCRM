@@ -62,6 +62,7 @@ function DocTypeIcon({ d, className }: { d: DocRow; className?: string }) {
 }
 
 const EDITABLE_EXTS = ['doc', 'docx']
+const CONVERTIBLE_EXTS = ['pdf'] // can be turned into an editable Word copy
 
 export function DocumentsClient() {
   const router = useRouter()
@@ -72,6 +73,8 @@ export function DocumentsClient() {
   const [dragOver, setDragOver] = React.useState(false)
   const [busyId, setBusyId] = React.useState<string | null>(null)
   const [toDelete, setToDelete] = React.useState<DocRow | null>(null)
+  const [toConvert, setToConvert] = React.useState<DocRow | null>(null)
+  const [converting, setConverting] = React.useState(false)
   const fileInput = React.useRef<HTMLInputElement>(null)
 
   // Viewer
@@ -139,9 +142,30 @@ export function DocumentsClient() {
     openViewer(d)
   }
 
-  // The explicit Edit button opens the editor straight in editing mode.
+  // The explicit Edit button. Word docs open in the editor; PDFs first convert
+  // to an editable Word copy (confirm dialog, since it's lossy).
   function editDoc(d: DocRow) {
-    router.push(`/documents/${d.id}/edit?mode=edit`)
+    if (EDITABLE_EXTS.includes(extOf(d))) { router.push(`/documents/${d.id}/edit?mode=edit`); return }
+    if (CONVERTIBLE_EXTS.includes(extOf(d))) { setToConvert(d) }
+  }
+
+  async function convertAndEdit() {
+    if (!toConvert) return
+    const d = toConvert
+    setConverting(true); setError(null)
+    try {
+      const r = await fetch(`/api/documents/${d.id}/convert`, { method: 'POST' })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j.error ?? 'Conversion failed')
+      const newId = j.data?.id as string | undefined
+      if (newId) { router.push(`/documents/${newId}/edit?mode=edit`); return }
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Conversion failed')
+    } finally {
+      setConverting(false)
+      setToConvert(null)
+    }
   }
 
   function download(d: DocRow) {
@@ -317,8 +341,9 @@ export function DocumentsClient() {
                           disabled={busyId === d.id} onClick={() => openDoc(d)}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {EDITABLE_EXTS.includes(extOf(d)) && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit"
+                        {(EDITABLE_EXTS.includes(extOf(d)) || CONVERTIBLE_EXTS.includes(extOf(d))) && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8"
+                            title={EDITABLE_EXTS.includes(extOf(d)) ? 'Edit' : 'Convert to editable Word & edit'}
                             disabled={busyId === d.id} onClick={() => editDoc(d)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -347,6 +372,11 @@ export function DocumentsClient() {
                             {EDITABLE_EXTS.includes(extOf(d)) && (
                               <DropdownMenuItem onClick={() => duplicateAndEdit(d)} icon={<CopyPlus className="h-3.5 w-3.5" />}>
                                 Duplicate &amp; edit
+                              </DropdownMenuItem>
+                            )}
+                            {CONVERTIBLE_EXTS.includes(extOf(d)) && (
+                              <DropdownMenuItem onClick={() => setToConvert(d)} icon={<PenLine className="h-3.5 w-3.5" />}>
+                                Convert to editable Word
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem onClick={() => duplicate(d)} icon={<Copy className="h-3.5 w-3.5" />}>
@@ -450,6 +480,24 @@ export function DocumentsClient() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)} disabled={editSaving}>Cancel</Button>
             <Button onClick={saveEdit} loading={editSaving}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Convert PDF → editable Word */}
+      <Dialog open={!!toConvert} onClose={() => (converting ? null : setToConvert(null))}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Convert to editable Word copy</DialogTitle>
+            <DialogDescription>
+              Makes an editable Word (.docx) copy of &ldquo;{toConvert?.name}&rdquo; by extracting its text.
+              Formatting, logos, and signatures are <strong>not</strong> preserved (scanned PDFs may come out
+              blank). Your original PDF is kept untouched.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setToConvert(null)} disabled={converting}>Cancel</Button>
+            <Button onClick={convertAndEdit} loading={converting}>Convert &amp; edit</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

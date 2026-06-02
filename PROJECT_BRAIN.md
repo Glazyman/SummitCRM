@@ -66,6 +66,7 @@
 | CSV parsing | Papaparse 5 | Client-side only, for import preview |
 | Excel export | xlsx 0.18.5 | |
 | Docx editor | superdoc 1.38.0 (+ peers pdfjs-dist, prosemirror-*, yjs, y-prosemirror, @hocuspocus/provider) | Client-side in-browser `.docx` editing on `/documents/[id]/edit`. Dynamic-imported (no SSR). Added 2026-06-02. |
+| PDF→Word | pdfjs-dist (text extract, server-side) + docx 9.7.1 (Word build) | In-house PDF→editable-`.docx` text conversion (`lib/documents/pdf-to-docx.ts`). `serverExternalPackages: ['pdfjs-dist']` in next.config. Text only — no layout/OCR. Added 2026-06-02. |
 | Database | Supabase (Postgres) + RLS | Multi-tenant via workspace_id on every table |
 | Auth | Supabase Auth (email/password + magic link) | JWT with custom claims (workspace_id, role) |
 | Storage | Supabase Storage | `lead-imports` bucket for CSV uploads |
@@ -541,6 +542,7 @@ All API routes require authentication. Role checks are in-route.
 - `POST /api/documents/[id]/duplicate` — storage `.copy()` + new "Copy of …" row
 - `POST /api/documents/[id]/replace` — replace file with a new version (multipart), repoint row, delete old object
 - `GET /api/documents/[id]/raw` — **same-origin** byte proxy for the in-app viewer (CSP blocks cross-origin iframes); inline by default, `?download=1` = attachment. Framing headers relaxed for this route in middleware.
+- `POST /api/documents/[id]/convert` — PDF → editable `.docx` (in-house text extraction), saved as a NEW "… (editable)" doc; returns the new row. Admin only, `runtime='nodejs'`.
 - Shared admin gate + loader: `lib/documents/context.ts` (`requireDocumentAdmin`, `loadDocument`)
 
 **Team**
@@ -663,7 +665,7 @@ Admin-only document library at `/documents` for contracts, templates, and signed
 - **Pop-up viewer** (added 2026-06-02): clicking a row name / the eye icon opens an in-app modal (`size="full"`). PDFs render in an `<iframe>`, images in `<img>` (both via the inline 120s signed URL); non-renderable types (.docx/.pages) show file info + a Download button **in-house only** (nothing sent to third-party viewers — user choice). Footer has "Open in new tab" + Download.
 - **Edit details** (added 2026-06-02): ⋯ menu → Edit opens a dialog to **rename** + edit a **description** (`PATCH /api/documents/[id]`) and optionally **Replace file** with a new version (`POST .../replace` — uploads new object, repoints row, deletes old). Description shows under the name in the list.
 - **View vs Edit split** (2026-06-02): **clicking a file = View** (read-only). PDF/image → popup; Word docs → the editor page in **viewing** mode (so docx is now viewable in-CRM, not just downloadable); `.pages` → popup download. Every row has an **eye (View)**; Word rows also get a **pencil (Edit)** → editor in **editing** mode (`?mode=edit`). The editor page (`/documents/[id]/edit`) takes `?mode=view|edit` and has an in-page **View/Edit toggle** (SuperDoc `setDocumentMode`); Save version / Save as copy show only in edit mode; the SuperDoc toolbar is hidden in view mode.
-- **PDF/.pages are NOT editable** — confirmed from SuperDoc's own docs ("renders and edits **DOCX**"). No in-browser editor can edit PDF text (fixed-layout) or `.pages` (proprietary). Editing those requires converting to `.docx` first (external/lossy or in-house pdfjs text-extraction). Edit (pencil) is intentionally shown only for doc/docx. Loads the file via the same-origin raw route, dynamic-imported client-side (no SSR). Two saves: **Save version** (`POST .../replace`, overwrites the file on the same row) or **Save as copy** (`POST /api/documents` with name "Copy of …"). PDFs and `.pages` can't be content-edited (only download/replace). Build-verified `next build` green.
+- **PDF → editable Word (in-house, added 2026-06-02)**: PDFs can't be edited directly, but the Edit pencil (and ⋯ "Convert to editable Word") on a PDF opens a confirm dialog → `POST /api/documents/[id]/convert` extracts the text (pdfjs, server-side) → builds a `.docx` (docx lib) → saves a NEW "… (editable)" doc → opens it in the editor. **Text only** — formatting/logos/signatures lost, scanned PDFs come out blank (no OCR). Original PDF kept. `.pages` still can't be converted in-house (proprietary). User chose this in-house route over CloudConvert (free, nothing leaves the server). Loads the file via the same-origin raw route, dynamic-imported client-side (no SSR). Two saves: **Save version** (`POST .../replace`, overwrites the file on the same row) or **Save as copy** (`POST /api/documents` with name "Copy of …"). PDFs and `.pages` can't be content-edited (only download/replace). Build-verified `next build` green.
 - **Duplicate** (added 2026-06-02): ⋯ menu → Duplicate (`POST .../duplicate`) storage-copies the file into a new "Copy of …" row.
 - **Duplicate & edit** (added 2026-06-02, .docx/.doc only): ⋯ → "Duplicate & edit" copies the doc then routes straight to `/documents/[newId]/edit` — one-click "new agreement from this template". Uses the new id returned by the duplicate route.
 - **Download**: `?download=1` signed URL (Content-Disposition attachment with the doc's name+ext).
@@ -1199,6 +1201,15 @@ Pipeline page 2nd stat card "Hot Leads" (interested count) → **"Needs Buyer"**
 | 2 | Installed `superdoc` + peer `pdfjs-dist` (other peers — prosemirror/yjs/y-prosemirror/@hocuspocus/provider — auto-installed). | `package.json` |
 | 3 | **`next build` run locally → green** (route `/documents/[id]/edit` compiled, SuperDoc bundled, CSS import OK). De-risks the recharts/build-only-fails-on-Vercel pattern. Also confirmed the full repo now type-checks 0 errors (the `radix-ui`-missing-locally noise resolved once `npm install` ran). | — |
 | — | **Limits**: editor is .docx only (PDFs/.pages can't be content-edited in a browser). Real-time collab (yjs/hocuspocus) NOT wired — single-user editing. | — |
+
+### Session 2026-06-02 (Documents: View/Edit split + in-house PDF→Word)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | **View vs Edit split** (per user): clicking a file = View (PDF/img popup; Word doc → editor in viewing mode; .pages popup). Every row has eye (View); Word/PDF rows get a pencil (Edit). Editor page takes `?mode=view\|edit` + in-page View/Edit toggle (`setDocumentMode`); Save/toolbar only in edit mode. | `documents-client.tsx`, `app/(dashboard)/documents/[id]/edit/page.tsx`, `docx-editor-client.tsx` |
+| 2 | **In-house PDF → editable Word** (user chose this over CloudConvert): pencil/⋯ on a PDF → confirm dialog → `POST /api/documents/[id]/convert` → pdfjs text extract → `docx` build → new "… (editable)" doc → opens editor. Text only (no layout/OCR). Prototyped on a real PDF first (161 clean lines from the 4-page Alpine agreement). | `app/api/documents/[id]/convert/route.ts`, `lib/documents/pdf-to-docx.ts`, `next.config.ts` (`serverExternalPackages`), `documents-client.tsx` |
+| 3 | Installed `docx` 9.7.1. `next build` → **green** (convert route + serverExternalPackages OK). | `package.json` |
+| — | **Reaffirmed limit**: PDF/.pages have no true in-browser text editing — conversion-to-docx is the only path; `.pages` can't be converted in-house (proprietary). | — |
 
 ---
 
