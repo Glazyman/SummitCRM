@@ -30,6 +30,9 @@ interface DocRow {
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif']
 const DOCX_EXTS = ['doc', 'docx']
+// Files the desktop Word app can open via the ms-word: protocol (Word also
+// opens/converts PDFs).
+const WORD_OPENABLE = ['doc', 'docx', 'pdf']
 
 function extOf(d: DocRow): string {
   const m = d.file_path.match(/\.([^.]+)$/)
@@ -123,6 +126,21 @@ export function DocumentsClient() {
     document.body.appendChild(a)
     a.click()
     a.remove()
+  }
+
+  // Launch the desktop Word app via the Office URI scheme. Word needs a
+  // publicly-fetchable URL, so use the short-lived signed URL (not the
+  // cookie-protected raw proxy).
+  async function openInWord(d: DocRow) {
+    setError(null)
+    try {
+      const res = await fetch(`/api/documents/${d.id}`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Could not open in Word')
+      window.location.href = `ms-word:ofe|u|${json.data.url}`
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not open in Word')
+    }
   }
 
   function openRename(d: DocRow) {
@@ -305,6 +323,11 @@ export function DocumentsClient() {
                 className="mr-auto inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground">
                 <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
               </a>
+            )}
+            {viewing && WORD_OPENABLE.includes(extOf(viewing)) && (
+              <Button variant="outline" onClick={() => openInWord(viewing)}>
+                <FileText className="h-4 w-4" /> Open in Word
+              </Button>
             )}
             {viewing && (
               <Button variant="outline" onClick={() => download(viewing)}>

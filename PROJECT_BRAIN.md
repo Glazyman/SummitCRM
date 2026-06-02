@@ -660,7 +660,8 @@ Admin-only document library at `/documents` for contracts, templates, and signed
 
 - **Pop-up viewer (view-only)**: clicking a row name / the eye icon opens an in-app modal (`size="full"`). PDFs → `<iframe>`, images → `<img>` (both via the **same-origin raw proxy** `/api/documents/[id]/raw` — CSP blocks cross-origin iframes, quirk 19). **.docx/.doc → rendered read-only via SuperDoc viewing mode** (`docx-viewer.tsx`, lazy `next/dynamic` `ssr:false`, `documentMode:'viewing'`) — so Word docs are viewable in-CRM. `.pages` and other non-renderables → file info + Download. Footer: Open in new tab + Download.
 - **Download**: `/api/documents/[id]/raw?download=1` (Content-Disposition attachment).
-- **Rename** (name only): pencil icon → small dialog with a name input → `PATCH /api/documents/[id]` `{name}`. The only allowed edit. Row actions: **View / Download / Rename / Delete**.
+- **Open in Word** (viewer footer, for `doc`/`docx`/`pdf`): launches the **desktop Word app** via the Office URI scheme `ms-word:ofe|u|<signedUrl>`. Uses the short-lived **signed URL** (`GET /api/documents/[id]`), NOT the cookie-protected `/raw` proxy, because Word fetches the URL itself with no browser cookies. Word also opens/converts PDFs locally (better fidelity than any server-side convert). Saving back to the CRM isn't wired — it opens a local copy.
+- **Rename** (name only): pencil icon → small dialog with a name input → `PATCH /api/documents/[id]` `{name}`. The only allowed in-CRM edit. Row actions: **View / Download / Rename / Delete**.
 - **Delete**: confirm dialog → `DELETE /api/documents/[id]` (storage object + row).
 - **Upload** stays (drag/drop + button). No content editing / replace / duplicate / convert — just rename.
 - **Access**: server page redirects non-admins to `/dashboard`; all API routes gate on `admin`/`super_admin`. Sidebar link sits in the Admin group.
