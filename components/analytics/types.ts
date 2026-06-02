@@ -76,6 +76,8 @@ export interface BatchRow {
 
 export interface CallOverview {
   total:            number
+  /** Distinct leads called in the period — one per lead (excludes repeat calls). */
+  unique_leads:     number
   answered:         number
   voicemail:        number
   no_answer:        number

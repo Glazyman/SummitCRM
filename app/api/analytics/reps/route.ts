@@ -81,9 +81,21 @@ export async function GET(req: Request) {
       full_name:  nameById.get(r.user_id)?.name  ?? null,
     }))
 
+    // Unique leads called in the range — one per lead (a lead called multiple
+    // times counts once), via the denormalized `last_contacted_at`. Exact for
+    // the analytics presets (all end at "now": today/7d/30d/all). NOTE: a custom
+    // range ending in the past could miss leads also called after `end`.
+    const { count: uniqueLeads } = await admin
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', wsId)
+      .gte('last_contacted_at', start)
+      .lte('last_contacted_at', end)
+      .is('deleted_at', null) as { count: number | null }
+
     return NextResponse.json({
       reps,
-      overview: payload.overview ?? {},
+      overview: { ...(payload.overview ?? {}), unique_leads: uniqueLeads ?? 0 },
       period:   payload.period   ?? { start, end },
     })
   } catch (err) {

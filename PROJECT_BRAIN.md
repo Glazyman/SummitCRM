@@ -1046,4 +1046,17 @@ Admin dashboard 4 cards now mirror the rep layout, workspace-wide:
 
 ---
 
-*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout)*
+### Session 2026-06-01 (analytics per-person vs all-calls)
+
+The analytics Overview "calls" number counted raw calls (repeats included). Added a **"Per person / All calls" toggle** on the Call Summary card (defaults to Per person = unique leads called). The donut center + the page subtitle now show both: `{unique_leads} called · {total} calls`.
+- Backend: `GET /api/analytics/reps` overview now includes `unique_leads` = `count(leads WHERE last_contacted_at in [start,end])` (one per lead; exact for the presets, which all end "now"). No migration — uses the denormalized field, same trick as the dashboard.
+- `CallOverview` type + `EMPTY_OVERVIEW` gained `unique_leads`. The outcome donut/breakdown stays per-call (it's the call-outcome mix); only the headline number toggles.
+- Note: the reps route is admin-only, so this is the admin/team analytics view.
+
+| Key files | |
+|---|---|
+| `app/api/analytics/reps/route.ts`, `components/analytics/types.ts`, `app/(dashboard)/analytics/analytics-client.tsx` | |
+
+---
+
+*Last updated: 2026-06-01 — covers all sessions through 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle)*

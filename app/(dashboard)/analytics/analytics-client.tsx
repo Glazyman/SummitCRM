@@ -30,7 +30,7 @@ function canSee(tabRole: string, userRole: string) {
 }
 
 const EMPTY_OVERVIEW: CallOverview = {
-  total: 0, answered: 0, voicemail: 0, no_answer: 0, wrong_number: 0, callback: 0,
+  total: 0, unique_leads: 0, answered: 0, voicemail: 0, no_answer: 0, wrong_number: 0, callback: 0,
   follow_ups_due: 0, follow_ups_overdue: 0, leads_total: 0, leads_active: 0,
 }
 
@@ -53,14 +53,37 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
     { name: 'Callback',  value: overview.callback,     color: OUTCOME_COLORS.callback  },
   ].filter(d => d.value > 0)
 
+  // "Per person" = unique leads called (each lead once). "All calls" = every
+  // call incl. repeats. Default to per-person — the more meaningful number.
+  const [callView, setCallView] = useState<'unique' | 'all'>('unique')
+  const headline      = callView === 'unique' ? overview.unique_leads : overview.total
+  const headlineLabel = callView === 'unique' ? 'leads called' : 'calls'
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Call summary + donut */}
       <Card className="lg:col-span-2">
         <CardContent className="pt-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Phone className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">Call Summary</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">Call Summary</span>
+            </div>
+            <div className="flex items-center rounded-lg border border-border p-0.5 text-xs font-medium">
+              {([['unique', 'Per person'], ['all', 'All calls']] as const).map(([v, lbl]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setCallView(v)}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 transition-colors whitespace-nowrap',
+                    callView === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
           </div>
           {loading ? (
             <div className="h-[200px] animate-pulse bg-muted rounded-xl" />
@@ -77,8 +100,8 @@ function OverviewCards({ overview, loading }: { overview: CallOverview; loading:
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold">{overview.total}</span>
-                  <span className="text-[11px] text-muted-foreground">calls</span>
+                  <span className="text-3xl font-bold">{headline}</span>
+                  <span className="text-[11px] text-muted-foreground text-center px-2 leading-tight">{headlineLabel}</span>
                 </div>
               </div>
               {/* Breakdown */}
@@ -223,7 +246,7 @@ function AnalyticsContent({ userRole }: Props) {
               <div>
                 <h1 className="text-lg font-semibold">{isRep ? 'My Analytics' : 'Team Analytics'}</h1>
                 <p className="text-xs text-muted-foreground">
-                  {reps.length > 0 && !isRep ? `${reps.length} reps · ` : ''}{overview.total} calls · {overview.leads_total} leads
+                  {reps.length > 0 && !isRep ? `${reps.length} reps · ` : ''}{overview.unique_leads} called · {overview.total} calls · {overview.leads_total} leads
                 </p>
               </div>
             </div>
