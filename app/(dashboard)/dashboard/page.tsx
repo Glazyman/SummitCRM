@@ -124,9 +124,9 @@ async function DashboardStats({
         href="/pipeline"
       />
       <StatCard
-        title="Calls Logged"
-        value={formatNumber(metrics.callsLogged)}
-        description="last 30 days"
+        title="Leads Called"
+        value={formatNumber(metrics.leadsCalled)}
+        description="last 30 days · once per lead"
         icon={PhoneCall}
         color="purple"
       />
@@ -165,7 +165,7 @@ type DashboardMetrics = {
   totalLeads:       number
   leadsContacted:   number
   dealsInPipeline:  number
-  callsLogged:      number
+  leadsCalled:      number
   callsToday:       number
   dailyCallTarget:  number
   unreadNotifications: number
@@ -177,7 +177,7 @@ function emptyDashboardMetrics(): DashboardMetrics {
     totalLeads:          0,
     leadsContacted:      0,
     dealsInPipeline:     0,
-    callsLogged:         0,
+    leadsCalled:         0,
     callsToday:          0,
     dailyCallTarget:     100,
     unreadNotifications: 0,
@@ -269,11 +269,14 @@ async function getDashboardMetrics(
       .select('settings')
       .eq('id', workspaceId)
       .single(),
+    // Leads called in the last 30 days — counted ONCE per lead (a lead called
+    // multiple times counts once). `last_contacted_at` is a per-lead field.
     supabase
-      .from('call_logs')
+      .from('leads')
       .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
-      .gte('called_at', weekAgo.toISOString()),
+      .gte('last_contacted_at', weekAgo.toISOString())
+      .is('deleted_at', null),
     // Unique leads called today (vs daily target).
     supabaseAny.rpc('get_unique_leads_called', {
       p_workspace_id: workspaceId,
@@ -283,13 +286,11 @@ async function getDashboardMetrics(
     dealsInPipelineQuery,
   ])
 
-  // Calls logged this week — all call paths write to call_logs, so the
-  // HEAD count is the single source of truth. The old activity_logs synthetic
-  // count was removed because it double-counted bulk status changes.
-  let callsLogged = 0
+  // Leads called in the last 30 days (unique — one per lead).
+  let leadsCalled = 0
   let callsToday  = 0
   try {
-    callsLogged = (callsRes as unknown as { count: number | null }).count ?? 0
+    leadsCalled = (callsRes as unknown as { count: number | null }).count ?? 0
   } catch {}
 
   try {
@@ -309,7 +310,7 @@ async function getDashboardMetrics(
       ? ((contactedRes as { count: number | null }).count ?? 0)
       : Number((contactedRes as { data: number | null }).data ?? 0),
     dealsInPipeline:     dealsRes.count ?? 0,
-    callsLogged,
+    leadsCalled,
     callsToday,
     dailyCallTarget,
     unreadNotifications: 0,

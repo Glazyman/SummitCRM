@@ -1012,9 +1012,9 @@ Admin dashboard 4 cards now mirror the rep layout, workspace-wide:
 |---|---|
 | **Total Leads** | `contacted / total` — `leadsContacted` (count of leads with `last_contacted_at IS NOT NULL` = contacted by any rep/admin, all-time) over workspace total. |
 | **Deals in Pipeline** | workspace leads with `pipeline_stage_id IS NOT NULL` (all reps' deals). Links to `/pipeline`. Replaced the old "Interested" card. |
-| **Calls Logged** | last 30 days (unchanged). |
+| **Leads Called** | unique leads called in the last 30 days — **once per lead** (`count(leads WHERE last_contacted_at >= 30d ago)`), NOT raw call events. Was "Calls Logged" counting `call_logs` rows; changed because raw calls (65) confusingly exceeded unique contacted (54). |
 | **Tasks Due** | follow_ups due today, workspace (unchanged). |
-`getDashboardMetrics`: `leadsContacted` and `dealsInPipeline` queries are now role-aware (admins = workspace-wide via `last_contacted_at`/no-assignee-filter; reps = their own via the RPC / `assigned_to`). Removed the `interestedLeads` metric + its query.
+`getDashboardMetrics`: `leadsContacted` and `dealsInPipeline` queries are now role-aware (admins = workspace-wide via `last_contacted_at`/no-assignee-filter; reps = their own via the RPC / `assigned_to`). Removed the `interestedLeads` metric + its query. **All dashboard call counts are now "unique leads, one per person"** — reps already used `get_unique_leads_called` (= `count(DISTINCT lead_id)`); the admin "Calls Logged" raw count was the only holdout and is now `leadsCalled` (unique).
 
 ---
 
