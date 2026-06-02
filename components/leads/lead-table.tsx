@@ -344,9 +344,12 @@ function StatusDropdown({
         <Button
           size="sm"
           variant="outline"
-          className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap hover:bg-transparent hover:shadow-sm', meta.badge)}
+          className="h-7 w-full justify-between gap-1.5 px-2 text-xs font-normal"
         >
-          {meta.label}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className={cn('h-2 w-2 shrink-0 rounded-full', meta.dot)} />
+            <span className="truncate">{meta.label}</span>
+          </span>
           <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
@@ -387,9 +390,12 @@ function InterestDropdown({
         <Button
           size="sm"
           variant="outline"
-          className={cn('h-7 gap-1 px-2 text-xs font-medium whitespace-nowrap hover:bg-transparent hover:shadow-sm', meta.badge)}
+          className="h-7 w-full justify-between gap-1.5 px-2 text-xs font-normal"
         >
-          {meta.label}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className={cn('h-2 w-2 shrink-0 rounded-full', meta.dot)} />
+            <span className="truncate">{meta.label}</span>
+          </span>
           <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
