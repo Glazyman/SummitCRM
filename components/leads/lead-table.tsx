@@ -6,19 +6,18 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowUpDown, ArrowUp, ArrowDown,
   Mail, ExternalLink, MoreHorizontal,
-  Building2, User, Clock, ChevronDown,
+  Building2, User, Clock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
-import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } from './status-config'
+import { StatusSelect, InterestSelect } from './status-select'
 import type { LeadRow, SortField, SortDir, ColumnId, InterestStatus } from './types'
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -336,42 +335,7 @@ function StatusDropdown({
   value:    LeadRow['status']
   onChange: (s: LeadRow['status']) => void
 }) {
-  const meta = STATUS_CONFIG[value]
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 w-full justify-between gap-1.5 px-2 text-xs font-normal"
-        >
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className={cn('h-2 w-2 shrink-0 rounded-full', meta.dot)} />
-            <span className="truncate">{meta.label}</span>
-          </span>
-          <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" minWidth="170px" side="top">
-        {ALL_STATUSES.map((status) => {
-          const m       = STATUS_CONFIG[status]
-          const current = status === value
-          return (
-            <DropdownMenuItem
-              key={status}
-              onClick={() => !current && onChange(status)}
-              className={cn(current && 'opacity-50 cursor-default')}
-            >
-              <span className={cn('h-2 w-2 rounded-full', m.dot)} />
-              {m.label}
-              {current && <span className="ml-auto text-xs text-muted-foreground">current</span>}
-            </DropdownMenuItem>
-          )
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
+  return <StatusSelect value={value} onChange={onChange} size="sm" className="w-full min-w-[124px]" />
 }
 
 // ── Inline interest dropdown ──────────────────────────────────────────────
@@ -382,42 +346,8 @@ function InterestDropdown({
   value:    InterestStatus
   onChange: (s: InterestStatus) => void
 }) {
-  const meta = INTEREST_CONFIG[value] ?? INTEREST_CONFIG['pending']
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 w-full justify-between gap-1.5 px-2 text-xs font-normal"
-        >
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className={cn('h-2 w-2 shrink-0 rounded-full', meta.dot)} />
-            <span className="truncate">{meta.label}</span>
-          </span>
-          <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" minWidth="155px" side="top">
-        {ALL_INTEREST_STATUSES.map((status) => {
-          const m       = INTEREST_CONFIG[status]
-          const current = status === value
-          return (
-            <DropdownMenuItem
-              key={status}
-              onClick={() => !current && onChange(status)}
-              className={cn(current && 'opacity-50 cursor-default')}
-            >
-              <span className={cn('h-2 w-2 rounded-full', m.dot)} />
-              {m.label}
-              {current && <span className="ml-auto text-xs text-muted-foreground">current</span>}
-            </DropdownMenuItem>
-          )
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
+  return <InterestSelect value={value ?? 'pending'} onChange={onChange} size="sm" className="w-full min-w-[112px]" />
+}
 }
 
 // ── Multi-contact hover cell ──────────────────────────────────────────────
