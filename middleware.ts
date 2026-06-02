@@ -49,9 +49,22 @@ const SECURITY_HEADERS: Record<string, string> = {
   ].join('; '),
 }
 
-function applySecurityHeaders(response: NextResponse): NextResponse {
+// The document raw-bytes proxy (/api/documents/<id>/raw) is embedded by the
+// same-origin in-app viewer (PDF iframe). The global X-Frame-Options: DENY +
+// frame-ancestors 'none' would block even same-origin framing, so this one
+// route gets SAMEORIGIN / frame-ancestors 'self' instead.
+const RAW_DOC_RE = /^\/api\/documents\/[^/]+\/raw$/
+
+function applySecurityHeaders(response: NextResponse, pathname?: string): NextResponse {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     response.headers.set(key, value)
+  }
+  if (pathname && RAW_DOC_RE.test(pathname)) {
+    response.headers.set('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.set(
+      'Content-Security-Policy',
+      SECURITY_HEADERS['Content-Security-Policy'].replace("frame-ancestors 'none'", "frame-ancestors 'self'"),
+    )
   }
   return response
 }
@@ -68,7 +81,7 @@ export async function middleware(request: NextRequest) {
   // ── Authenticated user visiting auth pages → redirect to dashboard ──────
   if (user && isAuthOnlyPath) {
     const res = NextResponse.redirect(new URL('/dashboard', request.url))
-    return applySecurityHeaders(res)
+    return applySecurityHeaders(res, pathname)
   }
 
   // ── Unauthenticated user visiting protected pages → redirect to login ────
@@ -76,7 +89,7 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('next', pathname)
     const res = NextResponse.redirect(loginUrl)
-    return applySecurityHeaders(res)
+    return applySecurityHeaders(res, pathname)
   }
 
   // ── Admin-only path check ─────────────────────────────────────────────────
@@ -85,11 +98,11 @@ export async function middleware(request: NextRequest) {
     const role   = claims?.role
     if (role && role !== 'admin' && role !== 'super_admin' && role !== 'manager') {
       const res = NextResponse.redirect(new URL('/dashboard', request.url))
-      return applySecurityHeaders(res)
+      return applySecurityHeaders(res, pathname)
     }
   }
 
-  return applySecurityHeaders(response)
+  return applySecurityHeaders(response, pathname)
 }
 
 export const config = {

@@ -535,6 +535,7 @@ All API routes require authentication. Role checks are in-route.
 - `DELETE /api/documents/[id]` — remove storage object + row
 - `POST /api/documents/[id]/duplicate` — storage `.copy()` + new "Copy of …" row
 - `POST /api/documents/[id]/replace` — replace file with a new version (multipart), repoint row, delete old object
+- `GET /api/documents/[id]/raw` — **same-origin** byte proxy for the in-app viewer (CSP blocks cross-origin iframes); inline by default, `?download=1` = attachment. Framing headers relaxed for this route in middleware.
 - Shared admin gate + loader: `lib/documents/context.ts` (`requireDocumentAdmin`, `loadDocument`)
 
 **Team**
@@ -891,6 +892,10 @@ Header is `sticky top-0 z-20`. Any `z-50` inside is bounded by z-20 against outs
 16. **`Questionnaire` (intake form) must re-sync from its `data` prop, not just the `useState` initializer.** `components/leads/detail/questionnaire.tsx` is a controlled form whose state seeds from `data`. The full lead-detail page (`lead-detail-client.tsx`) mounts it **eagerly** — `<Section>` always renders children and shows all sections on desktop (`lg:block`) — *before* the async `/api/leads/[id]/questionnaire` fetch resolves, so the initializer captured `null` and the form stayed blank even when intake existed. The side panel only *appeared* to work because it mounts the form conditionally (`activeTab === 'questionnaire' && <Questionnaire>`), i.e. after data loaded. Fixed 2026-06-01 with a `useEffect([data])` that re-seeds `answers`/`questions`, guarded by a `dirtyRef` so it never clobbers unsaved edits. Lesson: any eagerly-mounted controlled form fed by an async fetch needs a prop-change re-sync, not just an initializer.
 
 17. **recharts 3.8 breaks the stock shadcn/21st.dev `chart.tsx` types — and it only fails at build, never in the sandbox.** When pasting a 21st.dev chart that ships its own `chart.tsx` (we vendored it as `components/ui/pie-chart.tsx`), the upstream prop types assume older recharts. In **recharts 3.8** the `Tooltip` props are `Omit<…, PropertiesReadFromContext>` (no `active`/`payload`/`label`/`formatter`) and `LegendProps` no longer has `payload`/`verticalAlign`, and `LabelList`'s `formatter` param is `RenderableText` not `number`. Fix by giving `ChartTooltipContent`/`ChartLegendContent` **explicit** props types (don't lean on `ComponentProps<typeof Tooltip>` / `Pick<LegendProps,…>`) and typing the `LabelList` formatter param `unknown`. The agent sandbox can't run `tsc`/`next build` (Node is starved), so these surface only on the Vercel deploy — check the Vercel MCP build logs (`get_deployment_build_logs`) to read the type error, or have the user run `npx tsc --noEmit` natively before committing chart/type-heavy changes.
+
+---
+
+19. **The app's CSP (in `middleware.ts`) blocks cross-origin iframes/embeds.** `default-src 'self'` with **no `frame-src`** → frames restricted to same-origin; `object-src 'none'`. So embedding a Supabase signed URL (PDF) in an `<iframe>` is blocked ("content is being blocked"), though `<img>` works (img-src allows `*.supabase.co`). Fix used for the documents viewer: a **same-origin proxy** `GET /api/documents/[id]/raw` that streams the bytes, framed by the viewer. The global `X-Frame-Options: DENY` + `frame-ancestors 'none'` would block even same-origin framing of that response, so `applySecurityHeaders(res, pathname)` relaxes them to `SAMEORIGIN` / `frame-ancestors 'self'` for the `^/api/documents/[^/]+/raw$` route only. Don't widen the global CSP to external origins — proxy instead.
 
 ---
 

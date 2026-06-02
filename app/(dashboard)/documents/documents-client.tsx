@@ -72,8 +72,6 @@ export function DocumentsClient() {
 
   // Viewer
   const [viewing, setViewing] = React.useState<DocRow | null>(null)
-  const [viewUrl, setViewUrl] = React.useState<string | null>(null)
-  const [viewLoading, setViewLoading] = React.useState(false)
 
   // Edit
   const [editing, setEditing] = React.useState<DocRow | null>(null)
@@ -100,11 +98,9 @@ export function DocumentsClient() {
 
   React.useEffect(() => { load() }, [load])
 
-  async function fetchUrl(id: string, download: boolean): Promise<string> {
-    const res = await fetch(`/api/documents/${id}${download ? '?download=1' : ''}`)
-    const json = await res.json()
-    if (!res.ok) throw new Error(json.error ?? 'Could not open document')
-    return json.data.url as string
+  // Same-origin proxy URL so the CSP-restricted viewer can embed it.
+  function rawUrl(id: string, download = false): string {
+    return `/api/documents/${id}/raw${download ? '?download=1' : ''}`
   }
 
   async function uploadFiles(files: FileList | File[]) {
@@ -128,27 +124,17 @@ export function DocumentsClient() {
     }
   }
 
-  async function openViewer(d: DocRow) {
-    setViewing(d); setViewUrl(null); setViewLoading(true); setError(null)
-    try {
-      setViewUrl(await fetchUrl(d.id, false))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not open document')
-      setViewing(null)
-    } finally {
-      setViewLoading(false)
-    }
+  function openViewer(d: DocRow) {
+    setViewing(d); setError(null)
   }
 
-  async function download(d: DocRow) {
-    setBusyId(d.id)
-    try {
-      window.open(await fetchUrl(d.id, true), '_blank', 'noopener,noreferrer')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not download document')
-    } finally {
-      setBusyId(null)
-    }
+  function download(d: DocRow) {
+    const a = document.createElement('a')
+    a.href = rawUrl(d.id, true)
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
   }
 
   function openEdit(d: DocRow) {
@@ -341,13 +327,11 @@ export function DocumentsClient() {
           </DialogHeader>
           <DialogBody>
             <div className="flex min-h-[60vh] items-center justify-center rounded-lg border border-border bg-muted/30">
-              {viewLoading ? (
-                <Spinner />
-              ) : viewing && viewUrl && isPdf(viewing) ? (
-                <iframe src={viewUrl} title={viewing.name} className="h-[72vh] w-full rounded-lg" />
-              ) : viewing && viewUrl && isImage(viewing) ? (
+              {viewing && isPdf(viewing) ? (
+                <iframe src={rawUrl(viewing.id)} title={viewing.name} className="h-[72vh] w-full rounded-lg" />
+              ) : viewing && isImage(viewing) ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={viewUrl} alt={viewing.name} className="max-h-[72vh] max-w-full rounded-lg object-contain" />
+                <img src={rawUrl(viewing.id)} alt={viewing.name} className="max-h-[72vh] max-w-full rounded-lg object-contain" />
               ) : viewing ? (
                 <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
                   <DocTypeIcon d={viewing} className="h-10 w-10" />
@@ -365,8 +349,8 @@ export function DocumentsClient() {
             </div>
           </DialogBody>
           <DialogFooter>
-            {viewUrl && (
-              <a href={viewUrl} target="_blank" rel="noopener noreferrer"
+            {viewing && (
+              <a href={rawUrl(viewing.id)} target="_blank" rel="noopener noreferrer"
                 className="mr-auto inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground">
                 <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
               </a>
