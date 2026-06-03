@@ -1,22 +1,13 @@
 /**
  * In-house PDF → .docx text conversion (server-side, no external service).
  *
- * Extracts the PDF text layer with pdfjs-dist and emits a .docx whose
- * paragraphs mirror the lines. TEXT ONLY — layout/images/signatures are lost,
- * and scanned/image-only PDFs (no text layer) throw a clear error.
+ * Uses `unpdf` — a serverless-friendly PDF text extractor that bundles a
+ * polyfilled pdfjs, so it runs in Vercel's Node runtime without the browser
+ * globals raw pdfjs-dist needs (DOMMatrix/Path2D/etc.). TEXT ONLY — layout,
+ * images, and signatures are lost; scanned/image-only PDFs (no text layer)
+ * throw a clear error.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
-// pdfjs-dist v5 uses Promise.withResolvers, which only exists on Node 22+.
-// Polyfill it so the route also works if the runtime lands on Node 20 (this
-// was the silent prod failure: Vercel defaulted to Node 20).
-if (typeof (Promise as any).withResolvers !== 'function') {
-  ;(Promise as any).withResolvers = function () {
-    let resolve: any, reject: any
-    const promise = new Promise((res, rej) => { resolve = res; reject = rej })
-    return { promise, resolve, reject }
-  }
-}
 
 function withTimeout<T>(p: Promise<T>, ms: number, msg: string): Promise<T> {
   return Promise.race([
@@ -26,28 +17,18 @@ function withTimeout<T>(p: Promise<T>, ms: number, msg: string): Promise<T> {
 }
 
 export async function pdfToDocxBuffer(data: Uint8Array): Promise<Buffer> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const { extractText, getDocumentProxy } = await import('unpdf')
   const { Document, Packer, Paragraph, TextRun } = await import('docx')
 
-  const pdf = await withTimeout(
-    pdfjs.getDocument({ data, useSystemFonts: true, isEvalSupported: false } as any).promise,
+  const pdf = await withTimeout(getDocumentProxy(data), 45_000, 'PDF parsing timed out')
+  const { text } = await withTimeout(
+    extractText(pdf, { mergePages: true }),
     45_000,
-    'PDF parsing timed out',
-  )
+    'PDF text extraction timed out',
+  ) as { text: string | string[] }
 
-  const lines: string[] = []
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p)
-    const content = await page.getTextContent()
-    let line = ''
-    for (const item of content.items as any[]) {
-      if (typeof item.str !== 'string') continue
-      line += item.str
-      if (item.hasEOL) { lines.push(line); line = '' }
-    }
-    if (line.trim()) lines.push(line)
-    if (p < pdf.numPages) lines.push('') // blank line between pages
-  }
+  const raw = Array.isArray(text) ? text.join('\n') : text
+  const lines = raw.split(/\r?\n/)
 
   if (!lines.some((l) => l.trim())) {
     throw new Error('No selectable text found — this looks like a scanned/image-only PDF, which can’t be converted.')
