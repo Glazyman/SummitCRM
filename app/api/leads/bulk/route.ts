@@ -94,11 +94,15 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'ids array (or scope: all_matching) is required' }, { status: 400 })
 
     const { error: rpcErr } = await (admin as any).rpc('bulk_update_leads', {
-      p_workspace_id: member.workspace_id,
-      p_ids:          ids,
-      p_assigned_to:  assigned_to !== undefined ? (assigned_to || null) : null,
-      p_status:       status      !== undefined ? status      : null,
-      p_batch_id:     batch_id    !== undefined ? (batch_id   || null) : null,
+      p_workspace_id:   member.workspace_id,
+      p_ids:            ids,
+      p_assigned_to:    assigned_to !== undefined ? (assigned_to || null) : null,
+      p_status:         status      !== undefined ? status      : null,
+      p_batch_id:       batch_id    !== undefined ? (batch_id   || null) : null,
+      // Without these, a null assignee/batch meant "keep current" — so bulk
+      // "Unassigned" / "remove from batch" was a silent no-op.
+      p_clear_assigned: assigned_to === null,
+      p_clear_batch:    batch_id === null,
     })
     if (rpcErr) {
       console.error('[bulk PATCH] rpc error:', rpcErr)
