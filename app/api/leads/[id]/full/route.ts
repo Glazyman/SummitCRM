@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const isAdmin = ['super_admin', 'admin'].includes(member.role)
     const currentUserId = user.id
 
-    const [leadRes, batchesRes, activityRes, notesRes, emailsRes, followUpsRes, callsRes, membersRes] = await Promise.all([
+    const [leadRes, batchesRes, activityRes, notesRes, emailsRes, followUpsRes, callsRes, membersRes, tagsRes, allTagsRes] = await Promise.all([
       supabase
         .from('leads')
         .select('id, workspace_id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, interest_status, is_unsubscribed, batch_id, assigned_to, ai_summary, custom_fields, created_at, updated_at')
@@ -42,6 +42,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
       supabase.from('follow_ups').select('id, title, notes, due_at, completed_at, assigned_to').eq('lead_id', id).order('due_at', { ascending: true }),
       supabase.from('call_logs').select('id, outcome, duration_sec, notes, called_at, logged_by').eq('lead_id', id).order('called_at', { ascending: false }),
       supabase.from('workspace_members').select('user_id, role').eq('workspace_id', workspaceId).eq('is_active', true),
+      supabase.from('lead_tags').select('tags(id, name, color)').eq('lead_id', id),
+      supabase.from('tags').select('id, name, color').eq('workspace_id', workspaceId).order('name'),
     ])
 
     if (!leadRes.data) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
@@ -126,7 +128,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
       role: roleById.get(uid),
     }))
 
-    return NextResponse.json({ lead, activity, emails, followUps, calls, teamMembers, currentUserId, isAdmin })
+    // Lead's current tags (flatten the lead_tags → tags embed) + the workspace's
+    // full tag list so the picker can offer past tags for reuse.
+    type TagRow = { id: string; name: string; color: string }
+    const tags = ((tagsRes.data ?? []) as Array<{ tags: TagRow | TagRow[] | null }>)
+      .flatMap((r) => (Array.isArray(r.tags) ? r.tags : r.tags ? [r.tags] : []))
+    const availableTags = (allTagsRes.data ?? []) as TagRow[]
+
+    return NextResponse.json({ lead, activity, emails, followUps, calls, teamMembers, tags, availableTags, currentUserId, isAdmin })
   } catch (err) {
     console.error('[GET /api/leads/[id]/full]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

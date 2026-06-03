@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } from '@/components/leads/status-config'
 import { LeadProfileCard }  from '@/components/leads/detail/lead-profile-card'
+import { TagPicker }         from '@/components/leads/tag-picker'
 import { ActivityTimeline } from '@/components/leads/detail/activity-timeline'
 import { NoteEditor }       from '@/components/leads/detail/note-editor'
 import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
@@ -61,6 +62,8 @@ interface PanelData {
   calls:     CallLogItem[]
 }
 
+type Tag = { id: string; name: string; color: string }
+
 function tomorrowAt11LocalIso() {
   const d = new Date()
   d.setDate(d.getDate() + 1)
@@ -86,6 +89,8 @@ export function LeadFullPanel({
   const [activeTab,        setActiveTab]        = React.useState<TabId>('activity')
   const [followUpPrompt,   setFollowUpPrompt]   = React.useState<{ title: string; notes: string | null; due_at: string } | null>(null)
   const [questionnaireData, setQuestionnaireData] = React.useState<QuestionnaireData | null>(null)
+  const [tags,             setTags]             = React.useState<Tag[]>([])
+  const [availableTags,    setAvailableTags]    = React.useState<Tag[]>([])
   // Remember which page the panel was opened from so the full profile can keep
   // that section active in the sidebar and offer a Back link to it.
   const pathname = usePathname()
@@ -101,6 +106,8 @@ export function LeadFullPanel({
       if (!cancelled) {
         setData(leadData)
         setQuestionnaireData(qData.questionnaire ?? null)
+        setTags(leadData.tags ?? [])
+        setAvailableTags(leadData.availableTags ?? [])
       }
     }).catch(console.error)
     .finally(() => { if (!cancelled) setLoading(false) })
@@ -118,6 +125,48 @@ export function LeadFullPanel({
       body:    JSON.stringify(qData),
     })
     setQuestionnaireData(qData)
+  }
+
+  // ── Tags ───────────────────────────────────────────────────────────────
+  async function handleAddTag(tag: Tag) {
+    if (tags.some((t) => t.id === tag.id)) return
+    setTags((prev) => [...prev, tag])                    // optimistic
+    try {
+      const res = await fetch(`/api/leads/${leadId}/tags`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag_id: tag.id }),
+      })
+      if (!res.ok) throw new Error('add tag failed')
+    } catch (err) {
+      setTags((prev) => prev.filter((t) => t.id !== tag.id))  // rollback
+      console.error(err)
+    }
+  }
+
+  async function handleRemoveTag(tagId: string) {
+    const removed = tags.find((t) => t.id === tagId)
+    setTags((prev) => prev.filter((t) => t.id !== tagId))   // optimistic
+    try {
+      const res = await fetch(`/api/leads/${leadId}/tags?tag_id=${tagId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('remove tag failed')
+    } catch (err) {
+      if (removed) setTags((prev) => [...prev, removed])     // rollback
+      console.error(err)
+    }
+  }
+
+  // Create a new workspace tag (persisted + reusable). TagPicker calls onAdd
+  // with the returned tag, so this only creates + registers it as available.
+  async function handleCreateTag(name: string, color: string): Promise<Tag> {
+    const res  = await fetch('/api/tags', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, color }),
+    })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json?.error ?? 'create tag failed')
+    const tag = json.tag as Tag
+    setAvailableTags((prev) => prev.some((t) => t.id === tag.id) ? prev : [...prev, tag])
+    return tag
   }
 
   // ── Profile mutations ─────────────────────────────────────────────────
@@ -363,6 +412,18 @@ export function LeadFullPanel({
               onStatusChange={handleStatusChange}
               onInterestChange={handleInterestChange}
             />
+
+            {/* Tags — add custom/reusable tags (e.g. assigned buyer) */}
+            <div className="border-t border-border px-4 py-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tags</p>
+              <TagPicker
+                selectedTags={tags}
+                availableTags={availableTags}
+                onAdd={handleAddTag}
+                onRemove={handleRemoveTag}
+                onCreateTag={handleCreateTag}
+              />
+            </div>
           </div>
 
           {/* Tabbed right column */}

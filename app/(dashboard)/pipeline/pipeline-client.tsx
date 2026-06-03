@@ -263,8 +263,8 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
 
   const wonStageIds = new Set(stages.filter(s => s.is_won).map(s => s.id))
   const lostStageIds = new Set(stages.filter(s => s.is_lost).map(s => s.id))
-  // Leads currently in the "Needs Buyer" pipeline stage.
-  const needsBuyerStage = stages.find(s => s.name.trim().toLowerCase() === 'needs buyer')
+  // Leads currently in the "Seeking Buyer" pipeline stage (deals with no buyer yet).
+  const seekingBuyerStage = stages.find(s => s.name.trim().toLowerCase() === 'seeking buyer')
 
   // Without filters, the four numbers come from the server (accurate across the
   // full workspace). With a filter active, recompute from the filtered set so
@@ -273,7 +273,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
   const dealsWon        = filtersActive ? filteredLeads.filter(l => l.pipeline_stage_id && wonStageIds.has(l.pipeline_stage_id)).length : totals.deals_won
   const dealsInProgress = filtersActive ? filteredLeads.filter(l => l.pipeline_stage_id && !wonStageIds.has(l.pipeline_stage_id) && !lostStageIds.has(l.pipeline_stage_id)).length : totals.deals_in_progress
   const unassigned      = effectiveStageCounts['__unassigned__'] ?? 0
-  const needsBuyer = needsBuyerStage ? (effectiveStageCounts[needsBuyerStage.id] ?? 0) : 0
+  const seekingBuyer = seekingBuyerStage ? (effectiveStageCounts[seekingBuyerStage.id] ?? 0) : 0
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
@@ -384,11 +384,11 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
           />
           <StatCard
             icon={<Users className="h-4 w-4" />}
-            label="Needs Buyer"
-            value={needsBuyer.toLocaleString()}
-            sub={{ bold: `${totalLeads > 0 ? Math.round((needsBuyer / Math.max(totalLeads, 1)) * 100) : 0}%`, rest: 'of pipeline' }}
-            deltaUp={needsBuyer > 0}
-            accent={needsBuyer > 0}
+            label="Seeking Buyer"
+            value={seekingBuyer.toLocaleString()}
+            sub={{ bold: `${totalLeads > 0 ? Math.round((seekingBuyer / Math.max(totalLeads, 1)) * 100) : 0}%`, rest: 'of pipeline' }}
+            deltaUp={seekingBuyer > 0}
+            accent={seekingBuyer > 0}
           />
           <StatCard
             icon={<Trophy className="h-4 w-4" />}
