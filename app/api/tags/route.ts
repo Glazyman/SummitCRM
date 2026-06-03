@@ -34,12 +34,15 @@ export async function POST(req: NextRequest) {
 
   const { data: member } = await supabase
     .from('workspace_members')
-    .select('workspace_id')
+    .select('workspace_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .single()
 
   if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+  if (!['admin', 'super_admin'].includes(member.role)) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  }
 
   const body = await req.json().catch(() => ({}))
   const { name, color = '#6366f1' } = body

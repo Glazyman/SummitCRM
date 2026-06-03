@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+// Tag edits are admin-only (full lock): only admins/super_admins may attach or
+// detach tags on a lead. Reps see tags read-only.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function isWorkspaceAdmin(supabase: any, userId: string): Promise<boolean> {
+  const { data: member } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .single()
+  return Boolean(member && ['admin', 'super_admin'].includes(member.role))
+}
+
 // POST /api/leads/[id]/tags — add tag to lead
 export async function POST(
   req: NextRequest,
@@ -10,6 +23,9 @@ export async function POST(
   const supabase = await createClient() as any
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isWorkspaceAdmin(supabase, user.id))) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  }
 
   const body = await req.json().catch(() => ({}))
   const { tag_id } = body
@@ -36,6 +52,9 @@ export async function DELETE(
   const supabase = await createClient() as any
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isWorkspaceAdmin(supabase, user.id))) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  }
 
   const tagId = req.nextUrl.searchParams.get('tag_id')
   if (!tagId) return NextResponse.json({ error: 'tag_id is required' }, { status: 400 })

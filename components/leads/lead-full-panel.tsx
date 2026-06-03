@@ -422,17 +422,21 @@ export function LeadFullPanel({
               onInterestChange={handleInterestChange}
             />
 
-            {/* Tags — add custom/reusable tags (e.g. assigned buyer) */}
-            <div className="border-t border-border px-4 py-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tags</p>
-              <TagPicker
-                selectedTags={tags}
-                availableTags={availableTags}
-                onAdd={handleAddTag}
-                onRemove={handleRemoveTag}
-                onCreateTag={handleCreateTag}
-              />
-            </div>
+            {/* Tags — admin-only editing (reps see chips read-only). Hide the
+                section entirely for non-admins with no tags to show. */}
+            {(isAdmin || tags.length > 0) && (
+              <div className="border-t border-border px-4 py-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tags</p>
+                <TagPicker
+                  selectedTags={tags}
+                  availableTags={availableTags}
+                  onAdd={handleAddTag}
+                  onRemove={handleRemoveTag}
+                  onCreateTag={isAdmin ? handleCreateTag : undefined}
+                  readonly={!isAdmin}
+                />
+              </div>
+            )}
           </div>
 
           {/* Tabbed right column */}
