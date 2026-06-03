@@ -120,6 +120,9 @@ function OverviewCards({ overview, loading, reps }: { overview: CallOverview; lo
               )}
               {/* Breakdown */}
               <div className="flex flex-col justify-center space-y-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                  Call outcomes · % of {overview.total.toLocaleString()} call{overview.total === 1 ? '' : 's'}
+                </p>
                 {donutData.map(d => (
                   <div key={d.name} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
