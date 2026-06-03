@@ -53,7 +53,7 @@ function CallDonut({
   centerLabel: string
 }) {
   return (
-    <div className="relative [&_path]:!outline-none">
+    <div className="relative self-center [&_path]:!outline-none">
       <ResponsiveContainer width="100%" height={196}>
         <PieChart>
           <Pie
@@ -73,7 +73,10 @@ function CallDonut({
           />
         </PieChart>
       </ResponsiveContainer>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+      {/* Pinned to the chart height (196px), not the wrapper — the wrapper can
+          be stretched taller by the grid row, which would push this below the
+          donut hole. top-0 h-[196px] keeps it centered in the ring. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[196px] flex flex-col items-center justify-center">
         <span className="text-xl font-bold leading-none">{centerValue}</span>
         <span className="mt-0.5 text-[10px] text-muted-foreground text-center px-2 leading-tight">{centerLabel}</span>
       </div>
