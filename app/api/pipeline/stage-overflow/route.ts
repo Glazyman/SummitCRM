@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { cookies }      from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { getTagsByLeadIds } from '@/lib/lead-tags'
 
 export async function GET(req: Request) {
   try {
@@ -42,7 +43,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ leads: data ?? [] })
+    // Decorate the overflow cards with their tags (matches the initial load).
+    const leads = (data ?? []) as Array<{ id: string }>
+    const tagsMap = await getTagsByLeadIds(admin, leads.map((l) => l.id))
+    const withTags = leads.map((l) => ({ ...l, tags: tagsMap.get(l.id) ?? [] }))
+
+    return NextResponse.json({ leads: withTags })
   } catch (err) {
     console.error('[GET /api/pipeline/stage-overflow]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })

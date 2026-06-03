@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getUsersById } from '@/lib/users'
+import { getTagsByLeadIds } from '@/lib/lead-tags'
 import type { Metadata } from 'next'
 import PipelineClient from './pipeline-client'
 
@@ -90,11 +91,15 @@ export default async function PipelinePage() {
     if (rev > 0) revenueMap.set(row.id, rev)
   }
 
+  // Tags for the visible cards (one query for the whole trimmed set).
+  const tagsMap = await getTagsByLeadIds(admin, leadIds)
+
   const initialLeads = rawLeads.map((lead) => ({
     ...lead,
     last_contacted_at: lead.last_contacted_at ?? null,
     last_activity_at:  lead.last_activity_at  ?? null,
     pipeline_value:    revenueMap.get(lead.id) ?? 0,
+    tags:              tagsMap.get(lead.id) ?? [],
   }))
 
   // Filter options for the toolbar (admin only — reps don't filter by rep,

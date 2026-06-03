@@ -18,6 +18,7 @@ import {
 import { SelectMenu } from '@/components/ui/select-menu'
 import { INTEREST_CONFIG } from '@/components/leads/status-config'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
+import { TagBadge } from '@/components/leads/tag-badge'
 import type { InterestStatus } from '@/types/database'
 
 interface PipelineStage {
@@ -35,6 +36,7 @@ interface PipelineLead {
   last_activity_at:  string | null
   /** Parsed revenue from questionnaire (0 if not filled) */
   pipeline_value: number
+  tags: { id: string; name: string; color: string }[]
 }
 interface PipelineTotals {
   total_leads:       number
@@ -543,6 +545,13 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
                             <div className="min-w-0">
                               <p className="truncate text-[13px] font-semibold">{name}</p>
                               <p className="truncate text-xs text-muted-foreground">{lead.company ?? 'No company'} · {lead.email}</p>
+                              {lead.tags.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {lead.tags.map((t) => (
+                                    <TagBadge key={t.id} name={t.name} color={t.color} size="xs" />
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
@@ -588,6 +597,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             canEditBatch={isAdmin}
             onClose={() => setSelectedLeadId(null)}
             onLeadChange={patch => patchLead(selectedLeadId, patch as unknown as Partial<PipelineLead>)}
+            onTagsChange={(id, tags) => setLeads(p => p.map(l => l.id === id ? { ...l, tags } : l))}
           />
         </>
       )}
@@ -666,6 +676,15 @@ function KanbanCard({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Tags */}
+        {lead.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {lead.tags.map((t) => (
+              <TagBadge key={t.id} name={t.name} color={t.color} size="xs" />
+            ))}
+          </div>
+        )}
 
         {/* Phone + date */}
         <div className="flex items-center gap-3 text-[12px] text-muted-foreground">

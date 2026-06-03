@@ -48,6 +48,8 @@ export interface LeadFullPanelProps {
   onClose:       () => void
   /** Propagate lead field changes back to the parent list */
   onLeadChange:  (patch: Partial<LeadDetail>) => void
+  /** Propagate tag changes back to the parent list (e.g. pipeline cards) */
+  onTagsChange?: (leadId: string, tags: Tag[]) => void
   /** When opened from the activities view — shows a Mark Done button in the header */
   activityDone?:         boolean
   onMarkActivityDone?:   () => void
@@ -80,6 +82,7 @@ export function LeadFullPanel({
   canEditBatch,
   onClose,
   onLeadChange,
+  onTagsChange,
   activityDone,
   onMarkActivityDone,
   style,
@@ -130,7 +133,9 @@ export function LeadFullPanel({
   // ── Tags ───────────────────────────────────────────────────────────────
   async function handleAddTag(tag: Tag) {
     if (tags.some((t) => t.id === tag.id)) return
-    setTags((prev) => [...prev, tag])                    // optimistic
+    const next = [...tags, tag]
+    setTags(next)                                        // optimistic
+    onTagsChange?.(leadId, next)
     try {
       const res = await fetch(`/api/leads/${leadId}/tags`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -138,19 +143,23 @@ export function LeadFullPanel({
       })
       if (!res.ok) throw new Error('add tag failed')
     } catch (err) {
-      setTags((prev) => prev.filter((t) => t.id !== tag.id))  // rollback
+      const reverted = tags.filter((t) => t.id !== tag.id)
+      setTags(reverted)                                  // rollback
+      onTagsChange?.(leadId, reverted)
       console.error(err)
     }
   }
 
   async function handleRemoveTag(tagId: string) {
-    const removed = tags.find((t) => t.id === tagId)
-    setTags((prev) => prev.filter((t) => t.id !== tagId))   // optimistic
+    const next = tags.filter((t) => t.id !== tagId)
+    setTags(next)                                        // optimistic
+    onTagsChange?.(leadId, next)
     try {
       const res = await fetch(`/api/leads/${leadId}/tags?tag_id=${tagId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('remove tag failed')
     } catch (err) {
-      if (removed) setTags((prev) => [...prev, removed])     // rollback
+      setTags(tags)                                      // rollback to pre-remove
+      onTagsChange?.(leadId, tags)
       console.error(err)
     }
   }
