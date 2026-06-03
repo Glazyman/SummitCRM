@@ -116,13 +116,13 @@ export default async function PipelinePage() {
   }
 
   const defaultStages = stages.length === 0 ? [
-    { id: 'new-lead',    workspace_id: member.workspace_id, name: 'New Lead',      color: '#6366f1', position: 0, is_won: false, is_lost: false, created_at: '', updated_at: '' },
-    { id: 'contacted',   workspace_id: member.workspace_id, name: 'Contacted',     color: '#f59e0b', position: 1, is_won: false, is_lost: false, created_at: '', updated_at: '' },
-    { id: 'qualified',   workspace_id: member.workspace_id, name: 'Qualified',     color: '#3b82f6', position: 2, is_won: false, is_lost: false, created_at: '', updated_at: '' },
-    { id: 'proposal',    workspace_id: member.workspace_id, name: 'Proposal Sent', color: '#8b5cf6', position: 3, is_won: false, is_lost: false, created_at: '', updated_at: '' },
-    { id: 'negotiating', workspace_id: member.workspace_id, name: 'Negotiating',   color: '#ec4899', position: 4, is_won: false, is_lost: false, created_at: '', updated_at: '' },
-    { id: 'closed-won',  workspace_id: member.workspace_id, name: 'Closed Won',    color: '#10b981', position: 5, is_won: true,  is_lost: false, created_at: '', updated_at: '' },
-    { id: 'closed-lost', workspace_id: member.workspace_id, name: 'Closed Lost',   color: '#ef4444', position: 6, is_won: false, is_lost: true,  created_at: '', updated_at: '' },
+    { id: 'interested',     workspace_id: member.workspace_id, name: 'Interested',       color: '#6366f1', position: 0, is_won: false, is_lost: false, created_at: '', updated_at: '' },
+    { id: 'seeking-buyer',  workspace_id: member.workspace_id, name: 'Seeking Buyer',    color: '#3b82f6', position: 1, is_won: false, is_lost: false, created_at: '', updated_at: '' },
+    { id: 'intro-made',     workspace_id: member.workspace_id, name: 'Intro Made',       color: '#f59e0b', position: 2, is_won: false, is_lost: false, created_at: '', updated_at: '' },
+    { id: 'data-requested', workspace_id: member.workspace_id, name: 'Data Requested',   color: '#8b5cf6', position: 3, is_won: false, is_lost: false, created_at: '', updated_at: '' },
+    { id: 'loi',            workspace_id: member.workspace_id, name: 'LOI / Negotiation', color: '#ec4899', position: 4, is_won: false, is_lost: false, created_at: '', updated_at: '' },
+    { id: 'closed-won',     workspace_id: member.workspace_id, name: 'Closed / Won',     color: '#10b981', position: 5, is_won: true,  is_lost: false, created_at: '', updated_at: '' },
+    { id: 'lost-passed',    workspace_id: member.workspace_id, name: 'Lost / Passed',    color: '#ef4444', position: 6, is_won: false, is_lost: true,  created_at: '', updated_at: '' },
   ] : stages
 
   return (
