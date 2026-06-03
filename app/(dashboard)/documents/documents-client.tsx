@@ -2,9 +2,10 @@
 
 import * as React from 'react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import {
   FileText, FileSpreadsheet, FileImage, File as FileIcon,
-  Upload, Download, Eye, Trash2, ExternalLink, Pencil,
+  Upload, Download, Eye, Trash2, ExternalLink, Pencil, FileType2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -211,10 +212,18 @@ export function DocumentsClient() {
             Contracts, templates, and signed agreements — admin only.
           </p>
         </div>
-        <Button onClick={() => fileInput.current?.click()} loading={uploading} className="sm:shrink-0">
-          <Upload className="h-4 w-4" />
-          Upload
-        </Button>
+        <div className="flex items-center gap-2 sm:shrink-0">
+          <Button variant="outline" asChild>
+            <Link href="/documents/convert">
+              <FileType2 className="h-4 w-4" />
+              PDF → Word
+            </Link>
+          </Button>
+          <Button onClick={() => fileInput.current?.click()} loading={uploading}>
+            <Upload className="h-4 w-4" />
+            Upload
+          </Button>
+        </div>
         <input ref={fileInput} type="file" multiple className="hidden"
           onChange={(e) => e.target.files && uploadFiles(e.target.files)} />
       </div>

@@ -287,7 +287,10 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 │   │   ├── documents/                 ← admin-only VIEW-ONLY document library
 │   │   │   ├── page.tsx               ← server: admin gate (redirect non-admins → /dashboard)
 │   │   │   ├── documents-client.tsx   ← table + drag/drop upload + popup viewer + download/delete
-│   │   │   └── docx-viewer.tsx        ← read-only .docx render (SuperDoc viewing mode), lazy-loaded in the popup
+│   │   │   ├── docx-viewer.tsx        ← read-only .docx render (SuperDoc viewing mode), lazy-loaded in the popup
+│   │   │   └── convert/               ← standalone PDF → Word tool
+│   │   │       ├── page.tsx           ← server: admin gate
+│   │   │       └── convert-client.tsx ← drag/drop PDFs → convert → download
 │   │   ├── tasks/page.tsx             ← "Tasks" (formerly Activities); color-coded (past=red, today=amber, future=none)
 │   │   ├── notifications/page.tsx
 │   │   ├── admin/page.tsx             ← admin dashboard
@@ -346,6 +349,8 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 │   │   │       ├── route.ts                   ← GET signed URL (legacy) / PATCH rename / DELETE, admin-only
 │   │   │       ├── raw/route.ts               ← GET same-origin byte proxy for the viewer (?download=1)
 │   │   │       └── convert/route.ts           ← POST: PDF → temp .docx + signed URL (for "Open PDF in Word")
+│   │   ├── tools/
+│   │   │   └── pdf-to-word/route.ts            ← POST: multipart PDF → .docx download (standalone tool)
 │   │   ├── team/
 │   │   │   ├── route.ts
 │   │   │   ├── invite/route.ts
@@ -477,6 +482,7 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 | `/leads/import` | (dashboard)/leads/import | admin+ | CSV import wizard |
 | `/analytics` | (dashboard)/analytics | manager+ | Batches, email metrics, time-series, reps |
 | `/documents` | (dashboard)/documents | admin+ | View-only document library; non-admins redirected to /dashboard |
+| `/documents/convert` | (dashboard)/documents/convert | admin+ | Standalone PDF → Word converter (drag/drop, download); non-admins redirected |
 | `/tasks` | (dashboard)/tasks | All roles | "Tasks" page (renamed from Activities); color-coded follow-up/callback list + calendar |
 | `/notifications` | (dashboard)/notifications | All roles | Notification center |
 | `/admin` | (dashboard)/admin | admin+ | Team stats, rep performance, account health |
@@ -539,6 +545,9 @@ All API routes require authentication. Role checks are in-route.
 - `GET /api/documents/[id]/raw` — **same-origin** byte proxy for the in-app viewer (CSP blocks cross-origin iframes, quirk 19); inline by default, `?download=1` = attachment. Framing headers relaxed for this route in middleware.
 - `POST /api/documents/[id]/convert` — PDF → **temporary** `.docx` (in-house text extraction, quirk 20) under `<ws>/word-export/`, returns a 1h signed URL. Used by "Open in Word" on a PDF (hands the URL to the Office web viewer). Not a documents row. `runtime='nodejs'`, 45s timeout, 422 on scanned/failed.
 - Shared loader: `lib/documents/context.ts` (`requireDocumentAdmin`, `loadDocument`) — used by `/raw` + `/convert`.
+
+**Tools** (admin only)
+- `POST /api/tools/pdf-to-word` — standalone converter for `/documents/convert`: multipart PDF in → `.docx` bytes streamed back as a download (nothing stored). Uses `pdfToDocxBuffer`. `runtime='nodejs'`.
 - *(Removed 2026-06-02 in the view-only revert, still gone: `[id]/duplicate`, `[id]/replace`. `PATCH` re-added rename-only; `[id]/convert` re-added for "Open PDF in Word".)*
 
 **Team**
@@ -668,6 +677,8 @@ Admin-only document library at `/documents` for contracts, templates, and signed
 - **Upload** stays (drag/drop + button). No content editing / replace / duplicate / convert — just rename.
 - **Access**: server page redirects non-admins to `/dashboard`; all API routes gate on `admin`/`super_admin`. Sidebar link sits in the Admin group.
 - **Seeding**: `scripts/seed-documents.mjs` (service-role, idempotent by name) ensures the bucket and uploads the initial 5 agreements/templates.
+
+**PDF → Word tool** (`/documents/convert`, added 2026-06-03): a standalone converter, separate from the library. Drag/drop or pick PDFs → each is POSTed to `POST /api/tools/pdf-to-word` (multipart) → converts to `.docx` (same in-house `pdfToDocxBuffer`, text-only) → streamed straight back as a download (nothing stored). Per-file status rows (converting/done/error) with a Download button; object URLs revoked on unmount. Reached via a "PDF → Word" button in the Documents header. Same fidelity ceiling (text only — see "Open in Word" note); best used as drop → download → refine in desktop Word.
 
 ### Mobile / Responsive (added 2026-06-01)
 
@@ -1234,4 +1245,15 @@ User reversed course: **strip all editing, make every doc viewable in a popup.**
 
 ---
 
-*Last updated: 2026-06-02 — Documents: added **"Open in Word"** (doc/docx → Office web viewer; **PDF → in-house text-convert → Word viewer**); fixed the prior PDF-convert failure (Vercel Node 20 lacked `Promise.withResolvers` → pinned Node 22 + polyfill, quirk 20). Earlier same day: Documents library **reverted to VIEW-ONLY** (popup view for all types incl .docx via SuperDoc viewing mode; upload/download/delete; all editing — editor, rename, replace, duplicate, PDF→Word convert — removed per user). Earlier same day, since superseded: Documents library extended: in-app pop-up viewer (PDF/image inline via same-origin raw proxy — CSP blocks cross-origin iframes, quirk 19; .docx/.pages download-only), edit name+description, replace-with-new-version, duplicate, and **in-browser .docx editing via SuperDoc** at /documents/[id]/edit (next build verified green). Earlier same day: admin-only Documents library — page + upload/preview/download/delete API + `documents` table/bucket migration + seeder, shipped to main (`ade4679`); reui design pass across UI primitives + preview-env 500 gotcha; reui button + radix status/interest select; analytics sized-pie reverted to donut; dashboard rep-performance switched to Today/7d/30d/All-time presets; admin-only pipeline rep/batch/date filters; **repo migrated off iCloud Desktop → `~/Developer/SummitCRM` after local `.git` corruption; native git restored; global git identity + lfs fixed**; **Vercel build break fixed — `types/database.ts` was a failed supabase-gen capture, restored the 276-line manual file**; all three features deployed green to prod). Earlier: 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card; lead-status %; mini-chart moved to analytics (unique leads/day); Call Summary sized pie; recharts 3.8 chart-type gotcha)*
+### Session 2026-06-03 (PDF→Word: unpdf fix, line breaks, standalone tool)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | Fixed prod `DOMMatrix is not defined` crash: raw pdfjs-dist → **unpdf** (quirk 20). | `lib/documents/pdf-to-docx.ts`, `next.config.ts` |
+| 2 | Fixed "wall of text": use `getDocumentProxy` + per-page `getTextContent` + `hasEOL` line breaks (unpdf's `extractText` merged everything). | `lib/documents/pdf-to-docx.ts` |
+| 3 | **Standalone PDF → Word tool** at `/documents/convert` (drag/drop → convert → download; `POST /api/tools/pdf-to-word` streams the .docx, nothing stored). Linked from the Documents header. | `app/(dashboard)/documents/convert/*`, `app/api/tools/pdf-to-word/route.ts`, `documents-client.tsx` |
+| — | **Fidelity ceiling reaffirmed** (user compared screenshots): in-house = text only, no bold/centering/lists. True layout needs an external converter (CloudConvert/Adobe) or the user's desktop Word. | — |
+
+---
+
+*Last updated: 2026-06-03 — PDF→Word: fixed the serverless crash (pdfjs `DOMMatrix` → **unpdf**, quirk 20), restored line/paragraph breaks, and added a **standalone PDF → Word converter tool** at `/documents/convert` (drag/drop → download). Still text-only by nature (no layout fidelity — needs external converter or desktop Word). Earlier (2026-06-02): Documents added **"Open in Word"** (doc/docx → Office web viewer; **PDF → in-house text-convert → Word viewer**); fixed the prior PDF-convert failure (Vercel Node 20 lacked `Promise.withResolvers` → pinned Node 22 + polyfill, quirk 20). Earlier same day: Documents library **reverted to VIEW-ONLY** (popup view for all types incl .docx via SuperDoc viewing mode; upload/download/delete; all editing — editor, rename, replace, duplicate, PDF→Word convert — removed per user). Earlier same day, since superseded: Documents library extended: in-app pop-up viewer (PDF/image inline via same-origin raw proxy — CSP blocks cross-origin iframes, quirk 19; .docx/.pages download-only), edit name+description, replace-with-new-version, duplicate, and **in-browser .docx editing via SuperDoc** at /documents/[id]/edit (next build verified green). Earlier same day: admin-only Documents library — page + upload/preview/download/delete API + `documents` table/bucket migration + seeder, shipped to main (`ade4679`); reui design pass across UI primitives + preview-env 500 gotcha; reui button + radix status/interest select; analytics sized-pie reverted to donut; dashboard rep-performance switched to Today/7d/30d/All-time presets; admin-only pipeline rep/batch/date filters; **repo migrated off iCloud Desktop → `~/Developer/SummitCRM` after local `.git` corruption; native git restored; global git identity + lfs fixed**; **Vercel build break fixed — `types/database.ts` was a failed supabase-gen capture, restored the 276-line manual file**; all three features deployed green to prod). Earlier: 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card; lead-status %; mini-chart moved to analytics (unique leads/day); Call Summary sized pie; recharts 3.8 chart-type gotcha)*
