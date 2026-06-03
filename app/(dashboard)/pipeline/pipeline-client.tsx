@@ -287,7 +287,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
         {/* Toolbar */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Search */}
-          <div className="flex items-center gap-2.5 h-[38px] rounded-xl border border-border bg-card px-3 w-full sm:w-64">
+          <div className="flex items-center gap-2.5 h-[38px] rounded-xl border border-border bg-card px-3 min-w-0 flex-1 sm:flex-none sm:w-64">
             <Search className="h-[15px] w-[15px] text-muted-foreground shrink-0" />
             <input
               type="text"
@@ -321,10 +321,10 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             </Button>
           </div>
 
-          <div className="flex-1" />
+          <div className="hidden sm:block sm:flex-1" />
 
           {/* Add Lead */}
-          <Button asChild size="sm" className="gap-1.5">
+          <Button asChild size="sm" className="gap-1.5 shrink-0">
             <Link href="/leads">
               <Plus className="h-3.5 w-3.5" /> Add Lead
             </Link>
@@ -337,7 +337,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground">
               <Filter className="h-3.5 w-3.5" /> Filters
             </span>
-            <div className="w-44">
+            <div className="w-full sm:w-44">
               <SelectMenu
                 value={repFilter}
                 onChange={setRepFilter}
@@ -346,7 +346,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
                 searchable size="sm"
               />
             </div>
-            <div className="w-44">
+            <div className="w-full sm:w-44">
               <SelectMenu
                 value={batchFilter}
                 onChange={setBatchFilter}
@@ -355,7 +355,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
                 searchable size="sm"
               />
             </div>
-            <div className="w-40">
+            <div className="w-full sm:w-40">
               <SelectMenu
                 value={dateFilter}
                 onChange={(v) => setDateFilter((v || 'all') as DatePreset)}
@@ -377,7 +377,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
         )}
 
         {/* Stat cards — below toolbar */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <StatCard
             icon={<TrendingUp className="h-4 w-4" />}
             label="Total Deals"
@@ -495,7 +495,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
         </div>
       ) : (
         /* ── List view ── */
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
           {stages.map((stage) => {
             const stageLeads = leadsByStage.get(stage.id) ?? []
             const stageTotal = effectiveStageCounts[stage.id] ?? stageLeads.length
@@ -554,14 +554,14 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-3 shrink-0">
+                          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                             {interestMeta && (
                               <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border', interestMeta.badge)}>
                                 <span className={cn('h-1.5 w-1.5 rounded-full', interestMeta.dot)} />
                                 {interestMeta.label}
                               </span>
                             )}
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            <span className="hidden sm:inline text-xs text-muted-foreground whitespace-nowrap">
                               {lead.last_contacted_at ? `Contacted ${timeAgo(lead.last_contacted_at)}` : `Added ${timeAgo(lead.created_at)}`}
                             </span>
                           </div>
@@ -753,16 +753,16 @@ function StatCard({
 }) {
   return (
     <div className={cn(
-      'rounded-2xl border bg-card p-5 shadow-card',
+      'rounded-2xl border bg-card p-4 sm:p-5 shadow-card',
       accent ? 'border-emerald-200' : 'border-border',
     )}>
       <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-        <span className={accent ? 'text-emerald-600' : 'text-muted-foreground'}>{icon}</span>
-        {label}
+        <span className={cn('shrink-0', accent ? 'text-emerald-600' : 'text-muted-foreground')}>{icon}</span>
+        <span className="truncate">{label}</span>
       </div>
-      <div className="mt-3.5 flex items-end gap-3">
+      <div className="mt-3 sm:mt-3.5 flex items-end gap-3">
         <p className={cn(
-          'text-[32px] font-bold leading-none tracking-[-0.02em]',
+          'text-[26px] sm:text-[32px] font-bold leading-none tracking-[-0.02em]',
           accent ? 'text-emerald-700' : 'text-foreground',
         )}>
           {value}
@@ -778,7 +778,7 @@ function StatCard({
           </span>
         )}
       </div>
-      <p className="mt-3.5 text-[12.5px] text-muted-foreground">
+      <p className="mt-3 sm:mt-3.5 truncate text-[12.5px] text-muted-foreground">
         <span className="font-semibold text-foreground">{sub.bold}</span>{' '}{sub.rest}
       </p>
     </div>
