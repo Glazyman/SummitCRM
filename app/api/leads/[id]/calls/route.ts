@@ -61,9 +61,10 @@ export async function GET(
 
   const { data, error } = await admin
     .from('call_logs')
-    .select('*')
+    .select('id, outcome, duration_sec, notes, called_at, logged_by')
     .eq('lead_id', leadId)
     .order('called_at', { ascending: false })
+    .limit(200)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ calls: data })
@@ -158,12 +159,21 @@ export async function POST(
     })
   }
 
+  // Callback promises have no lead status of their own (callbacks live in the
+  // tasks system), so a callback outcome MUST suggest a task or the promise
+  // silently disappears from every queue.
   const followUpSuggestion = (outcome === 'voicemail' || outcome === 'no_answer')
     ? {
         title:  outcome === 'voicemail' ? 'Follow up after voicemail' : 'Follow up after no answer',
         notes:  outcome === 'voicemail'
           ? 'Left voicemail. Try again tomorrow morning.'
           : 'No answer. Retry tomorrow morning.',
+        due_at: tomorrowAt(DEFAULT_FOLLOWUP_HOUR),
+      }
+    : outcome === 'callback_requested'
+    ? {
+        title:  'Call back (requested by lead)',
+        notes:  'Lead asked to be called back.',
         due_at: tomorrowAt(DEFAULT_FOLLOWUP_HOUR),
       }
     : null
