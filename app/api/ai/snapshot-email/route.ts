@@ -12,6 +12,7 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { generateSnapshotEmail, isAiEnabled, logUsage } from '@/lib/ai'
+import { rateLimit, rateLimitResponse, AI_LIMIT } from '@/lib/security/rate-limit'
 
 const bodySchema = z.object({
   lead_id: z.string().uuid().optional(),
@@ -57,6 +58,10 @@ export async function POST(req: NextRequest) {
     if (!member || !['admin', 'super_admin'].includes(member.role)) {
       return NextResponse.json({ error: 'Admin role required' }, { status: 403 })
     }
+
+    // Each call costs real OpenAI money — cap per workspace per minute.
+    const rl = rateLimit(member.workspace_id, AI_LIMIT.prefix, AI_LIMIT.limit, AI_LIMIT.windowMs)
+    if (!rl.success) return rateLimitResponse(rl.resetIn)
 
     const parsed = bodySchema.safeParse(await req.json())
     if (!parsed.success) {

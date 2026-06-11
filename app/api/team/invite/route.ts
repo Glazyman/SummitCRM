@@ -3,8 +3,19 @@ import { Resend } from 'resend'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { findUserByEmail } from '@/lib/users'
+import { rateLimit, getRateLimitKey, rateLimitResponse, INVITE_SEND_LIMIT } from '@/lib/security/rate-limit'
 import type { WorkspaceRole } from '@/types/database'
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+// Workspace name is user-controlled — escape it before embedding in HTML.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 
 function buildInviteEmail(opts: {
   workspaceName: string
@@ -12,10 +23,11 @@ function buildInviteEmail(opts: {
   inviteUrl: string
 }): { subject: string; html: string; text: string } {
   const roleLabel = opts.role === 'admin' ? 'Admin' : 'Rep'
+  const safeName = escapeHtml(opts.workspaceName)
   const subject = `You've been invited to join ${opts.workspaceName}`
   const html = `
     <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#111">
-      <h2 style="margin:0 0 8px">You're invited to ${opts.workspaceName}</h2>
+      <h2 style="margin:0 0 8px">You're invited to ${safeName}</h2>
       <p style="margin:0 0 24px;color:#555">
         You've been invited to join as a <strong>${roleLabel}</strong>.
         Click the button below to create your account and get started.
@@ -54,6 +66,11 @@ export async function POST(req: NextRequest) {
   if (!['admin', 'super_admin'].includes(member.role)) {
     return NextResponse.json({ error: 'Only admins can invite members' }, { status: 403 })
   }
+
+  // Each invite sends an email — throttle per admin so a compromised session
+  // can't be used to spam.
+  const rl = rateLimit(getRateLimitKey(req, user.id), INVITE_SEND_LIMIT.prefix, INVITE_SEND_LIMIT.limit, INVITE_SEND_LIMIT.windowMs)
+  if (!rl.success) return rateLimitResponse(rl.resetIn)
 
   const body = await req.json().catch(() => ({}))
   const { email, role = 'rep' }: { email: string; role: WorkspaceRole } = body
@@ -127,8 +144,12 @@ export async function POST(req: NextRequest) {
   if (resendKey) {
     const resend = new Resend(resendKey)
     const { subject, html, text } = buildInviteEmail({ workspaceName, role, inviteUrl })
+    // Display name in the From header: strip quotes/backslashes/newlines then
+    // QUOTE it (RFC 5322) so commas/parens in a workspace name can't produce
+    // an invalid address that makes every invite email fail.
+    const fromName = workspaceName.replace(/[\r\n\\"]/g, '').trim() || 'Summit Mergers CRM'
     const { error: emailErr } = await resend.emails.send({
-      from:    `${workspaceName} <${fromEmail}>`,
+      from:    `"${fromName}" <${fromEmail}>`,
       to:      [email],
       subject,
       html,

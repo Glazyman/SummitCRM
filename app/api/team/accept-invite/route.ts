@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { findUserByEmail } from '@/lib/users'
+import { rateLimit, getRateLimitKey, rateLimitResponse, INVITE_ACCEPT_LIMIT } from '@/lib/security/rate-limit'
 
 // POST /api/team/accept-invite — accept invite, create account, join workspace
 export async function POST(req: NextRequest) {
@@ -10,6 +11,12 @@ export async function POST(req: NextRequest) {
   if (!token)     return NextResponse.json({ error: 'token is required' }, { status: 400 })
   if (!password)  return NextResponse.json({ error: 'password is required' }, { status: 400 })
   if (!full_name) return NextResponse.json({ error: 'full_name is required' }, { status: 400 })
+
+  // Unauthenticated endpoint that looks up tokens and sets passwords —
+  // throttle per IP so invite tokens can't be brute-forced. Runs AFTER field
+  // validation so malformed requests don't burn the budget.
+  const rl = rateLimit(getRateLimitKey(req), INVITE_ACCEPT_LIMIT.prefix, INVITE_ACCEPT_LIMIT.limit, INVITE_ACCEPT_LIMIT.windowMs)
+  if (!rl.success) return rateLimitResponse(rl.resetIn)
 
   const admin = createAdminClient() as any
 

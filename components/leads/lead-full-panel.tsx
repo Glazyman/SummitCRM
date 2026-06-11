@@ -50,7 +50,7 @@ export interface LeadFullPanelProps {
   onLeadChange:  (patch: Partial<LeadDetail>) => void
   /** Propagate tag changes back to the parent list (e.g. pipeline cards) */
   onTagsChange?: (leadId: string, tags: Tag[]) => void
-  /** When opened from the activities view — shows a Mark Done button in the header */
+  /** When opened from the tasks view — shows a Mark Done button in the header */
   activityDone?:         boolean
   onMarkActivityDone?:   () => void
   /** Override panel positioning (e.g. shift left when a sibling panel is open) */
@@ -89,6 +89,7 @@ export function LeadFullPanel({
 }: LeadFullPanelProps) {
   const [data,             setData]             = React.useState<PanelData | null>(null)
   const [loading,          setLoading]          = React.useState(true)
+  const [loadError,        setLoadError]        = React.useState<string | null>(null)
   const [activeTab,        setActiveTab]        = React.useState<TabId>('activity')
   const [followUpPrompt,   setFollowUpPrompt]   = React.useState<{ title: string; notes: string | null; due_at: string } | null>(null)
   const [questionnaireData, setQuestionnaireData] = React.useState<QuestionnaireData | null>(null)
@@ -102,8 +103,15 @@ export function LeadFullPanel({
     let cancelled = false
     setLoading(true)
     setData(null)
+    setLoadError(null)
     Promise.all([
-      fetch(`/api/leads/${leadId}/full`).then((r) => r.json()),
+      // 403 (rep lost access) / 404 (lead deleted) return { error } with no
+      // lead — setData on that shape crashes the render below.
+      fetch(`/api/leads/${leadId}/full`).then(async (r) => {
+        const json = await r.json().catch(() => ({}))
+        if (!r.ok || !json.lead) throw new Error(json.error ?? 'Failed to load lead')
+        return json
+      }),
       fetch(`/api/leads/${leadId}/questionnaire`).then((r) => r.json()).catch(() => ({ questionnaire: null })),
     ]).then(([leadData, qData]) => {
       if (!cancelled) {
@@ -112,7 +120,10 @@ export function LeadFullPanel({
         setTags(leadData.tags ?? [])
         setAvailableTags(leadData.availableTags ?? [])
       }
-    }).catch(console.error)
+    }).catch((err: unknown) => {
+      console.error(err)
+      if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load lead')
+    })
     .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [leadId])
@@ -352,7 +363,7 @@ export function LeadFullPanel({
   // ── Derived ───────────────────────────────────────────────────────────
   const lead             = data?.lead
   const name             = lead ? [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email : '…'
-  const pendingFollowUps = data?.followUps.filter((f) => !f.is_completed).length ?? 0
+  const pendingFollowUps = data?.followUps?.filter((f) => !f.is_completed).length ?? 0
 
   return (
     <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-4xl flex-col border-l border-border bg-background shadow-2xl" style={style}>
@@ -405,6 +416,15 @@ export function LeadFullPanel({
         </div>
       )}
 
+      {/* ── Load failure (403 access lost / 404 deleted / network) ── */}
+      {!loading && loadError && (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+          <p className="text-sm font-medium">This lead can’t be opened</p>
+          <p className="text-xs text-muted-foreground">{loadError}</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={onClose}>Close</Button>
+        </div>
+      )}
+
       {/* ── Content ── */}
       {!loading && lead && data && (
         <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
@@ -452,7 +472,9 @@ export function LeadFullPanel({
                   onScheduled={() => {
                     setFollowUpPrompt(null)
                     setActiveTab('followups')
-                    fetch(`/api/leads/${leadId}/full`).then((r) => r.json()).then((d) => setData(d)).catch(() => {})
+                    fetch(`/api/leads/${leadId}/full`)
+                      .then(async (r) => { const d = await r.json().catch(() => null); if (r.ok && d?.lead) setData(d) })
+                      .catch(() => {})
                   }}
                   onDismiss={() => setFollowUpPrompt(null)}
                 />
