@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { resolveDailyCallTarget } from '@/lib/call-targets'
+import { getUsersById } from '@/lib/users'
 import { CallModeClient, type QueueLead, type QueuePreset } from './call-mode-client'
 
 export const metadata: Metadata = { title: 'Call Mode' }
@@ -55,6 +56,10 @@ export default async function CallModePage({ searchParams }: PageProps) {
   let clientBatchId: string | null = batchId
   let skippedNoPhone = 0
   let currentUserId = ''
+  let isAdmin = false
+  // Workspace members (id + display name) for the optional full lead panel —
+  // powers its note-assignment / follow-up assignee dropdowns.
+  let teamMembers: { id: string; name: string }[] = []
   let loadError = false
   // Daily-target progress (resolveDailyCallTarget — same source as the
   // dashboard KPI). 0 = hide the target UI (set only when the queries succeed).
@@ -78,6 +83,7 @@ export default async function CallModePage({ searchParams }: PageProps) {
     if (!member) return <CallModeClient leads={[]} batches={[]} queue={queue} batchId={batchId} skippedNoPhone={0} />
 
     currentUserId = user.id
+    isAdmin = member.role === 'admin' || member.role === 'super_admin'
     const isRep = member.role === 'rep'
     // Reps work their own assigned leads — no batch picking (admins/managers
     // can filter any batch). Enforced here, not just hidden in the UI.
@@ -87,7 +93,7 @@ export default async function CallModePage({ searchParams }: PageProps) {
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
 
-    const [pageResult, batchesResult, workspaceResult, todayResult] = await Promise.all([
+    const [pageResult, batchesResult, workspaceResult, todayResult, membersResult] = await Promise.all([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (admin as any).rpc('get_workspace_leads_page', {
         p_workspace_id:        member.workspace_id,
@@ -125,7 +131,19 @@ export default async function CallModePage({ searchParams }: PageProps) {
         p_user_id:      user.id,
         p_since:        startOfToday.toISOString(),
       }),
+      admin
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', member.workspace_id)
+        .eq('is_active', true),
     ])
+
+    // Workspace members for the optional full lead panel's assignment dropdowns.
+    const memberIds = ((membersResult.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
+    const nameById = await getUsersById(admin, member.workspace_id, memberIds)
+    teamMembers = memberIds
+      .map((id) => ({ id, name: nameById.get(id) ?? 'Unknown' }))
+      .sort((a, b) => a.name.localeCompare(b.name))
 
     // Daily target — shared resolution with the dashboard KPI. If either
     // query failed, leave dailyTarget=0 so the UI hides rather than showing a
@@ -195,6 +213,8 @@ export default async function CallModePage({ searchParams }: PageProps) {
       batchId={clientBatchId}
       skippedNoPhone={skippedNoPhone}
       currentUserId={currentUserId}
+      isAdmin={isAdmin}
+      teamMembers={teamMembers}
       loadError={loadError}
       calledToday={calledToday}
       dailyTarget={dailyTarget}

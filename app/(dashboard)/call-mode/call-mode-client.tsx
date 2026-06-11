@@ -4,12 +4,14 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import {
   PhoneCall, Phone, Mail, MapPin, Layers, SkipForward,
-  Voicemail, PhoneMissed, PhoneOff, CalendarClock, CheckCircle2, X,
+  Voicemail, PhoneMissed, PhoneOff, CalendarClock, CheckCircle2, X, PanelRightOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { FollowUpPrompt } from '@/components/leads/detail/follow-up-prompt'
+import { LeadFullPanel } from '@/components/leads/lead-full-panel'
+import type { TeamMember } from '@/components/leads/detail/types'
 import type { CallOutcome } from '@/types/database'
 
 // NOTE: no "callbacks" preset — `callback` is not a lead status in this app
@@ -39,6 +41,10 @@ interface Props {
   batchId:        string | null
   skippedNoPhone: number
   currentUserId?: string
+  /** Whether the caller is an admin — gates batch edits etc. in the full panel. */
+  isAdmin?:       boolean
+  /** Workspace members for the full lead panel's assignment dropdowns. */
+  teamMembers?:   TeamMember[]
   loadError?:     boolean
   /** Unique leads this user already called today (server-computed at load). */
   calledToday?:   number
@@ -96,6 +102,7 @@ type Phase = 'setup' | 'live' | 'done'
 
 export function CallModeClient({
   leads, batches, queue, batchId, skippedNoPhone, currentUserId, loadError,
+  isAdmin = false, teamMembers = [],
   calledToday = 0, dailyTarget = 0, totalMatching = 0,
 }: Props) {
   const router = useRouter()
@@ -119,6 +126,9 @@ export function CallModeClient({
   const [tally,   setTally]   = React.useState<Record<string, number>>({})
   const [skipped, setSkipped] = React.useState(0)
   const [followUp, setFollowUp] = React.useState<{ leadId: string; title: string; notes: string | null } | null>(null)
+  // Optional full lead panel for the current lead (read everything / edit notes,
+  // tags, intake mid-call). Opening it suspends the 1–5/S keyboard shortcuts.
+  const [panelOpen, setPanelOpen] = React.useState(false)
 
   const lead = leads[index] as QueueLead | undefined
   const called = Object.values(tally).reduce((a, b) => a + b, 0)
@@ -137,6 +147,7 @@ export function CallModeClient({
     notesRef.current = ''
     setError(null)
     setFollowUp(null)
+    setPanelOpen(false)
     if (index + 1 >= leads.length) setPhase('done')
     else setIndex(index + 1)
   }
@@ -185,9 +196,10 @@ export function CallModeClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posting, followUp, index, leads.length])
 
-  // Keyboard shortcuts: 1–5 = outcomes, S = skip. Ignored while typing.
+  // Keyboard shortcuts: 1–5 = outcomes, S = skip. Ignored while typing or while
+  // the full lead panel is open (its own inputs/buttons own the keyboard then).
   React.useEffect(() => {
-    if (phase !== 'live') return
+    if (phase !== 'live' || panelOpen) return
     function onKey(e: KeyboardEvent) {
       // Held-down keys auto-repeat ~30x/sec — without this guard a held "1"
       // would log calls against leads as the queue advances under it.
@@ -201,7 +213,7 @@ export function CallModeClient({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [phase, logOutcome, skip])
+  }, [phase, panelOpen, logOutcome, skip])
 
   // ── Setup ────────────────────────────────────────────────────────────────
   if (phase === 'setup') {
@@ -388,14 +400,27 @@ export function CallModeClient({
       <div className="rounded-xl border bg-card p-5 shadow-xs shadow-black/5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold tracking-tight">{leadName(lead)}</h1>
+            <button
+              type="button"
+              onClick={() => setPanelOpen(true)}
+              title="Open full lead profile"
+              className="max-w-full truncate rounded text-left text-xl font-semibold tracking-tight outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/30"
+            >
+              {leadName(lead)}
+            </button>
             <p className="truncate text-sm text-muted-foreground">
               {[lead.title, lead.company].filter(Boolean).join(' · ') || '—'}
             </p>
           </div>
-          <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs font-medium capitalize text-muted-foreground">
-            {lead.status.replace(/_/g, ' ')}
-          </span>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs font-medium capitalize text-muted-foreground">
+              {lead.status.replace(/_/g, ' ')}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => setPanelOpen(true)}>
+              <PanelRightOpen className="mr-1.5 h-3.5 w-3.5" />
+              Full profile
+            </Button>
+          </div>
         </div>
 
         {/* The phone number — the whole point */}
@@ -489,6 +514,22 @@ export function CallModeClient({
           ))}
           {skipped > 0 && <span>Skipped: {skipped}</span>}
         </div>
+      )}
+
+      {/* Optional full lead panel — opened from the lead name / "Full profile". */}
+      {panelOpen && lead && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setPanelOpen(false)} />
+          <LeadFullPanel
+            leadId={lead.id}
+            teamMembers={teamMembers}
+            isAdmin={isAdmin}
+            currentUserId={currentUserId ?? ''}
+            canEditBatch={isAdmin}
+            onClose={() => setPanelOpen(false)}
+            onLeadChange={() => {}}
+          />
+        </>
       )}
     </div>
   )
