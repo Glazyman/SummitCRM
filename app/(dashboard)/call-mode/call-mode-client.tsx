@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   PhoneCall, Phone, Globe, MapPin, Layers, SkipForward,
@@ -138,6 +139,11 @@ export function CallModeClient({
   // Optional full lead panel for the current lead (read everything / edit notes,
   // tags, intake mid-call). Opening it suspends the 1–5/S keyboard shortcuts.
   const [panelOpen, setPanelOpen] = React.useState(false)
+  // Logged Call Mode session: created on "Start calling", finalized (tallies +
+  // ended_at) when the session reaches the summary. Refs so the fire-and-forget
+  // writes don't re-trigger renders or the keyboard effect.
+  const sessionIdRef = React.useRef<string | null>(null)
+  const finalizedRef = React.useRef(false)
 
   const lead = leads[index] as QueueLead | undefined
   const called = Object.values(tally).reduce((a, b) => a + b, 0)
@@ -149,6 +155,23 @@ export function CallModeClient({
     params.set('queue', q)
     if (b) params.set('batch', b)
     startTransition(() => router.replace(`/call-mode?${params.toString()}`))
+  }
+
+  // Begin a session: reset tallies, create the logged call_sessions row
+  // (fire-and-forget — a failed log just means no rollup), enter the live phase.
+  function startSession() {
+    setIndex(0); setTally({}); setSkipped(0); setNotes(''); notesRef.current = ''
+    sessionIdRef.current = null
+    finalizedRef.current = false
+    setPhase('live')
+    fetch('/api/call-sessions', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ queue_preset: queue, batch_id: batchId, queue_size: leads.length }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j?.id) sessionIdRef.current = j.id })
+      .catch(() => {})
   }
 
   function advance() {
@@ -223,6 +246,18 @@ export function CallModeClient({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [phase, panelOpen, logOutcome, skip])
+
+  // Finalize the logged session once the summary is reached (queue exhausted or
+  // End session). Stamps the final tallies + ended_at exactly once.
+  React.useEffect(() => {
+    if (phase !== 'done' || !sessionIdRef.current || finalizedRef.current) return
+    finalizedRef.current = true
+    void fetch(`/api/call-sessions/${sessionIdRef.current}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ calls_logged: called, skipped, outcomes: tally, ended: true }),
+    }).catch(() => {})
+  }, [phase, called, skipped, tally])
 
   // ── Setup ────────────────────────────────────────────────────────────────
   if (phase === 'setup') {
@@ -307,7 +342,7 @@ export function CallModeClient({
             </div>
             <Button
               disabled={isPending || leads.length === 0 || !!loadError}
-              onClick={() => { setIndex(0); setTally({}); setSkipped(0); setNotes(''); notesRef.current = ''; setPhase('live') }}
+              onClick={startSession}
             >
               <PhoneCall className="mr-1.5 h-4 w-4" />
               Start calling
@@ -317,6 +352,11 @@ export function CallModeClient({
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
           Shortcuts during a session: <Kbd>1</Kbd>–<Kbd>5</Kbd> log an outcome · <Kbd>S</Kbd> skips
+        </p>
+        <p className="mt-2 text-center text-xs">
+          <Link href="/call-mode/sessions" className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+            View past sessions
+          </Link>
         </p>
       </div>
     )
@@ -358,6 +398,11 @@ export function CallModeClient({
               New session
             </Button>
           </div>
+          <p className="mt-3 text-xs">
+            <Link href="/call-mode/sessions" className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+              View past sessions
+            </Link>
+          </p>
         </div>
       </div>
     )
