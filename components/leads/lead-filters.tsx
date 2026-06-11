@@ -139,6 +139,9 @@ export function LeadFiltersPanel({
               'h-9 w-full rounded-lg border border-input bg-background pl-9 pr-9 text-sm',
               'placeholder:text-muted-foreground transition-colors',
               'focus:outline-none focus:ring-2 focus:ring-ring',
+              // type="search" gets a native ✕ from WebKit/Chromium — hide it,
+              // we render our own clear button below.
+              '[&::-webkit-search-cancel-button]:hidden',
             )}
           />
           {localSearch && (
