@@ -40,6 +40,12 @@ interface Props {
   skippedNoPhone: number
   currentUserId?: string
   loadError?:     boolean
+  /** Unique leads this user already called today (server-computed at load). */
+  calledToday?:   number
+  /** Admin-set daily call target (per-rep override or workspace default). */
+  dailyTarget?:   number
+  /** Total leads matching the filters — the queue itself is capped per session. */
+  totalMatching?: number
 }
 
 const QUEUE_LABELS: Record<QueuePreset, { title: string; desc: string }> = {
@@ -88,9 +94,19 @@ const OUTCOME_LABELS: Record<string, string> = {
 
 type Phase = 'setup' | 'live' | 'done'
 
-export function CallModeClient({ leads, batches, queue, batchId, skippedNoPhone, currentUserId, loadError }: Props) {
+export function CallModeClient({
+  leads, batches, queue, batchId, skippedNoPhone, currentUserId, loadError,
+  calledToday = 0, dailyTarget = 0, totalMatching = 0,
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = React.useTransition()
+
+  // Today's unique-leads-called count. Incremented locally only for leads not
+  // already contacted today (matches the server's count-DISTINCT-lead
+  // semantics — a retry-queue lead called earlier today must not re-count);
+  // re-seeded from the server on refresh.
+  const [todayCalled, setTodayCalled] = React.useState(calledToday)
+  React.useEffect(() => { setTodayCalled(calledToday) }, [calledToday])
 
   const [phase,   setPhase]   = React.useState<Phase>('setup')
   const [index,   setIndex]   = React.useState(0)
@@ -141,6 +157,11 @@ export function CallModeClient({ leads, batches, queue, batchId, skippedNoPhone,
         return
       }
       setTally((t) => ({ ...t, [outcome]: (t[outcome] ?? 0) + 1 }))
+      const startOfToday = new Date()
+      startOfToday.setHours(0, 0, 0, 0)
+      const alreadyCountedToday =
+        !!lead.last_contacted_at && new Date(lead.last_contacted_at) >= startOfToday
+      if (!alreadyCountedToday) setTodayCalled((c) => c + 1)
       const suggestion = json.follow_up_suggestion as { title: string; notes: string | null } | null
       if (suggestion) {
         // Pause on this lead so the rep can one-tap a follow-up task; the
@@ -197,6 +218,12 @@ export function CallModeClient({ leads, batches, queue, batchId, skippedNoPhone,
         </div>
 
         <div className="rounded-xl border bg-card p-5 shadow-xs shadow-black/5">
+          {dailyTarget > 0 && (
+            <div className="mb-4 border-b pb-4">
+              <TargetProgress called={todayCalled} target={dailyTarget} />
+            </div>
+          )}
+
           <p className="mb-2 text-sm font-medium">Who are we calling?</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {(Object.keys(QUEUE_LABELS) as QueuePreset[]).map((key) => (
@@ -246,6 +273,11 @@ export function CallModeClient({ leads, batches, queue, batchId, skippedNoPhone,
                 <>
                   <span className="font-semibold text-foreground">{leads.length}</span>
                   {' '}lead{leads.length === 1 ? '' : 's'} in the queue
+                  {totalMatching > leads.length && (
+                    <span className="block text-xs">
+                      of {totalMatching} matching — finish this session and start another for the rest
+                    </span>
+                  )}
                   {skippedNoPhone > 0 && (
                     <span className="block text-xs">({skippedNoPhone} matching lead{skippedNoPhone === 1 ? '' : 's'} skipped — no phone number)</span>
                   )}
@@ -282,6 +314,12 @@ export function CallModeClient({ leads, batches, queue, batchId, skippedNoPhone,
             {called} call{called === 1 ? '' : 's'} logged{skipped > 0 ? ` · ${skipped} skipped` : ''}
           </p>
 
+          {dailyTarget > 0 && (
+            <div className="mx-auto mt-4 max-w-xs">
+              <TargetProgress called={todayCalled} target={dailyTarget} />
+            </div>
+          )}
+
           {called > 0 && (
             <div className="mx-auto mt-5 grid max-w-sm grid-cols-2 gap-2 text-left sm:grid-cols-3">
               {OUTCOMES.filter((o) => (tally[o.outcome] ?? 0) > 0).map((o) => (
@@ -315,6 +353,14 @@ export function CallModeClient({ leads, batches, queue, batchId, skippedNoPhone,
           <PhoneCall className="h-4 w-4 text-primary" />
           Call Mode
           <span className="text-muted-foreground">· {index + 1} / {leads.length}</span>
+          {dailyTarget > 0 && (
+            <span className={cn(
+              'whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+              todayCalled >= dailyTarget ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground',
+            )}>
+              Today {todayCalled}/{dailyTarget}
+            </span>
+          )}
         </div>
         <Button variant="ghost" size="sm" onClick={() => setPhase('done')}>
           <X className="mr-1 h-3.5 w-3.5" /> End session
@@ -444,6 +490,29 @@ export function CallModeClient({ leads, batches, queue, batchId, skippedNoPhone,
           {skipped > 0 && <span>Skipped: {skipped}</span>}
         </div>
       )}
+    </div>
+  )
+}
+
+function TargetProgress({ called, target }: { called: number; target: number }) {
+  if (target <= 0) return null
+  const pct = Math.min(100, Math.round((called / target) * 100))
+  const hit = called >= target
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">Leads called today (daily target)</span>
+        <span className={cn('font-semibold tabular-nums', hit ? 'text-emerald-600' : 'text-foreground')}>
+          {called} / {target}{hit ? ' — target hit!' : ''}
+        </span>
+      </div>
+      {/* Decorative — the visible "called / target" text above carries the value. */}
+      <div aria-hidden="true" className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn('h-full rounded-full transition-all', hit ? 'bg-emerald-500' : 'bg-primary')}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   )
 }

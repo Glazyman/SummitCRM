@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { resolveDailyCallTarget } from '@/lib/call-targets'
 import { getUsersById } from '@/lib/users'
 
 /** Parse "YYYY-MM-DD" into a Date at local midnight. Falls back to today. */
@@ -133,13 +134,7 @@ export async function GET(req: NextRequest) {
     const leadsCalledByUser = new Map(leadsCalledRows.map((r) => [r.user_id, Number(r.leads_called)]))
 
     const wsSettings = (workspaceRes.data as { settings?: Record<string, unknown> } | null)?.settings ?? {}
-    const workspaceDefault = Number(wsSettings.daily_call_target)
-    const defaultTarget = Number.isFinite(workspaceDefault) && workspaceDefault > 0 ? Math.floor(workspaceDefault) : 100
-    const overrideMap = (wsSettings.rep_daily_call_targets ?? {}) as Record<string, unknown>
-    const targetForUser = (uid: string) => {
-      const o = Number(overrideMap[uid])
-      return Number.isFinite(o) && o > 0 ? Math.floor(o) : defaultTarget
-    }
+    const targetForUser = (uid: string) => resolveDailyCallTarget(wsSettings, uid)
 
     const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
     const memberIds = members.map((m) => m.user_id)

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { resolveDailyCallTarget } from '@/lib/call-targets'
 import { Card, CardContent } from '@/components/ui/card'
 import { OverdueFollowUpsWidget } from '@/components/notifications/overdue-followups-widget'
 import { RepPerformancePanel } from '@/components/dashboard/rep-performance'
@@ -297,11 +298,10 @@ async function getDashboardMetrics(
     callsToday = Number((uniqueLeadsRes as { data: number | null }).data ?? 0)
   } catch {}
 
-  const workspaceDefault = Number((workspaceResult.data as { settings?: Record<string, unknown> } | null)?.settings?.daily_call_target)
-  const overrideMap = (((workspaceResult.data as { settings?: Record<string, unknown> } | null)?.settings?.rep_daily_call_targets ?? {}) as Record<string, unknown>)
-  const overrideTarget = Number(overrideMap[userId])
-  const defaultTarget = Number.isFinite(workspaceDefault) && workspaceDefault > 0 ? Math.floor(workspaceDefault) : 100
-  const dailyCallTarget = Number.isFinite(overrideTarget) && overrideTarget > 0 ? Math.floor(overrideTarget) : defaultTarget
+  const dailyCallTarget = resolveDailyCallTarget(
+    (workspaceResult.data as { settings?: Record<string, unknown> } | null)?.settings,
+    userId,
+  )
 
   return {
     totalLeads:          leadsResult.count     ?? 0,

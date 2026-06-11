@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { resolveDailyCallTarget } from '@/lib/call-targets'
 import { CallModeClient, type QueueLead, type QueuePreset } from './call-mode-client'
 
 export const metadata: Metadata = { title: 'Call Mode' }
@@ -48,10 +49,19 @@ export default async function CallModePage({ searchParams }: PageProps) {
   const batchId = rawBatch && UUID_RE.test(rawBatch) ? rawBatch : null
 
   let leads: QueueLead[] = []
-  let batches: { id: string; name: string }[] = []
+  // Batch options for the setup-screen picker — empty for reps (they get no
+  // batch filter); the full list is still fetched internally for name chips.
+  let batchOptions: { id: string; name: string }[] = []
+  let clientBatchId: string | null = batchId
   let skippedNoPhone = 0
   let currentUserId = ''
   let loadError = false
+  // Daily-target progress (resolveDailyCallTarget — same source as the
+  // dashboard KPI). 0 = hide the target UI (set only when the queries succeed).
+  let calledToday = 0
+  let dailyTarget = 0
+  // Total leads matching the filters (the queue itself is capped per session).
+  let totalMatching = 0
 
   try {
     const supabase = await createClient()
@@ -69,9 +79,15 @@ export default async function CallModePage({ searchParams }: PageProps) {
 
     currentUserId = user.id
     const isRep = member.role === 'rep'
+    // Reps work their own assigned leads — no batch picking (admins/managers
+    // can filter any batch). Enforced here, not just hidden in the UI.
+    const effectiveBatchId = isRep ? null : batchId
     const admin = createAdminClient()
 
-    const [pageResult, batchesResult] = await Promise.all([
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+
+    const [pageResult, batchesResult, workspaceResult, todayResult] = await Promise.all([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (admin as any).rpc('get_workspace_leads_page', {
         p_workspace_id:        member.workspace_id,
@@ -80,7 +96,7 @@ export default async function CallModePage({ searchParams }: PageProps) {
         p_search:              null,
         p_statuses:            QUEUE_STATUSES[queue],
         p_interests:           null,
-        p_batch_id:            batchId,
+        p_batch_id:            effectiveBatchId,
         p_assigned_to:         null,
         p_assigned_unassigned: false,
         p_my_leads:            false,
@@ -98,10 +114,34 @@ export default async function CallModePage({ searchParams }: PageProps) {
         .select('id, name')
         .eq('workspace_id', member.workspace_id)
         .order('created_at', { ascending: false }),
+      supabase
+        .from('workspaces')
+        .select('settings')
+        .eq('id', member.workspace_id)
+        .single(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (admin as any).rpc('get_unique_leads_called', {
+        p_workspace_id: member.workspace_id,
+        p_user_id:      user.id,
+        p_since:        startOfToday.toISOString(),
+      }),
     ])
 
-    batches = (batchesResult.data ?? []) as { id: string; name: string }[]
+    // Daily target — shared resolution with the dashboard KPI. If either
+    // query failed, leave dailyTarget=0 so the UI hides rather than showing a
+    // fabricated "Today 0/100".
+    if (workspaceResult.error || (todayResult as { error?: unknown }).error) {
+      console.error('[/call-mode page] target queries failed', workspaceResult.error ?? (todayResult as { error?: unknown }).error)
+    } else {
+      const settings = (workspaceResult.data as { settings?: Record<string, unknown> } | null)?.settings
+      dailyTarget = resolveDailyCallTarget(settings, user.id)
+      calledToday = Number((todayResult as { data: number | null }).data ?? 0)
+    }
+
+    const batches = (batchesResult.data ?? []) as { id: string; name: string }[]
     const batchNames = new Map(batches.map((b) => [b.id, b.name]))
+    batchOptions = isRep ? [] : batches
+    clientBatchId = effectiveBatchId
 
     if (pageResult.error) {
       console.error('[/call-mode page] queue RPC failed', pageResult.error)
@@ -115,12 +155,16 @@ export default async function CallModePage({ searchParams }: PageProps) {
       last_contacted_at: string | null; last_call_outcome: string | null
       custom_fields: Record<string, string> | null
     }
-    const rows = (((pageResult.data ?? {}) as { rows?: RawLead[] }).rows ?? [])
+    const payload = (pageResult.data ?? {}) as { rows?: RawLead[]; total_count?: number }
+    const rows = payload.rows ?? []
 
     // Filter on the SANITIZED number — "N/A"-style phone values would
     // otherwise pass and render a dead tel: link.
     const withPhone = rows.filter((l) => (l.phone ?? '').replace(/[^+\d]/g, '').length > 0)
     skippedNoPhone = rows.length - withPhone.length
+    // Callable total: subtract the known phoneless leads so "of N matching"
+    // doesn't promise leads a future session can never serve.
+    totalMatching = Math.max(0, (payload.total_count ?? rows.length) - skippedNoPhone)
 
     leads = withPhone.slice(0, QUEUE_CAP).map((l) => ({
       id:                l.id,
@@ -146,12 +190,15 @@ export default async function CallModePage({ searchParams }: PageProps) {
   return (
     <CallModeClient
       leads={leads}
-      batches={batches}
+      batches={batchOptions}
       queue={queue}
-      batchId={batchId}
+      batchId={clientBatchId}
       skippedNoPhone={skippedNoPhone}
       currentUserId={currentUserId}
       loadError={loadError}
+      calledToday={calledToday}
+      dailyTarget={dailyTarget}
+      totalMatching={totalMatching}
     />
   )
 }
