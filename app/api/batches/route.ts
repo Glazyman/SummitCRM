@@ -37,34 +37,21 @@ export async function GET() {
       return apiError('Access denied', 403)
     }
 
+    // lead_count is denormalized and trigger-maintained (incl. soft-deletes and
+    // batch moves — see sync_lead_batch_count) so no per-batch COUNT(*) needed.
     const { data, error } = await (admin as any)
       .from('lead_batches')
-      .select('id, name, created_at')
+      .select('id, name, lead_count, created_at')
       .eq('workspace_id', member.workspace_id)
       .order('created_at', { ascending: false })
 
     if (error) return apiServerError(error)
 
-    const batchesWithCount = await Promise.all((data ?? []).map(async (b: any) => {
-      const { count } = await (admin as any)
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .eq('workspace_id', member.workspace_id)
-        .eq('batch_id', b.id)
-        .is('deleted_at', null)
-      return {
-        id: b.id,
-        name: b.name,
-        leadCount: count ?? 0,
-        createdAt: b.created_at,
-      }
-    }))
-
-    const batches = batchesWithCount.map((b) => ({
+    const batches = (data ?? []).map((b: any) => ({
       id: b.id,
       name: b.name,
-      leadCount: b.leadCount,
-      createdAt: b.createdAt,
+      leadCount: b.lead_count ?? 0,
+      createdAt: b.created_at,
     }))
 
     return apiSuccess({ batches })
