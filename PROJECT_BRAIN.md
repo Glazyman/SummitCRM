@@ -74,7 +74,7 @@
 | Secrets | Supabase Vault | Sending account credentials |
 | Background jobs | pg_cron | Quota reset, follow-up reminders |
 | AI | OpenAI API (gpt-4o) | Email Snapshot only; gpt-4o-mini removed |
-| Email delivery | Resend (primary) + Nodemailer (SMTP fallback) | Used for transactional only (invites, notifs) |
+| Email delivery | Resend | Transactional only (team invites). `nodemailer` + `svix` removed 2026-06-11 (zero imports) |
 | Hosting | Vercel | Auto-deploy from `main` branch |
 | CI/CD | GitHub → Vercel | Lint + type check on push |
 
@@ -142,8 +142,11 @@ Resend API
 
 ```sql
 workspace_role: super_admin | admin | manager | rep | viewer
-lead_status: new | called | voicemail | no_answer | wrong_number | callback | replied | interested | not_interested | converted | do_not_contact
-call_outcome: Answered | Voicemail | No answer | Wrong number | Callback requested
+lead_status: new | called | emailed | voicemail | no_answer | wrong_number | sold_already | contacted | replied | interested | not_interested | do_not_contact | unsubscribed | converted
+  -- ⚠️ NO 'callback' status (corrected 2026-06-11 — this list previously claimed one).
+  -- Callback promises live in the TASKS system (follow_ups.type = 'callback'), not lead status;
+  -- the callback_requested call outcome maps to status 'called' + a follow-up task suggestion.
+call_outcome: answered | voicemail | no_answer | wrong_number | callback_requested (lowercase)
 pipeline_stage: (custom per workspace)
 notification_type: mention | follow_up_due | lead_assigned   -- only 3 active types
 activity_type: lead_created | lead_updated | lead_status_changed | note_added | call_logged | lead_assigned | lead_imported | ...
@@ -272,6 +275,9 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 │   │
 │   ├── (dashboard)/          ← protected group
 │   │   ├── dashboard/page.tsx          ← KPI cards (30-day window), recent calls, rep panel
+│   │   ├── call-mode/                  ← power-dialer "work the queue" mode (added 2026-06-11)
+│   │   │   ├── page.tsx               ← server: queue via get_workspace_leads_page (rep-scoped)
+│   │   │   └── call-mode-client.tsx   ← setup → live session (kbd 1-5/S) → summary
 │   │   ├── pipeline/                   ← Kanban board
 │   │   │   ├── page.tsx               ← server: fetch + rep filter
 │   │   │   └── pipeline-client.tsx    ← drag/drop + 3-dot move menu
@@ -334,12 +340,9 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 │   │   │   ├── ai-usage/route.ts              ← admin-only, MTD + recent 50
 │   │   │   ├── activity/route.ts
 │   │   │   └── call-targets/route.ts
-│   │   ├── analytics/
-│   │   │   ├── email-metrics/route.ts
-│   │   │   ├── time-series/route.ts
-│   │   │   ├── funnel/route.ts
+│   │   ├── analytics/                         ← email-metrics/time-series/funnel/calls-7d routes DELETED 2026-06-11 (zero callers)
 │   │   │   ├── batches/route.ts               ← uses get_batch_analytics RPC
-│   │   │   ├── reps/route.ts                  ← BUG: line 80-81 .email/.name on unknown type
+│   │   │   ├── reps/route.ts
 │   │   │   ├── reps/[id]/route.ts
 │   │   │   └── export/route.ts
 │   │   ├── ai/
@@ -423,8 +426,6 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 │   ├── security/
 │   │   ├── audit.ts           ← logActivity() utility
 │   │   └── rate-limit.ts
-│   ├── notifications/
-│   │   └── create.ts          ← DEAD CODE: createNotification + notifyAdmins (zero callers)
 │   └── utils/
 │
 ├── hooks/
@@ -478,6 +479,7 @@ activity_type: lead_created | lead_updated | lead_status_changed | note_added | 
 | `/reset-password` | (auth)/reset-password | Unauthenticated | |
 | `/accept-invite` | (auth)/accept-invite | Unauthenticated | Token in query param |
 | `/dashboard` | (dashboard)/dashboard | All roles | KPI cards (30-day), recent calls, rep performance panel |
+| `/call-mode` | (dashboard)/call-mode | All roles | Power dialer: queue presets (fresh/retry/callbacks/all) + batch filter, one-lead-at-a-time calling with keyboard shortcuts; reps auto-scoped to assigned leads |
 | `/pipeline` | (dashboard)/pipeline | All roles | Kanban; reps see only assigned leads |
 | `/leads` | (dashboard)/leads | All roles | Paginated table, filters, bulk ops |
 | `/leads/[id]` | (dashboard)/leads/[id] | All roles | Full lead detail + timeline |
@@ -527,13 +529,11 @@ All API routes require authentication. Role checks are in-route.
 - `GET /api/admin/call-targets`
 
 **Analytics**
-- `GET /api/analytics/email-metrics`
-- `GET /api/analytics/time-series`
-- `GET /api/analytics/funnel`
 - `GET /api/analytics/batches` — uses `get_batch_analytics` RPC
-- `GET /api/analytics/reps` — **BUG**: line 80-81, `.email`/`.name` on `unknown` type
+- `GET /api/analytics/reps`
 - `GET /api/analytics/reps/[id]`
 - `GET /api/analytics/export` — CSV export
+- *(Deleted 2026-06-11, zero callers: `email-metrics`, `time-series`, `funnel`, `calls-7d`. The `get_email_metrics_analytics` + `get_time_series_analytics` RPCs still exist in prod but have no callers.)*
 
 **AI**
 - `POST /api/ai/snapshot-email` — admin only, gpt-4o, logs to ai_usage_logs
@@ -590,6 +590,14 @@ All API routes require authentication. Role checks are in-route.
 - **Lead Pipeline**: Kanban with stages. Top N per stage via `get_pipeline_leads_json`. Overflow loaded on demand. Drag-drop + 3-dot move menu. Server search. Reps see only assigned leads.
 - **Status sync**: Call outcome → lead status via `OUTCOME_TO_STATUS` map. Delete last call → resets status to `new` if outcome-status.
 
+### Call Mode (power dialer — added 2026-06-11)
+
+Full-screen "work the queue" flow at `/call-mode` (sidebar: Call Mode, PhoneCall icon). Three phases in one client component:
+- **Setup**: pick a queue preset — Fresh (`new`), Retries (`voicemail`+`no_answer`), Everything (those three) — plus an optional batch filter (UUID-validated). **No Callbacks preset** — `callback` is not a lead status; callback promises become tasks (see below). Filter changes round-trip through the URL (`?queue=&batch=`) so the queue is always built **server-side** via `get_workspace_leads_page` (`p_scope_to_rep` ⇒ reps only get their assigned leads; same enforcement as `/leads`). Sort is per-preset: fresh/all → `created_at ASC` (never-touched leads have NULL `last_activity_at` and the RPC orders NULLS LAST, which would push them off the cap), retry → `last_activity_at ASC`. Capped at 100/session (fetches 200, filters out leads whose phone has no digits — count of skipped shown). RPC failure / page error surfaces as a "queue failed to load" state (not a fake empty queue).
+- **Live**: one lead at a time — big `tel:` phone link, context line (last outcome + ago, state, batch, email), notes textarea (sent with the call log), 5 outcome buttons + Skip. **Keyboard: 1–5 = outcomes, S = skip** (ignored while typing; `e.repeat` guarded so held keys can't mass-log calls). Logging POSTs the existing `/api/leads/[id]/calls` (so status sync, activity log, and follow-up suggestion all reuse the standard path — no new API). After voicemail/no-answer **or callback-requested** (added 2026-06-11 so callback promises land in Tasks) the shared `FollowUpPrompt` appears (one-tap untimed-tomorrow task; now shows an error instead of silently swallowing a failed create) before advancing. Progress bar + running tally; End session anytime.
+- **Summary**: outcome breakdown cards, skipped count, "New session" (router.refresh → fresh queue).
+No DB changes, no new API routes. Key files: `app/(dashboard)/call-mode/page.tsx`, `call-mode-client.tsx`, sidebar link in `components/layout/sidebar.tsx`.
+
 ### Call Logging
 
 - Manual call log: outcome + notes → inserts to `call_logs` → trigger updates `leads.last_contacted_at` + `last_call_outcome` + `leads.status`
@@ -641,8 +649,7 @@ Workspace-scoped, reusable labels on leads — primary use is **buyer type** (PE
 ### Analytics
 
 - **Batches: MOVED to the Import page** (2026-06-01). The `BatchComparisonTable` now lives on `/leads/import` under the "Import History" tab (stacked below Import History), not on Analytics. Analytics tabs are now just Overview + Rep Performance.
-- Email metrics (aggregate RPCs bypass 1000-row cap)
-- Time-series charts
+- Email-metrics / time-series / funnel UI + routes are fully gone (last remnants deleted 2026-06-11).
 - **Dashboard Rep Performance panel** (`components/dashboard/rep-performance.tsx`, admin-only on `/dashboard`): rolling **Today / Last 7 days / Last 30 days / All time** presets (changed 2026-06-02 from calendar Day/Week/Month + date stepper — the calendar windows hid old/May-dated calls once the month rolled over). Donut of call outcomes + per-rep table; "Today" shows the daily-target progress bar, other presets show a plain leads-called count. Backed by `/api/admin/rep-performance?start&end` (legacy `period&date` still accepted).
 - **Pipeline filters (admin only)**: Rep / Batch / Activity-date presets on `/pipeline` — client-side over the loaded set; counts + stat cards recompute from the filtered set. See Section 8 Lead Pipeline.
 
@@ -869,12 +876,15 @@ Header is `sticky top-0 z-20`. Any `z-50` inside is bounded by z-20 against outs
 | # | Item | Priority | Notes |
 |---|---|---|---|
 | 1 | CSV export of all matching leads | Medium | `handleExport` in `leads-client.tsx` only exports visible page; needs streaming endpoint |
-| 2 | `lib/notifications/create.ts` dead code | Low | `createNotification` + `notifyAdmins` have zero callers (~110 lines) |
+| 2 | ~~`lib/notifications/create.ts` dead code~~ | — | **RESOLVED 2026-06-11** — deleted along with the rest of the dead-code sweep |
 | 3 | Outlook rich-HTML clipboard | Low | Auto-linkify doesn't work in Outlook plain-text compose; need HTML clipboard write |
 | 4 | `emails` table raw-row fetch in `team-stats` | Low | 1000-row cap risk; low priority until email volume >1000/30 days |
-| 5 | Fix `app/api/analytics/reps/route.ts:80-81` | Medium | `.email`/`.name` on `unknown` type — was hidden under old `any` typing |
+| 5 | ~~Fix `app/api/analytics/reps/route.ts:80-81`~~ | — | **RESOLVED** (verified already fixed before 2026-06-11 — map is properly typed now) |
 | 6 | `get_workspace_leads_json` RPC | Info | Deployed in prod but only backfilled into migrations (no-op migration). Legacy path. |
 | 7 | 32 orphaned `call_logged` activity entries | Info | `metadata.call_log_id` no longer exists in `call_logs`. Harmless noise. |
+| 9 | Caller-less RPCs in prod | Info | `get_email_metrics_analytics` + `get_time_series_analytics` have zero code callers since 2026-06-11. Dropping them needs a migration (not done). |
+| 10 | In-memory rate limiter is per-instance | Info | Fine for this team size; swap to Upstash Redis if it ever needs to be exact across Vercel instances (noted in `lib/security/rate-limit.ts`). |
+| 11 | **Harden `get_workspace_leads_page` + bulk RPCs (P1, needs migration)** | High | Found by 2026-06-11 ship review: these SECURITY DEFINER RPCs are granted to `authenticated` and trust their params — any logged-in user can call them directly via PostgREST with the anon key, passing `p_scope_to_rep=false` or another `workspace_id` (read AND bulk-write paths). Server routes pass verified values, but the DB layer doesn't enforce. Fix: validate `auth.uid()` membership inside the functions, or `REVOKE EXECUTE FROM authenticated` (server uses service role). Same review also suggested: `sync_lead_batch_count` has no un-soft-delete branch + needs a one-off `lead_count` backfill; call-log POST has no idempotency key (dialer retry can double-log). All three need migrations — do as one hardening migration pass. |
 | 8 | **Tag chips on the `/leads` table** | Low | Tags now show as chips on **pipeline kanban cards + pipeline list view** (2026-06-03) and are editable in the side panel. Remaining: surface them in the `/leads` table too. (`LeadRow.tags` field already exists.) Consider seeding starter tags + a `Buyer: <name>` convention. |
 
 ---
@@ -941,9 +951,17 @@ Header is `sticky top-0 z-20`. Any `z-50` inside is bounded by z-20 against outs
 
 **Secrets:** API keys and SMTP passwords in Supabase Vault (never in DB tables directly).
 
-**API surface:** All routes validate auth, role, and workspace membership before mutations. Zod schemas validate inputs. Rate limiting on auth and AI endpoints.
+**API surface:** All routes validate auth, role, and workspace membership before mutations. Zod schemas validate inputs.
 
-**Webhook security:** Supabase webhook signature verification (svix library).
+**Rate limiting (actually wired 2026-06-11 — was defined but unused before):** `lib/security/rate-limit.ts` (in-memory sliding window, per-instance) now guards: `POST /api/team/accept-invite` (5/IP/5min — unauthenticated token lookup), `POST /api/team/invite` (10/admin/min — sends email), `POST /api/ai/snapshot-email` (20/workspace/min — costs OpenAI money). `/api/auth/signup` is a hard 403 stub (self-signup disabled), so no limiter needed there.
+
+**Rep lead-visibility enforcement:** `GET /api/leads/[id]`, `GET/POST /api/leads/[id]/calls`, and (since 2026-06-11) `GET /api/leads/[id]/full` all 403/404 a rep on leads not assigned to them. `/full` was the one lead read missing the check (any rep could open any workspace lead's full panel by UUID).
+
+**Documents raw proxy hardening (2026-06-11):** `GET /api/documents/[id]/raw` serves only an allowlist of MIME types (pdf, png/jpeg/gif/webp, doc/docx, txt/csv) with the stored type; everything else is forced to `application/octet-stream`. `X-Content-Type-Options: nosniff` added. Reason: `mime_type` comes from the uploader's browser (`file.type`) — without this, an uploaded `text/html` file would execute same-origin in the framed viewer route.
+
+**Invite email hardening (2026-06-11):** workspace name is HTML-escaped in the invite email body and stripped of header-breaking chars in the From display name (it's user-controlled via workspace rename).
+
+**Webhook security:** NOT implemented — no `/api/webhooks` route exists and `svix` was removed 2026-06-11 (zero imports). ⚠️ middleware's matcher still excludes `api/webhooks` from auth; any future webhook route must add its own signature verification before shipping.
 
 **GDPR hooks:** `unsubscribes` table, `do_not_contact` flag, data export/delete hooks in place.
 
@@ -1359,4 +1377,51 @@ Tightened the pipeline page (`app/(dashboard)/pipeline/pipeline-client.tsx`) on 
 
 ---
 
-*Last updated: 2026-06-03 — Analytics donut: centered the "leads called" middle label (it sat below the ring because the grid stretched the donut wrapper taller than the 196px chart; pinned the overlay to the chart height + `self-center` on the donut). Earlier 2026-06-03 — Analytics Call Summary: verified the outcome percentages are correct (e.g. Wrong number = 2 of 82 calls = 2%, not a bug) and added a "Call outcomes · % of N calls" header so the denominator (total calls, 82) is explicit — the confusion was that the donut center shows unique leads (70) while the %s are of total calls (82). Earlier 2026-06-03 — Pipeline page mobile layout pass: search shares a row with Add Lead, admin filter selects stack full-width (were overflowing), stat cards tightened (smaller number + padding + truncation), list rows hide the timestamp on phones so name/company/tags fit. Desktop unchanged. Earlier 2026-06-03 — Tag editing is now ADMIN-ONLY (full lock): create/attach/detach 403 for non-admins across `/api/tags` + `/api/leads/[id]/tags`, and the side-panel TagPicker is read-only (section hidden for reps with no tags). Reps still see tag chips. Earlier 2026-06-03 — Tags now show as chips on pipeline kanban cards + the pipeline list view (bulk-fetched via new `lib/lead-tags.ts`; "+N more" overflow cards included; cards update live when tags are edited in the side panel via a new optional `onTagsChange` prop). Only the `/leads` table still lacks chips (Open Item #8). Earlier 2026-06-03 — Wired the tags UI into the lead side panel: a "Tags" section under the profile card (`TagPicker`) where you add/reuse workspace tags or create custom ones (name + color) that persist for reuse — activating the dormant tags backend and giving buyer type a home after "PE Qualified" was dropped. `/api/leads/[id]/full` now returns the lead's tags + the workspace tag list. Pending: tag chips on pipeline cards/leads table (Open Item #8). Earlier 2026-06-03 — Pipeline stages revamped into an M&A deal flow: removed "PE Qualified" (buyer type → tags, UI still to be wired), renamed Needs Buyer→Seeking Buyer / Successful Intro→Intro Made / Data Requests→Data Requested / Unsuccessful Intro→Lost-Passed (now terminal), and added a real **Closed / Won** stage — fixing the bug where "LOI / Negotiation" was wrongly flagged `is_won`. Migration `20260603000002` applied to prod (rename-in-place keeps leads' stage ids); pipeline-client + page fallback updated. Earlier 2026-06-03 — Fixed bulk "Assign → Unassigned" no-op: the ids-based `bulk_update_leads` RPC treated a null assignee/batch as "keep current", so unassigning (and bulk remove-from-batch) silently did nothing while assigning to another rep worked. Added `p_clear_assigned`/`p_clear_batch` flags (migration `20260603000001`, applied to prod) + route now passes them. Earlier 2026-06-03 — PDF→Word: fixed the serverless crash (pdfjs `DOMMatrix` → **unpdf**, quirk 20), restored line/paragraph breaks, and added a **standalone PDF → Word converter tool** at `/documents/convert` (drag/drop → download). Still text-only by nature (no layout fidelity — needs external converter or desktop Word). Earlier (2026-06-02): Documents added **"Open in Word"** (doc/docx → Office web viewer; **PDF → in-house text-convert → Word viewer**); fixed the prior PDF-convert failure (Vercel Node 20 lacked `Promise.withResolvers` → pinned Node 22 + polyfill, quirk 20). Earlier same day: Documents library **reverted to VIEW-ONLY** (popup view for all types incl .docx via SuperDoc viewing mode; upload/download/delete; all editing — editor, rename, replace, duplicate, PDF→Word convert — removed per user). Earlier same day, since superseded: Documents library extended: in-app pop-up viewer (PDF/image inline via same-origin raw proxy — CSP blocks cross-origin iframes, quirk 19; .docx/.pages download-only), edit name+description, replace-with-new-version, duplicate, and **in-browser .docx editing via SuperDoc** at /documents/[id]/edit (next build verified green). Earlier same day: admin-only Documents library — page + upload/preview/download/delete API + `documents` table/bucket migration + seeder, shipped to main (`ade4679`); reui design pass across UI primitives + preview-env 500 gotcha; reui button + radix status/interest select; analytics sized-pie reverted to donut; dashboard rep-performance switched to Today/7d/30d/All-time presets; admin-only pipeline rep/batch/date filters; **repo migrated off iCloud Desktop → `~/Developer/SummitCRM` after local `.git` corruption; native git restored; global git identity + lfs fixed**; **Vercel build break fixed — `types/database.ts` was a failed supabase-gen capture, restored the 276-line manual file**; all three features deployed green to prod). Earlier: 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card; lead-status %; mini-chart moved to analytics (unique leads/day); Call Summary sized pie; recharts 3.8 chart-type gotcha)*
+### Session 2026-06-11 (security + perf + dead-code hardening pass)
+
+Full-codebase audit (3 parallel audit agents: security / performance / correctness), findings verified by hand, then fixed. Build + tsc green; lint went 140 → 132 problems (net −8, nothing new).
+
+| # | What | Key files |
+|---|---|---|
+| 1 | **SECURITY (high): rep gating on `/api/leads/[id]/full`** — the side-panel route returned ANY workspace lead (profile, notes, calls, emails, intake) to a rep who knew the UUID. Now 403s reps on non-assigned leads, matching `GET /api/leads/[id]` + the calls route. | `app/api/leads/[id]/full/route.ts` |
+| 2 | **SECURITY: rate limiter wired in** (was defined, zero usages): accept-invite 5/IP/5min (unauthenticated token brute-force), invite-send 10/admin/min, snapshot-email 20/workspace/min. | `app/api/team/accept-invite/route.ts`, `app/api/team/invite/route.ts`, `app/api/ai/snapshot-email/route.ts` |
+| 3 | **SECURITY: invite email injection** — workspace name (user-controlled) now HTML-escaped in the email body + sanitized in the From display name. | `app/api/team/invite/route.ts` |
+| 4 | **SECURITY: documents raw proxy** — MIME allowlist (pdf/images/doc/docx/txt/csv) + `nosniff`; non-allowlisted types forced to `application/octet-stream` so an uploaded `text/html` can't execute same-origin in the framed viewer. | `app/api/documents/[id]/raw/route.ts` |
+| 5 | **PERF: batches N+1 killed** — `GET /api/batches` ran one COUNT query per batch; now reads the trigger-maintained `lead_batches.lead_count` denorm (verified the trigger handles soft-deletes + batch moves). | `app/api/batches/route.ts` |
+| 6 | **PERF: narrowed wasteful selects** — call_logs GET `select('*')` → named columns; unread-count `select('*')` → `select('id')`. | `app/api/leads/[id]/calls/route.ts`, `app/api/notifications/unread-count/route.ts` |
+| 7 | **DEAD CODE deleted** (all verified zero callers): API routes `analytics/{calls-7d,email-metrics,time-series,funnel}`; components `email-metrics-cards`, `email-time-series-chart`, `lead-funnel-chart`, `campaign-comparison-table`, `daily-calls-mini-chart`, `quick-log-call-widget`; `lib/notifications/create.ts`; types `EmailMetrics`/`TimeSeriesPoint`/`FunnelData`/`FunnelStage`/`CampaignRow`; barrel exports trimmed. | `components/analytics/*`, `components/dashboard/*`, `lib/notifications/` |
+| 8 | **DEPS removed**: `nodemailer`, `@types/nodemailer`, `svix` (zero imports). | `package.json` |
+| 9 | Verified ALREADY fixed: the old `analytics/reps:80-81` unknown-type bug (Open Item #5). Stale "activities view" comment fixed in `lead-full-panel.tsx`. | — |
+| 10 | **UI: double ✕ in the leads search box** — the input is `type="search"`, so WebKit/Chromium rendered a native clear button next to our custom one. Hid the native one (`[&::-webkit-search-cancel-button]:hidden`); kept the custom ✕ (it refocuses + resets page). Only `type="search"` input in the app. | `components/leads/lead-filters.tsx` |
+| — | NOT done (needs explicit authorization / separate pass): dropping caller-less RPCs from prod, visual design pass (`/design-review`), CSV full export (Open Item #1). | — |
+
+---
+
+### Session 2026-06-11 (Call Mode — power dialer)
+
+| # | What | Key files |
+|---|---|---|
+| 1 | **New `/call-mode` page** — power-dialer flow: setup (queue preset + batch) → live one-lead-at-a-time calling (kbd 1–5/S, notes, tel: link, FollowUpPrompt reuse) → session summary. Queue built server-side via `get_workspace_leads_page` with `p_scope_to_rep` (rep gating preserved); logging reuses `POST /api/leads/[id]/calls` unchanged. No DB/API changes. | `app/(dashboard)/call-mode/page.tsx`, `call-mode-client.tsx` |
+| 2 | Sidebar: "Call Mode" link (PhoneCall icon) between Leads and Pipeline. | `components/layout/sidebar.tsx` |
+| — | Verified: `next build` green (route compiles), `tsc` clean. NOT runtime-tested in a browser (no auth session in sandbox) — verify on deploy: pick queue → log a call → check it lands in the lead's call history. | — |
+
+### Session 2026-06-11 (ship review — 7 review agents, 16 fixes)
+
+`/ship` ran 6 specialist reviewers + a red team over the branch. Fixed before landing:
+| # | What | Key files |
+|---|---|---|
+| 1 | **Callbacks queue preset was dead** — filtered on a `callback` lead status that doesn't exist (brain §5 enum was wrong; corrected). Preset removed; instead the **callback_requested outcome now returns a follow-up suggestion** so the promise lands in Tasks via FollowUpPrompt. | `call-mode/page.tsx`, `call-mode-client.tsx`, `app/api/leads/[id]/calls/route.ts` |
+| 2 | Call-mode keyboard: `e.repeat` guard (held key would mass-log calls); notes read via ref (stable listener); New-session refresh wrapped in `startTransition` (stale-queue restart). | `call-mode-client.tsx` |
+| 3 | Fresh-queue ordering: never-touched leads (NULL `last_activity_at`) sorted LAST (RPC is NULLS LAST) — fresh/all presets now sort `created_at ASC`. | `call-mode/page.tsx` |
+| 4 | Call-mode page: RPC errors / bad `?batch` no longer render as a fake empty queue (loadError state + UUID validation + proper `redirect('/login')`). Phone filter now requires digits (no dead `tel:` links). | `call-mode/page.tsx`, `call-mode-client.tsx` |
+| 5 | **Lead panel crash on 403/404** — `/full` fetch had no `res.ok` check; error shape crashed render (`data?.followUps.filter`). Now guards + "This lead can't be opened" state. (Note: for reps the RLS-scoped client makes the new 403 surface as 404 — the in-route check is defense-in-depth.) | `components/leads/lead-full-panel.tsx` |
+| 6 | **Documents viewer/proxy MIME mismatch** — `isImage` included svg/avif which the raw proxy now serves as octet-stream → broken `<img>`. Client allowlist now mirrors the server's; svg/avif fall through to Download. | `documents-client.tsx` |
+| 7 | FollowUpPrompt: failed task-create no longer silent (error message; was load-bearing in call mode where the prompt blocks the queue). | `follow-up-prompt.tsx` |
+| 8 | Middleware: `/call-mode`, `/pipeline`, `/tasks`, `/batches`, `/documents` added to PROTECTED_PATHS (were relying on layout redirect only; lost `?next=` param). | `middleware.ts` |
+| 9 | Invite From-header: quote the display name (RFC 5322) instead of just stripping — a workspace name with a comma made every invite email fail after the invitation row was created. Rate limits moved to named rules (`INVITE_ACCEPT_LIMIT` 10/IP/5min — after field validation so malformed requests don't burn budget; `INVITE_SEND_LIMIT` 10/admin/min). | `app/api/team/invite/route.ts`, `accept-invite/route.ts`, `lib/security/rate-limit.ts` |
+| 10 | Calls GET bounded (`.limit(200)`); call-mode polish: `text-destructive`, reui focus rings on all interactive elements, h1 in live phase, token-based Kbd, derived OUTCOME_LABELS. | `calls/route.ts`, `call-mode-client.tsx` |
+| 11 | Brain corrections: §5 lead_status enum fixed (no `callback`), §13 webhook claim removed (svix gone, no webhook routes). **New Open Item #11 (P1)**: RPC SECURITY DEFINER hardening + lead_count backfill/restore-branch + call idempotency — one migration pass. | `PROJECT_BRAIN.md` |
+
+---
+
+*Last updated: 2026-06-11 (ship review) — 7-agent pre-landing review fixed 16 issues before deploy (dead Callbacks preset → callback outcome now creates a task suggestion; e.repeat guard; lead-panel 403/404 crash guard; documents MIME mismatch; queue ordering for never-touched leads; middleware route protection; invite From-header quoting; named rate-limit rules; brain §5 enum + §13 webhook corrections; new P1 Open Item #11: RPC SECURITY DEFINER hardening migration). Earlier: NEW: Call Mode power dialer at `/call-mode` (queue presets, keyboard-driven outcome logging via the existing calls API, follow-up prompt, session summary; see Section 8 "Call Mode"). Earlier today: Fixed double ✕ in the leads search box (native WebKit search-cancel button hidden; our custom clear button stays). Earlier today: Security/perf/dead-code hardening pass (see session block above): rep gating added to `/api/leads/[id]/full` (IDOR fix), rate limiting actually wired (accept-invite / invite-send / snapshot-email), invite-email HTML escaping, documents raw-proxy MIME allowlist + nosniff, batches N+1 → `lead_count` denorm, narrowed selects, ~10 dead files/routes deleted, `nodemailer`+`svix` removed. Open Items #2 + #5 resolved; new info items #9 (caller-less RPCs in prod) + #10 (per-instance rate limiter). Earlier 2026-06-03 — Analytics donut: centered the "leads called" middle label (it sat below the ring because the grid stretched the donut wrapper taller than the 196px chart; pinned the overlay to the chart height + `self-center` on the donut). Earlier 2026-06-03 — Analytics Call Summary: verified the outcome percentages are correct (e.g. Wrong number = 2 of 82 calls = 2%, not a bug) and added a "Call outcomes · % of N calls" header so the denominator (total calls, 82) is explicit — the confusion was that the donut center shows unique leads (70) while the %s are of total calls (82). Earlier 2026-06-03 — Pipeline page mobile layout pass: search shares a row with Add Lead, admin filter selects stack full-width (were overflowing), stat cards tightened (smaller number + padding + truncation), list rows hide the timestamp on phones so name/company/tags fit. Desktop unchanged. Earlier 2026-06-03 — Tag editing is now ADMIN-ONLY (full lock): create/attach/detach 403 for non-admins across `/api/tags` + `/api/leads/[id]/tags`, and the side-panel TagPicker is read-only (section hidden for reps with no tags). Reps still see tag chips. Earlier 2026-06-03 — Tags now show as chips on pipeline kanban cards + the pipeline list view (bulk-fetched via new `lib/lead-tags.ts`; "+N more" overflow cards included; cards update live when tags are edited in the side panel via a new optional `onTagsChange` prop). Only the `/leads` table still lacks chips (Open Item #8). Earlier 2026-06-03 — Wired the tags UI into the lead side panel: a "Tags" section under the profile card (`TagPicker`) where you add/reuse workspace tags or create custom ones (name + color) that persist for reuse — activating the dormant tags backend and giving buyer type a home after "PE Qualified" was dropped. `/api/leads/[id]/full` now returns the lead's tags + the workspace tag list. Pending: tag chips on pipeline cards/leads table (Open Item #8). Earlier 2026-06-03 — Pipeline stages revamped into an M&A deal flow: removed "PE Qualified" (buyer type → tags, UI still to be wired), renamed Needs Buyer→Seeking Buyer / Successful Intro→Intro Made / Data Requests→Data Requested / Unsuccessful Intro→Lost-Passed (now terminal), and added a real **Closed / Won** stage — fixing the bug where "LOI / Negotiation" was wrongly flagged `is_won`. Migration `20260603000002` applied to prod (rename-in-place keeps leads' stage ids); pipeline-client + page fallback updated. Earlier 2026-06-03 — Fixed bulk "Assign → Unassigned" no-op: the ids-based `bulk_update_leads` RPC treated a null assignee/batch as "keep current", so unassigning (and bulk remove-from-batch) silently did nothing while assigning to another rep worked. Added `p_clear_assigned`/`p_clear_batch` flags (migration `20260603000001`, applied to prod) + route now passes them. Earlier 2026-06-03 — PDF→Word: fixed the serverless crash (pdfjs `DOMMatrix` → **unpdf**, quirk 20), restored line/paragraph breaks, and added a **standalone PDF → Word converter tool** at `/documents/convert` (drag/drop → download). Still text-only by nature (no layout fidelity — needs external converter or desktop Word). Earlier (2026-06-02): Documents added **"Open in Word"** (doc/docx → Office web viewer; **PDF → in-house text-convert → Word viewer**); fixed the prior PDF-convert failure (Vercel Node 20 lacked `Promise.withResolvers` → pinned Node 22 + polyfill, quirk 20). Earlier same day: Documents library **reverted to VIEW-ONLY** (popup view for all types incl .docx via SuperDoc viewing mode; upload/download/delete; all editing — editor, rename, replace, duplicate, PDF→Word convert — removed per user). Earlier same day, since superseded: Documents library extended: in-app pop-up viewer (PDF/image inline via same-origin raw proxy — CSP blocks cross-origin iframes, quirk 19; .docx/.pages download-only), edit name+description, replace-with-new-version, duplicate, and **in-browser .docx editing via SuperDoc** at /documents/[id]/edit (next build verified green). Earlier same day: admin-only Documents library — page + upload/preview/download/delete API + `documents` table/bucket migration + seeder, shipped to main (`ade4679`); reui design pass across UI primitives + preview-env 500 gotcha; reui button + radix status/interest select; analytics sized-pie reverted to donut; dashboard rep-performance switched to Today/7d/30d/All-time presets; admin-only pipeline rep/batch/date filters; **repo migrated off iCloud Desktop → `~/Developer/SummitCRM` after local `.git` corruption; native git restored; global git identity + lfs fixed**; **Vercel build break fixed — `types/database.ts` was a failed supabase-gen capture, restored the 276-line manual file**; all three features deployed green to prod). Earlier: 2026-06-01 (Activities → Tasks rename; gh-API commit workflow; mobile pass; untimed follow-ups + conflict greying + origin-context profile nav; rep permissions + Tags column removal; dashboard Tasks widget; rep-performance Today-bounce fix; batches moved to Import page; rep dashboard KPI cards; interest→pipeline removal; admin dashboard KPI cards; mobile header + drawer polish; mobile header dropdowns centered; analytics + team mobile layout; analytics per-person/all-calls toggle; pipeline Needs Buyer card; lead-status %; mini-chart moved to analytics (unique leads/day); Call Summary sized pie; recharts 3.8 chart-type gotcha)*
