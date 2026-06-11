@@ -16,6 +16,22 @@ import { apiNotFound, apiServerError } from '@/lib/utils/api'
 
 type Params = { params: Promise<{ id: string }> }
 
+// mime_type comes from the uploader's browser (file.type) — untrusted. Only
+// types the viewer actually renders inline keep their Content-Type; anything
+// else (incl. text/html, image/svg+xml) is served as a generic download so a
+// crafted upload can never execute same-origin in this framed route.
+const INLINE_SAFE_MIME = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+  'text/csv',
+])
+
 export async function GET(request: NextRequest, { params }: Params) {
   try {
     const ctx = await requireDocumentAdmin()
@@ -33,11 +49,15 @@ export async function GET(request: NextRequest, { params }: Params) {
     const ext = doc.file_path.includes('.') ? '.' + doc.file_path.split('.').pop() : ''
     const downloadName = /\.[^.]+$/.test(doc.name) ? doc.name : doc.name + ext
     const disposition = request.nextUrl.searchParams.get('download') === '1' ? 'attachment' : 'inline'
+    const mime = doc.mime_type && INLINE_SAFE_MIME.has(doc.mime_type.toLowerCase())
+      ? doc.mime_type
+      : 'application/octet-stream'
 
     return new Response(buf, {
       headers: {
-        'Content-Type': doc.mime_type || 'application/octet-stream',
+        'Content-Type': mime,
         'Content-Disposition': `${disposition}; filename="${encodeURIComponent(downloadName)}"`,
+        'X-Content-Type-Options': 'nosniff',
         'Cache-Control': 'private, no-store',
       },
     })

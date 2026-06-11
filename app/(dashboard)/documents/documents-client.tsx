@@ -29,7 +29,11 @@ interface DocRow {
   created_at: string
 }
 
-const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif']
+// Must mirror INLINE_SAFE_MIME in /api/documents/[id]/raw — anything outside
+// that allowlist (svg, avif, …) is served as application/octet-stream and
+// would render as a broken <img>, so it falls through to Download instead.
+const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+const INLINE_IMAGE_MIME = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 const DOCX_EXTS = ['doc', 'docx']
 // Files that can open in Word for the web. Office files open directly; PDFs
 // are converted to a Word doc first (text only, in-house).
@@ -40,7 +44,8 @@ function extOf(d: DocRow): string {
   return (m ? m[1] : '').toLowerCase()
 }
 const isPdf = (d: DocRow) => extOf(d) === 'pdf' || d.mime_type === 'application/pdf'
-const isImage = (d: DocRow) => (d.mime_type ?? '').startsWith('image/') || IMAGE_EXTS.includes(extOf(d))
+const isImage = (d: DocRow) =>
+  INLINE_IMAGE_MIME.includes((d.mime_type ?? '').toLowerCase()) || IMAGE_EXTS.includes(extOf(d))
 const isDocx = (d: DocRow) => DOCX_EXTS.includes(extOf(d))
 
 function formatBytes(n: number | null): string {

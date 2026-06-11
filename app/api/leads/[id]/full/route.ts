@@ -48,6 +48,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     if (!leadRes.data) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
+    // Reps can only open leads assigned to them (same rule as GET /api/leads/[id]
+    // and the calls route — this was the one lead read missing the check).
+    if (member.role === 'rep' && (leadRes.data as { assigned_to: string | null }).assigned_to !== user.id) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    }
+
     // Resolve user names via workspace-scoped SQL RPC.
     const memberRows = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
     const memberIds  = memberRows.map((m) => m.user_id)

@@ -4,7 +4,10 @@ import { updateSession } from './lib/supabase/middleware'
 /**
  * Routes that require authentication.
  */
-const PROTECTED_PATHS = ['/dashboard', '/leads', '/campaigns', '/analytics', '/settings', '/admin', '/notifications']
+const PROTECTED_PATHS = [
+  '/dashboard', '/leads', '/call-mode', '/pipeline', '/tasks', '/batches',
+  '/documents', '/campaigns', '/analytics', '/settings', '/admin', '/notifications',
+]
 
 /**
  * Routes that are only accessible to unauthenticated users.

@@ -120,3 +120,10 @@ export const EMAIL_LIMIT = { prefix: 'email', limit: 60, windowMs: 60_000 } as c
 
 /** 5 signup attempts per IP per minute */
 export const SIGNUP_LIMIT = { prefix: 'signup', limit: 5, windowMs: 60_000 } as const
+
+/** 10 invite acceptances per IP per 5 minutes (unauthenticated token endpoint;
+ *  generous enough for a team onboarding behind one office NAT) */
+export const INVITE_ACCEPT_LIMIT = { prefix: 'invite-accept', limit: 10, windowMs: 300_000 } as const
+
+/** 10 invite emails per admin per minute */
+export const INVITE_SEND_LIMIT = { prefix: 'invite-send', limit: 10, windowMs: 60_000 } as const
