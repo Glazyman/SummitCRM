@@ -27,9 +27,22 @@ export async function GET(req: NextRequest) {
       .select('id, first_name, last_name, email, phone, company, title, status')
       .eq('workspace_id', member.workspace_id)
       .is('deleted_at', null)
-      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,company.ilike.%${q}%`)
       .order('updated_at', { ascending: false })
       .limit(12)
+
+    // Match every whitespace-separated token somewhere across name/email/
+    // company/title. Each .or() is AND-combined, so "John Smith" needs BOTH
+    // "john" and "smith" to match (first matches first_name, second last_name)
+    // — fixing the old "%full query%" against a single column that never
+    // matched a two-word name. Strip PostgREST filter-breaking chars per token.
+    const tokens = q.split(/\s+/)
+      .map((t) => t.replace(/[%,()*\\]/g, '').trim())
+      .filter((t) => t.length > 0)
+    for (const tok of tokens) {
+      query = query.or(
+        `first_name.ilike.%${tok}%,last_name.ilike.%${tok}%,email.ilike.%${tok}%,company.ilike.%${tok}%,title.ilike.%${tok}%`,
+      )
+    }
 
     if (member.role === 'rep') {
       query = query.eq('assigned_to', user.id)
