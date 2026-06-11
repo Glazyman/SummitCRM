@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  PhoneCall, Phone, Mail, MapPin, Layers, SkipForward,
+  PhoneCall, Phone, Globe, MapPin, Layers, SkipForward,
   Voicemail, PhoneMissed, PhoneOff, CalendarClock, CheckCircle2, X, PanelRightOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -24,6 +24,7 @@ export interface QueueLead {
   first_name:        string | null
   last_name:         string | null
   email:             string | null
+  website:           string | null
   phone:             string
   company:           string | null
   title:             string | null
@@ -89,6 +90,14 @@ function fmtAgo(iso: string | null): string | null {
 
 function leadName(l: QueueLead): string {
   return [l.first_name, l.last_name].filter(Boolean).join(' ') || l.email || 'Unnamed lead'
+}
+
+// Ensure the website opens as an absolute URL; show it bare (no protocol/slash).
+function siteHref(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`
+}
+function siteLabel(url: string): string {
+  return url.replace(/^https?:\/\//i, '').replace(/\/+$/, '')
 }
 
 // Derived from OUTCOMES so a renamed outcome can't drift; callback uses the
@@ -443,9 +452,14 @@ export function CallModeClient({
           )}
           {lead.state && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{lead.state}</span>}
           {lead.batch_name && <span className="inline-flex items-center gap-1"><Layers className="h-3 w-3" />{lead.batch_name}</span>}
-          {lead.email && (
-            <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1 hover:text-foreground">
-              <Mail className="h-3 w-3" />{lead.email}
+          {lead.website && (
+            <a
+              href={siteHref(lead.website)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 hover:text-foreground"
+            >
+              <Globe className="h-3 w-3" />{siteLabel(lead.website)}
             </a>
           )}
         </div>

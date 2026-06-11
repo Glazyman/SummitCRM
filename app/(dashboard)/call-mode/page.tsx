@@ -28,8 +28,11 @@ const QUEUE_SORT: Record<QueuePreset, string> = {
   all:   'created_at',
 }
 
-const QUEUE_CAP = 100      // one calling session's worth
-const FETCH_CAP = 200      // fetch extra so filtering out phoneless leads still fills the queue
+// Pull the whole matching set so a rep can work a batch/queue to the end in one
+// session (no per-session cap). get_workspace_leads_page returns one jsonb blob,
+// so PostgREST's 1000-row cap doesn't apply. The high ceiling is just a memory/
+// payload guard — if a queue ever exceeds it the "of N matching" note kicks in.
+const FETCH_CAP = 5000
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface PageProps {
@@ -169,6 +172,7 @@ export default async function CallModePage({ searchParams }: PageProps) {
     type RawLead = {
       id: string; first_name: string | null; last_name: string | null
       email: string | null; phone: string | null; company: string | null; title: string | null
+      website: string | null
       status: string; interest_status: string | null; batch_id: string | null
       last_contacted_at: string | null; last_call_outcome: string | null
       custom_fields: Record<string, string> | null
@@ -184,11 +188,12 @@ export default async function CallModePage({ searchParams }: PageProps) {
     // doesn't promise leads a future session can never serve.
     totalMatching = Math.max(0, (payload.total_count ?? rows.length) - skippedNoPhone)
 
-    leads = withPhone.slice(0, QUEUE_CAP).map((l) => ({
+    leads = withPhone.map((l) => ({
       id:                l.id,
       first_name:        l.first_name,
       last_name:         l.last_name,
       email:             l.email,
+      website:           l.website,
       phone:             (l.phone as string).trim(),
       company:           l.company,
       title:             l.title,
