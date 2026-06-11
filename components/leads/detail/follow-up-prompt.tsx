@@ -40,10 +40,12 @@ export function FollowUpPrompt({ leadId, title, notes, assigneeId, message, onSc
   const [date,   setDate]   = React.useState(tomorrowDateStr)
   const [time,   setTime]   = React.useState('09:00')
   const [saving, setSaving] = React.useState(false)
+  const [error,  setError]  = React.useState<string | null>(null)
   const takenSlots = useTakenSlots(assigneeId ?? null, date)
 
   async function create(dueAtIso: string) {
     setSaving(true)
+    setError(null)
     try {
       const res = await fetch(`/api/leads/${leadId}/follow-ups`, {
         method:  'POST',
@@ -57,6 +59,10 @@ export function FollowUpPrompt({ leadId, title, notes, assigneeId, message, onSc
       })
       const json = await res.json().catch(() => ({}))
       if (res.ok) onScheduled(json.follow_up ?? null)
+      // A silent failure here loses the rep's callback commitment — say so.
+      else setError((json as { error?: string }).error ?? 'Could not add the task — try again.')
+    } catch {
+      setError('Network error — the task was not added.')
     } finally {
       setSaving(false)
     }
@@ -88,6 +94,8 @@ export function FollowUpPrompt({ leadId, title, notes, assigneeId, message, onSc
           <Button size="sm" onClick={saveTimed} disabled={saving}>Save time</Button>
         </div>
       )}
+
+      {error && <p className="mt-1 text-xs font-medium text-red-700">{error}</p>}
     </div>
   )
 }

@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   Kanban,
   ListChecks,
+  PhoneCall,
   BarChart2,
   ChevronLeft,
   ChevronRight,
@@ -37,6 +38,7 @@ interface NavItem {
 const mainNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Leads',     href: '/leads',     icon: Users },
+  { label: 'Call Mode', href: '/call-mode', icon: PhoneCall },
   { label: 'Pipeline',  href: '/pipeline',  icon: Kanban },
   { label: 'Tasks',    href: '/tasks',     icon: ListChecks },
 ]
