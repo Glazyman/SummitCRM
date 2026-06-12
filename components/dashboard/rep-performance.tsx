@@ -184,9 +184,9 @@ function CallsByRepPanel({ reps }: { reps: RepStat[] }) {
 
 // ── Main component ────────────────────────────────────────────────────────
 export function RepPerformancePanel() {
-  // Default to "Last 30 days" — matches the analytics page default and shows
-  // recent activity without aging out as aggressively as a single day.
-  const [preset, setPreset]   = React.useState<Preset>('30d')
+  // Default to "All time" — shows the full call history by default (per user
+  // request); the Today/7d/30d presets narrow it down.
+  const [preset, setPreset]   = React.useState<Preset>('all')
   const [reps, setReps]       = React.useState<RepStat[]>([])
   const [uniqueLeads, setUniqueLeads] = React.useState(0)   // unique leads called in range (per person)
   const [loading, setLoading] = React.useState(true)
