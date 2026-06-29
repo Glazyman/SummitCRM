@@ -13,8 +13,8 @@ import {
   ListChecks,
   PhoneCall,
   BarChart2,
-  ChevronLeft,
-  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
   LogOut,
   UserCog,
   FileText,
@@ -136,37 +136,42 @@ export function Sidebar({ workspaceName, role, userEmail, userName, hideCollapse
       'relative border-r border-border',
       collapsed ? 'w-[64px]' : 'w-[var(--sidebar-width)]'
     )}>
-      {!hideCollapse && (
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          className={cn(
-            'absolute -right-3 top-[68px] z-30',
-            'flex h-6 w-6 items-center justify-center',
-            'text-muted-foreground transition-colors hover:text-foreground'
-          )}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </button>
-      )}
-
-      {/* Brand */}
+      {/* Brand + collapse toggle */}
       {collapsed ? (
-        <div className="flex flex-col items-center gap-3 px-2 pb-4 pt-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-foreground text-[13px] font-bold text-background">
-            {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
-          </div>
+        // Collapsed: no brand — just the toggle icon at the top (Claude-style).
+        <div className="flex items-center justify-center px-2 pb-4 pt-5">
+          {!hideCollapse && (
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <PanelLeftOpen className="h-[18px] w-[18px]" />
+            </button>
+          )}
         </div>
       ) : (
         <div className="flex items-center gap-2.5 px-4 pb-5 pt-5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-foreground text-[13px] font-bold text-background">
             {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
           </div>
-          <p className="min-w-0 flex-1 truncate text-[15px] font-bold leading-none tracking-[-0.02em]">
+          {/* leading-snug + py keeps the "g" descender from being clipped by truncate's overflow-hidden */}
+          <p className="min-w-0 flex-1 truncate py-0.5 text-[15px] font-bold leading-snug tracking-[-0.02em]">
             {workspaceName ?? 'Summit Mergers'}
           </p>
+          {!hideCollapse && (
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+            >
+              <PanelLeftClose className="h-[18px] w-[18px]" />
+            </button>
+          )}
         </div>
       )}
 
