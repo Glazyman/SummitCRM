@@ -4,8 +4,8 @@ import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  Plus, Search, Columns3, List,
-  MoreHorizontal, TrendingUp, Calendar, Phone,
+  Plus, Search, Columns3, List, LayoutGrid,
+  MoreHorizontal, TrendingUp, TrendingDown, Calendar, Phone,
   BarChart3, Trophy, Users, Filter, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -102,9 +102,14 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
   const [batchFilter,    setBatchFilter]    = React.useState<string>('')   // '' = all batches
   const [dateFilter,     setDateFilter]     = React.useState<DatePreset>('all')
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
-  const [pipelineView,   setPipelineView]   = React.useState<'kanban' | 'list'>(() => {
-    try { return localStorage.getItem('pipeline_view_mode') === 'list' ? 'list' : 'kanban' } catch { return 'kanban' }
+  const [pipelineView,   setPipelineView]   = React.useState<'kanban' | 'list' | 'focus'>(() => {
+    try {
+      const v = localStorage.getItem('pipeline_view_mode')
+      return v === 'list' || v === 'focus' ? v : 'kanban'
+    } catch { return 'kanban' }
   })
+  // "Stage" view shows one stage at a time, picked from a dropdown.
+  const [focusStageId,   setFocusStageId]   = React.useState<string>(() => stages[0]?.id ?? '')
   // The kanban board is 1500px+ wide (one 300px column per stage), so on
   // phones/tablets force the list view. Desktop (≥ lg) keeps the saved choice.
   const isMobile = useIsMobile()
@@ -274,8 +279,15 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
   const totalLeads      = filtersActive ? filteredLeads.length : totals.total_leads
   const dealsWon        = filtersActive ? filteredLeads.filter(l => l.pipeline_stage_id && wonStageIds.has(l.pipeline_stage_id)).length : totals.deals_won
   const dealsInProgress = filtersActive ? filteredLeads.filter(l => l.pipeline_stage_id && !wonStageIds.has(l.pipeline_stage_id) && !lostStageIds.has(l.pipeline_stage_id)).length : totals.deals_in_progress
+  // Summed from per-stage counts (server-accurate when unfiltered, filtered-set
+  // when a filter is active) — PipelineTotals has no deals_lost field.
+  const dealsLost       = [...lostStageIds].reduce((sum, id) => sum + (effectiveStageCounts[id] ?? 0), 0)
   const unassigned      = effectiveStageCounts['__unassigned__'] ?? 0
   const seekingBuyer = seekingBuyerStage ? (effectiveStageCounts[seekingBuyerStage.id] ?? 0) : 0
+
+  // The stage currently shown in the single-stage "Stage" view. Falls back to
+  // the first stage if the saved id no longer exists (e.g. a stage was deleted).
+  const focusStage = stages.find(s => s.id === focusStageId) ?? stages[0] ?? null
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'hsl(var(--background))' }}>
@@ -318,6 +330,14 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
               onClick={() => { setPipelineView('list'); try { localStorage.setItem('pipeline_view_mode', 'list') } catch {} }}
             >
               <List className="h-3.5 w-3.5" /> List
+            </Button>
+            <Button
+              size="sm"
+              variant={pipelineView === 'focus' ? 'default' : 'outline'}
+              className="gap-1.5"
+              onClick={() => { setPipelineView('focus'); try { localStorage.setItem('pipeline_view_mode', 'focus') } catch {} }}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" /> Stage
             </Button>
           </div>
 
@@ -377,7 +397,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
         )}
 
         {/* Stat cards — below toolbar */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard
             icon={<TrendingUp className="h-4 w-4" />}
             label="Total Deals"
@@ -390,7 +410,6 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             value={seekingBuyer.toLocaleString()}
             sub={{ bold: `${totalLeads > 0 ? Math.round((seekingBuyer / Math.max(totalLeads, 1)) * 100) : 0}%`, rest: 'of pipeline' }}
             deltaUp={seekingBuyer > 0}
-            accent={seekingBuyer > 0}
           />
           <StatCard
             icon={<Trophy className="h-4 w-4" />}
@@ -398,6 +417,13 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             value={dealsWon.toLocaleString()}
             sub={{ bold: wonStageIds.size > 0 ? stages.find(s => s.is_won)?.name ?? 'Won stage' : 'No won stage', rest: '' }}
             deltaUp={dealsWon > 0}
+            accent={dealsWon > 0}
+          />
+          <StatCard
+            icon={<TrendingDown className="h-4 w-4" />}
+            label="Deals Lost"
+            value={dealsLost.toLocaleString()}
+            sub={{ bold: lostStageIds.size > 0 ? stages.find(s => s.is_lost)?.name ?? 'Lost stage' : 'No lost stage', rest: '' }}
           />
           <StatCard
             icon={<BarChart3 className="h-4 w-4" />}
@@ -492,6 +518,76 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
               )
             })}
           </div>
+        </div>
+      ) : effectivePipelineView === 'focus' ? (
+        /* ── Single-stage "Stage" view ── */
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+          {!focusStage ? (
+            <p className="px-1 py-6 text-sm text-muted-foreground">No pipeline stages yet.</p>
+          ) : (() => {
+            const stageLeads = leadsByStage.get(focusStage.id) ?? []
+            const stageTotal = effectiveStageCounts[focusStage.id] ?? stageLeads.length
+            const hasMore    = stageTotal > stageLeads.length
+            return (
+              <>
+                {/* Stage switcher */}
+                <div className="mb-4 flex flex-wrap items-center gap-3">
+                  <div className="w-full sm:w-72">
+                    <SelectMenu
+                      value={focusStage.id}
+                      onChange={(v) => setFocusStageId(v || stages[0]?.id || '')}
+                      options={stages.map(s => ({
+                        value: s.id,
+                        label: `${s.name} · ${effectiveStageCounts[s.id] ?? 0}`,
+                      }))}
+                      searchable size="sm"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: focusStage.color }} />
+                    <span className="text-sm font-semibold capitalize">{focusStage.name}</span>
+                    {focusStage.is_won  && <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white">WON</span>}
+                    {focusStage.is_lost && <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">LOST</span>}
+                    <span className="text-xs text-muted-foreground">· {stageTotal} {stageTotal === 1 ? 'lead' : 'leads'}</span>
+                  </div>
+                </div>
+
+                {/* Cards grid */}
+                {stageLeads.length === 0 ? (
+                  <div className="flex h-40 items-center justify-center rounded-xl border-2 border-dashed border-border/60 text-sm text-muted-foreground">
+                    No leads in this stage.
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {stageLeads.map(lead => (
+                      <KanbanCard
+                        key={lead.id}
+                        lead={lead}
+                        stageColor={focusStage.color}
+                        stages={stages}
+                        isDragging={false}
+                        onDragStart={() => {}}
+                        onDragEnd={() => {}}
+                        onOpen={() => setSelectedLeadId(lead.id)}
+                        onMoveToStage={moveLeadToStage}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Load more */}
+                {hasMore && (
+                  <button
+                    type="button"
+                    onClick={() => loadStageOverflow(focusStage.id)}
+                    className="mt-4 w-full rounded-md border border-border/70 px-3 py-2.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    + {stageTotal - stageLeads.length} more
+                  </button>
+                )}
+              </>
+            )
+          })()}
         </div>
       ) : (
         /* ── List view ── */
