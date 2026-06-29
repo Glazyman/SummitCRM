@@ -154,11 +154,9 @@ export function Sidebar({ workspaceName, role, userEmail, userName, hideCollapse
         </div>
       ) : (
         <div className="flex items-center gap-2.5 px-4 pb-5 pt-5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-foreground text-[13px] font-bold text-background">
-            {(workspaceName?.trim()?.[0] ?? 'S').toUpperCase()}
-          </div>
-          {/* leading-snug + py keeps the "g" descender from being clipped by truncate's overflow-hidden */}
-          <p className="min-w-0 flex-1 truncate py-0.5 text-[15px] font-bold leading-snug tracking-[-0.02em]">
+          {/* Elegant Playfair Display serif wordmark (text, not an image).
+              leading-snug + py keeps the "g" descender from being clipped by truncate's overflow-hidden */}
+          <p className="min-w-0 flex-1 truncate py-0.5 font-serif text-[20px] font-semibold leading-snug tracking-[-0.01em] text-foreground">
             {workspaceName ?? 'Summit Mergers'}
           </p>
           {!hideCollapse && (

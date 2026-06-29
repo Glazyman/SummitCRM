@@ -37,6 +37,7 @@
   --radius: var(--border-radius);
 
   --font-sans: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", ui-sans-serif, system-ui, sans-serif);
+  --font-serif: var(--font-playfair, 'Playfair Display', Georgia, ui-serif, serif);
 }
 
 /* ── Light-only CSS variables ──────────────────────────────────────────────── */
