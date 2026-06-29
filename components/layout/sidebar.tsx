@@ -180,25 +180,6 @@ export function Sidebar({ workspaceName, role, userEmail, userName, hideCollapse
         'flex flex-1 flex-col overflow-y-auto scrollbar-thin',
         collapsed ? 'px-2' : 'px-3'
       )}>
-        {isAdmin && !collapsed && (
-          <Link
-            href="/leads/import"
-            className="mb-3 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground px-3 text-[13px] font-semibold text-background shadow-primary-glow transition-colors hover:bg-foreground/90"
-          >
-            <PlusCircle className="h-4 w-4" />
-            Import
-          </Link>
-        )}
-        {isAdmin && collapsed && (
-          <Link
-            href="/leads/import"
-            className="mb-3 flex items-center justify-center rounded-full bg-foreground p-2.5 text-background shadow-primary-glow transition-colors hover:bg-foreground/90"
-            title="Import"
-          >
-            <PlusCircle className="h-4 w-4" />
-          </Link>
-        )}
-
         <div className="flex flex-col gap-1">
           {visibleMain.map((item) => (
             <NavLink key={item.href} item={item} active={isActive(item.href)} collapsed={collapsed} />
