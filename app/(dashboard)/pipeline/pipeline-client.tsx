@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Search, Columns3, List, LayoutGrid,
-  MoreHorizontal, TrendingUp, TrendingDown, Calendar, Phone,
+  MoreHorizontal, TrendingUp, Calendar, Phone,
   BarChart3, Trophy, Users, Filter, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -279,9 +279,6 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
   const totalLeads      = filtersActive ? filteredLeads.length : totals.total_leads
   const dealsWon        = filtersActive ? filteredLeads.filter(l => l.pipeline_stage_id && wonStageIds.has(l.pipeline_stage_id)).length : totals.deals_won
   const dealsInProgress = filtersActive ? filteredLeads.filter(l => l.pipeline_stage_id && !wonStageIds.has(l.pipeline_stage_id) && !lostStageIds.has(l.pipeline_stage_id)).length : totals.deals_in_progress
-  // Summed from per-stage counts (server-accurate when unfiltered, filtered-set
-  // when a filter is active) — PipelineTotals has no deals_lost field.
-  const dealsLost       = [...lostStageIds].reduce((sum, id) => sum + (effectiveStageCounts[id] ?? 0), 0)
   const unassigned      = effectiveStageCounts['__unassigned__'] ?? 0
   const seekingBuyer = seekingBuyerStage ? (effectiveStageCounts[seekingBuyerStage.id] ?? 0) : 0
 
@@ -397,7 +394,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
         )}
 
         {/* Stat cards — below toolbar */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <StatCard
             icon={<TrendingUp className="h-4 w-4" />}
             label="Total Deals"
@@ -418,12 +415,6 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             sub={{ bold: wonStageIds.size > 0 ? stages.find(s => s.is_won)?.name ?? 'Won stage' : 'No won stage', rest: '' }}
             deltaUp={dealsWon > 0}
             accent={dealsWon > 0}
-          />
-          <StatCard
-            icon={<TrendingDown className="h-4 w-4" />}
-            label="Deals Lost"
-            value={dealsLost.toLocaleString()}
-            sub={{ bold: lostStageIds.size > 0 ? stages.find(s => s.is_lost)?.name ?? 'Lost stage' : 'No lost stage', rest: '' }}
           />
           <StatCard
             icon={<BarChart3 className="h-4 w-4" />}
@@ -531,24 +522,52 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
             return (
               <>
                 {/* Stage switcher */}
-                <div className="mb-4 flex flex-wrap items-center gap-3">
-                  <div className="w-full sm:w-72">
-                    <SelectMenu
-                      value={focusStage.id}
-                      onChange={(v) => setFocusStageId(v || stages[0]?.id || '')}
-                      options={stages.map(s => ({
-                        value: s.id,
-                        label: `${s.name} · ${effectiveStageCounts[s.id] ?? 0}`,
-                      }))}
-                      searchable size="sm"
-                    />
+                <div className="mb-4 space-y-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="w-full sm:w-72">
+                      <SelectMenu
+                        value={focusStage.id}
+                        onChange={(v) => setFocusStageId(v || stages[0]?.id || '')}
+                        options={stages.map(s => ({
+                          value: s.id,
+                          label: `${s.name} · ${effectiveStageCounts[s.id] ?? 0}`,
+                        }))}
+                        searchable size="sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: focusStage.color }} />
+                      <span className="text-sm font-semibold capitalize">{focusStage.name}</span>
+                      {focusStage.is_won  && <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white">WON</span>}
+                      {focusStage.is_lost && <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">LOST</span>}
+                      <span className="text-xs text-muted-foreground">· {stageTotal} {stageTotal === 1 ? 'lead' : 'leads'}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: focusStage.color }} />
-                    <span className="text-sm font-semibold capitalize">{focusStage.name}</span>
-                    {focusStage.is_won  && <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white">WON</span>}
-                    {focusStage.is_lost && <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">LOST</span>}
-                    <span className="text-xs text-muted-foreground">· {stageTotal} {stageTotal === 1 ? 'lead' : 'leads'}</span>
+
+                  {/* Stage quick-switch buttons */}
+                  <div className="flex flex-wrap gap-2">
+                    {stages.map(s => {
+                      const active = s.id === focusStage.id
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setFocusStageId(s.id)}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors',
+                            active
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground',
+                          )}
+                        >
+                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: s.color }} />
+                          {s.name}
+                          <span className={cn('tabular-nums', active ? 'text-primary-foreground/80' : 'text-muted-foreground/70')}>
+                            {effectiveStageCounts[s.id] ?? 0}
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 
