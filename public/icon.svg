@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="24" fill="#191C23"/>
+  <text x="50" y="50" text-anchor="middle" dominant-baseline="central"
+        font-family="Georgia, 'Times New Roman', 'Playfair Display', serif"
+        font-weight="600" font-size="42" letter-spacing="-2" fill="#F5F3EE">SM</text>
+</svg>
