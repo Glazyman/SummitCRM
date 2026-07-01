@@ -25,14 +25,12 @@ export const metadata: Metadata = {
   },
   description: 'AI-powered cold outreach CRM for modern sales teams.',
   icons: {
-    // "SM" monogram (serif, matching the wordmark). Modern browsers prefer the
-    // SVG; the .ico stays as a legacy fallback.
-    icon: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico' },
-    ],
-    shortcut: '/icon.svg',
-    apple: '/icon.svg',
+    // "SM" monogram (serif, matching the wordmark). SVG only — the old default
+    // favicon.ico was removed so it can't win over this. `?v=2` busts the
+    // browser's aggressive favicon cache.
+    icon: { url: '/icon.svg?v=2', type: 'image/svg+xml' },
+    shortcut: '/icon.svg?v=2',
+    apple: '/icon.svg?v=2',
   },
 }
 
