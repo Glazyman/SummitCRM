@@ -1,23 +1,16 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 import { DocumentsClient } from './documents-client'
 
 export const metadata = { title: 'Documents — Summit CRM' }
 
 export default async function DocumentsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  // Admin-only feature. Effective actor gates it, so an admin viewing-as a rep
+  // is bounced just like the rep would be.
+  const actor = await getActor()
+  if (!actor) redirect('/login')
 
-  const { data: member } = await supabase
-    .from('workspace_members')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single() as { data: { role: string } | null }
-
-  // Admin-only feature.
-  if (!member || !['admin', 'super_admin'].includes(member.role)) {
+  if (!['admin', 'super_admin'].includes(actor.role)) {
     redirect('/dashboard')
   }
 

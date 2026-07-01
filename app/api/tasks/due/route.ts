@@ -1,22 +1,16 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getActor } from '@/lib/auth/actor'
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Effective actor — an admin viewing-as a rep sees the rep's due tasks.
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const member = { workspace_id: actor.workspaceId }
+    const user = { id: actor.userId }
 
     const admin = createAdminClient()
-    const { data: member } = await (admin as any)
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single() as { data: { workspace_id: string } | null }
-
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
 
     const now         = new Date()
     const startToday  = new Date(now); startToday.setHours(0, 0, 0, 0)

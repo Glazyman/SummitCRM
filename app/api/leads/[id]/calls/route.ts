@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getActor } from '@/lib/auth/actor'
 
 const DEFAULT_FOLLOWUP_HOUR = 11 // 11 AM — change this to adjust follow-up time
 
@@ -29,33 +29,26 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: leadId } = await params
-  const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Effective actor: the impersonated teammate when an admin is "viewing as"
+  // someone, else the real user. Scoping keys off this.
+  const actor = await getActor()
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient() as any
-  const { data: member } = await admin
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
 
   // Verify the lead belongs to this workspace
   const leadQuery = admin
     .from('leads')
     .select('id, assigned_to, workspace_id')
     .eq('id', leadId)
-    .eq('workspace_id', member.workspace_id)
+    .eq('workspace_id', actor.workspaceId)
     .single()
 
   const { data: lead, error: leadErr } = await leadQuery
   if (leadErr || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
   // Reps can only see calls for leads assigned to them
-  if (member.role === 'rep' && lead.assigned_to !== user.id) {
+  if (actor.role === 'rep' && lead.assigned_to !== actor.userId) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 })
   }
 
@@ -76,9 +69,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: leadId } = await params
-  const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Effective actor: when an admin is "viewing as" a teammate, the call is
+  // logged UNDER that teammate (logged_by / activity user_id) — this is the
+  // core of "act as the rep".
+  const actor = await getActor()
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
   const { outcome, duration_sec, notes } = body
@@ -86,26 +81,18 @@ export async function POST(
   if (!outcome) return NextResponse.json({ error: 'outcome is required' }, { status: 400 })
 
   const admin = createAdminClient() as any
-  const { data: member } = await admin
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
 
   // Verify lead belongs to workspace; reps can only log calls for their own leads
   const { data: lead, error: leadErr } = await admin
     .from('leads')
     .select('id, workspace_id, assigned_to, status')
     .eq('id', leadId)
-    .eq('workspace_id', member.workspace_id)
+    .eq('workspace_id', actor.workspaceId)
     .single()
 
   if (leadErr || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
-  if (member.role === 'rep' && lead.assigned_to !== user.id) {
+  if (actor.role === 'rep' && lead.assigned_to !== actor.userId) {
     return NextResponse.json({ error: 'You can only log calls for your own leads' }, { status: 403 })
   }
 
@@ -114,7 +101,7 @@ export async function POST(
     .insert({
       lead_id:      leadId,
       workspace_id: lead.workspace_id,
-      logged_by:    user.id,
+      logged_by:    actor.userId,
       outcome,
       duration_sec: duration_sec ?? null,
       notes:        notes ?? null,
@@ -130,7 +117,7 @@ export async function POST(
   await admin.from('activity_logs').insert({
     workspace_id: lead.workspace_id,
     lead_id:      leadId,
-    user_id:      user.id,
+    user_id:      actor.userId,
     type:         'call_logged',
     metadata: {
       outcome,
@@ -153,7 +140,7 @@ export async function POST(
     await admin.from('activity_logs').insert({
       workspace_id: lead.workspace_id,
       lead_id:      leadId,
-      user_id:      user.id,
+      user_id:      actor.userId,
       type:         'lead_status_changed',
       metadata:     { from: lead.status, to: targetStatus, auto_from_call: true },
     })

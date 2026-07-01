@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 import { getUsersById } from '@/lib/users'
 
 type Params = { params: Promise<{ id: string }> }
@@ -11,17 +12,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const cookieStore = await cookies()
     const supabase = (await createServerClient(cookieStore)) as unknown as ReturnType<typeof createAdminClient>
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { data: member } = await supabase
-      .from('workspace_members')
-      .select('workspace_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
-
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+    // Effective actor: an admin viewing-as a rep is scoped like the rep — can
+    // only open leads assigned to them (rep IDOR guard below uses the rep id).
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const member = { workspace_id: actor.workspaceId, role: actor.role }
+    const user = { id: actor.userId }
 
     const workspaceId = member.workspace_id
     const isAdmin = ['super_admin', 'admin'].includes(member.role)

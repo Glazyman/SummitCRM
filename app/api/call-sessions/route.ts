@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getActor } from '@/lib/auth/actor'
 import { getUsersById } from '@/lib/users'
 
 const PRESETS = new Set(['fresh', 'retry', 'all'])
@@ -12,18 +12,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // Reps see their own; admins/managers see the whole workspace (optionally
 // filtered to one rep via ?userId=). Returns sessions + a userId→name map.
 export async function GET(req: NextRequest) {
-  const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Effective actor: a session started while an admin is "viewing as" a rep is
+  // owned by (and listed for) the rep — same as if the rep ran it.
+  const actor = await getActor()
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient() as any
-  const { data: member } = await admin
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-  if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+  const member = { workspace_id: actor.workspaceId, role: actor.role }
+  const user = { id: actor.userId }
 
   const canSeeAll = ['admin', 'super_admin', 'manager'].includes(member.role)
   const filterUser = req.nextUrl.searchParams.get('userId')
@@ -59,18 +55,14 @@ export async function GET(req: NextRequest) {
 // POST /api/call-sessions — start a session (one per "Start calling").
 // Always owned by the caller (user_id = auth.uid()).
 export async function POST(req: NextRequest) {
-  const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Effective actor: a session started while an admin is "viewing as" a rep is
+  // owned by (and listed for) the rep — same as if the rep ran it.
+  const actor = await getActor()
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient() as any
-  const { data: member } = await admin
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-  if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+  const member = { workspace_id: actor.workspaceId, role: actor.role }
+  const user = { id: actor.userId }
 
   const body = await req.json().catch(() => ({}))
   const preset = PRESETS.has(body?.queue_preset) ? body.queue_preset : null

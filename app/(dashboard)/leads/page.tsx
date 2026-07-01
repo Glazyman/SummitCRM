@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 import { getUsersById } from '@/lib/users'
 import { LeadsClient }       from './leads-client'
 import { Spinner } from '@/components/ui/spinner'
@@ -52,20 +53,15 @@ export default async function LeadsPage({ searchParams }: PageProps) {
 
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    // Effective actor: impersonated teammate when an admin is "viewing as"
+    // someone, else the real user. Scoping keys off this.
+    const actor = await getActor()
 
-    if (user) {
-      currentUserId = user.id
-      const { data: member } = await supabase
-        .from('workspace_members')
-        .select('role, workspace_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .single() as { data: { role: string; workspace_id: string } | null; error: unknown }
-
-      role    = member?.role ?? 'rep'
+    if (actor) {
+      currentUserId = actor.userId
+      role    = actor.role
       isAdmin = ['super_admin', 'admin'].includes(role)
-      workspaceId = member?.workspace_id ?? ''
+      workspaceId = actor.workspaceId
       const isRep = role === 'rep'
 
       perPage = parsePerPage(sParam('per'))
@@ -82,7 +78,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       const [pageResult, batchesResult, membersResult] = await Promise.all([
         (adminForLeads as any).rpc('get_workspace_leads_page', {
           p_workspace_id:        workspaceId,
-          p_viewer_id:           user.id,
+          p_viewer_id:           actor.userId,
           p_scope_to_rep:        isRep,
           p_search:              sParam('q') ?? null,
           p_statuses:            statusesArr.length > 0 ? statusesArr : null,

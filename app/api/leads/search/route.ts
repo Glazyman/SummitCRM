@@ -1,26 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getActor } from '@/lib/auth/actor'
 
 export async function GET(req: NextRequest) {
   try {
     const q = (req.nextUrl.searchParams.get('q') ?? '').trim()
     if (q.length < 2) return NextResponse.json({ leads: [] })
 
-    const supabase = await createClient()
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Effective actor — an admin viewing-as a rep searches only the rep's leads.
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()
-    const { data: member } = await (admin as any)
-      .from('workspace_members')
-      .select('workspace_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
-
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+    const member = { workspace_id: actor.workspaceId, role: actor.role }
+    const user = { id: actor.userId }
 
     let query = (admin as any)
       .from('leads')

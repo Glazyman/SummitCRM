@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
+import { ViewAsSwitcher } from '@/components/layout/view-as-switcher'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { WorkspaceRole } from '@/types/database'
 
@@ -37,10 +38,15 @@ function RoleBadge({ role }: { role: WorkspaceRole }) {
 
 // ── Header ────────────────────────────────────────────────────────────────
 interface HeaderProps {
-  user:           SupabaseUser | null
-  role?:          WorkspaceRole | null
-  workspaceName?: string | null
-  onMenuClick?:   () => void
+  user:             SupabaseUser | null
+  /** Effective role — the impersonated teammate's role while viewing-as. */
+  role?:            WorkspaceRole | null
+  workspaceName?:   string | null
+  onMenuClick?:     () => void
+  /** Real caller's role — gates the "View as" switcher (real admins only). */
+  realRole?:        WorkspaceRole | null
+  isImpersonating?: boolean
+  impersonatedName?: string | null
 }
 
 interface SearchLead {
@@ -53,7 +59,7 @@ interface SearchLead {
   status: string
 }
 
-export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) {
+export function Header({ user, role, workspaceName, onMenuClick, realRole, isImpersonating, impersonatedName }: HeaderProps) {
   const router   = useRouter()
   const supabase = createClient()
 
@@ -239,6 +245,13 @@ export function Header({ user, role, workspaceName, onMenuClick }: HeaderProps) 
           >
             <Search className="h-4 w-4" />
           </button>
+
+          {/* Admin-only "view as" (impersonation) switcher */}
+          <ViewAsSwitcher
+            realRole={realRole ?? null}
+            isImpersonating={isImpersonating ?? false}
+            impersonatedName={impersonatedName ?? null}
+          />
 
           {/* One bell for everyone — mentions + lead-assigned + today's
               activities + upcoming activities, all in the same dropdown. */}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getActor } from '@/lib/auth/actor'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -15,9 +15,10 @@ export async function PATCH(
   const { id } = await params
   if (!UUID_RE.test(id)) return NextResponse.json({ error: 'Bad id' }, { status: 400 })
 
-  const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Effective actor: a session owned by the impersonated rep is finalized by
+  // the admin viewing-as them (owner check uses the effective id).
+  const actor = await getActor()
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient() as any
   // Owner check — the session must exist and belong to the caller.
@@ -26,7 +27,7 @@ export async function PATCH(
     .select('id, user_id')
     .eq('id', id)
     .single()
-  if (!session || session.user_id !== user.id) {
+  if (!session || session.user_id !== actor.userId) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 

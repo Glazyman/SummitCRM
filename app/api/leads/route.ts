@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 
 // POST /api/leads — create a new lead
 export async function POST(req: NextRequest) {
   const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: member } = await supabase
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+  // Effective actor: a lead created while an admin is "viewing as" a rep is
+  // assigned to (and attributed to) the rep by default.
+  const actor = await getActor()
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const member = { workspace_id: actor.workspaceId, role: actor.role }
+  const user = { id: actor.userId }
 
   const body = await req.json().catch(() => ({}))
   const {

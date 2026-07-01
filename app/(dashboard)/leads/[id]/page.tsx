@@ -3,6 +3,7 @@ import { notFound }      from 'next/navigation'
 import { Spinner }       from '@/components/ui/spinner'
 import LeadDetailClient  from './lead-detail-client'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 import { getUsersById } from '@/lib/users'
 import type { ActivityEntry, EmailHistoryItem, FollowUp, LeadDetail, TeamMember } from '@/components/leads/detail/types'
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -15,27 +16,26 @@ export default async function LeadDetailPage({ params }: PageProps) {
   const { id } = await params
 
   const supabase = (await createClient()) as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) notFound()
+  // Effective actor: impersonated teammate when an admin is "viewing as"
+  // someone, else the real user. Rep scoping keys off this.
+  const actor = await getActor()
+  if (!actor) notFound()
 
-  const { data: member } = await supabase
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
+  const workspaceId = actor.workspaceId
+  const isRep = actor.role === 'rep'
 
-  const workspaceId = member?.workspace_id
-  if (!workspaceId) notFound()
+  // Reps (and admins viewing-as a rep) may only open leads assigned to them —
+  // matches GET /api/leads/[id] and closes the full-profile IDOR gap.
+  let leadQuery = supabase
+    .from('leads')
+    .select('id, workspace_id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, interest_status, is_unsubscribed, batch_id, assigned_to, ai_summary, custom_fields, created_at, updated_at')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .is('deleted_at', null)
+  if (isRep) leadQuery = leadQuery.eq('assigned_to', actor.userId)
 
   const [leadResult, batchesResult, activityResult, notesResult, emailsResult, followUpsResult, callsResult, membersResult] = await Promise.all([
-    supabase
-      .from('leads')
-      .select('id, workspace_id, first_name, last_name, email, phone, title, company, website, linkedin_url, status, interest_status, is_unsubscribed, batch_id, assigned_to, ai_summary, custom_fields, created_at, updated_at')
-      .eq('id', id)
-      .eq('workspace_id', workspaceId)
-      .is('deleted_at', null)
-      .single(),
+    leadQuery.single(),
     supabase.from('lead_batches').select('id, name').eq('workspace_id', workspaceId),
     supabase.from('activity_logs').select('id, lead_id, user_id, type, metadata, created_at').eq('lead_id', id).order('created_at', { ascending: false }),
     supabase.from('notes').select('id, lead_id, author_id, content, created_at, updated_at').eq('lead_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
@@ -83,9 +83,9 @@ export default async function LeadDetailPage({ params }: PageProps) {
     custom_fields: rawLead.custom_fields ?? {},
   }
 
-  const currentUserId = user.id
-  const isAdmin = ['super_admin', 'admin'].includes(member?.role ?? '')
-  const canEditBatch = ['admin', 'super_admin'].includes(member?.role ?? '')
+  const currentUserId = actor.userId
+  const isAdmin = ['super_admin', 'admin'].includes(actor.role)
+  const canEditBatch = ['admin', 'super_admin'].includes(actor.role)
   const teamMembers: TeamMember[] = memberIds.map((userId) => ({ id: userId, name: usersById.get(userId) ?? userId }))
 
   const activity: ActivityEntry[] = ((activityResult.data ?? []) as Array<{

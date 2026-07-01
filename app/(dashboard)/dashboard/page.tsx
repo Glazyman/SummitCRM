@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 import { resolveDailyCallTarget } from '@/lib/call-targets'
 import { Card, CardContent } from '@/components/ui/card'
 import { OverdueFollowUpsWidget } from '@/components/notifications/overdue-followups-widget'
@@ -14,19 +15,11 @@ import type { WorkspaceRole } from '@/types/database'
 export const metadata: Metadata = { title: 'Dashboard' }
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Fetch role for contextual dashboard content. Cheap query — needed
-  // to decide which widgets to render, so kept in the page shell.
-  const { data: member } = await supabase
-    .from('workspace_members')
-    .select('role, workspace_id')
-    .eq('user_id', user?.id ?? '')
-    .eq('is_active', true)
-    .single() as { data: { role: WorkspaceRole; workspace_id: string } | null; error: unknown }
-
-  const role = member?.role
+  // Effective actor: impersonated teammate when an admin is "viewing as"
+  // someone, else the real user. Widget selection + metric scoping key off this,
+  // so an admin viewing-as a rep sees the rep dashboard.
+  const actor = await getActor()
+  const role = actor?.role
 
   return (
     <div className="space-y-5">
@@ -39,11 +32,11 @@ export default async function DashboardPage() {
           page shell; real numbers stream in once getDashboardMetrics
           resolves (the slow part). */}
       <Suspense fallback={<StatsRowSkeleton />}>
-        {member && user ? (
+        {actor ? (
           <DashboardStats
-            workspaceId={member.workspace_id}
-            userId={user.id}
-            role={member.role}
+            workspaceId={actor.workspaceId}
+            userId={actor.userId}
+            role={actor.role}
           />
         ) : (
           <StatsRowSkeleton />
