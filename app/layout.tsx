@@ -25,7 +25,14 @@ export const metadata: Metadata = {
   },
   description: 'AI-powered cold outreach CRM for modern sales teams.',
   icons: {
-    icon: '/favicon.ico',
+    // "SM" monogram (serif, matching the wordmark). Modern browsers prefer the
+    // SVG; the .ico stays as a legacy fallback.
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico' },
+    ],
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
   },
 }
 

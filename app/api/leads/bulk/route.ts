@@ -124,16 +124,26 @@ export async function PATCH(req: NextRequest) {
 
       const outcome = STATUS_TO_CALL_OUTCOME[status as LeadStatus]
       if (outcome) {
-        const callRows = chunk.map((id) => ({
-          lead_id:      id,
-          workspace_id: member.workspace_id,
-          logged_by:    user.id,
-          outcome,
-          duration_sec: null,
-          notes:        null,
-          called_at:    new Date().toISOString(),
-        }))
-        await (admin as any).from('call_logs').insert(callRows)
+        // Only auto-log a call for leads with NO existing call log — the first
+        // call-status change counts as a call; a later one is treated as a
+        // status correction, not a second call (same rule as PATCH /leads/[id]).
+        const { data: existingRows } = await (admin as any)
+          .from('call_logs')
+          .select('lead_id')
+          .in('lead_id', chunk)
+        const hasCall = new Set(((existingRows ?? []) as Array<{ lead_id: string }>).map((r) => r.lead_id))
+        const callRows = chunk
+          .filter((id) => !hasCall.has(id))
+          .map((id) => ({
+            lead_id:      id,
+            workspace_id: member.workspace_id,
+            logged_by:    user.id,
+            outcome,
+            duration_sec: null,
+            notes:        null,
+            called_at:    new Date().toISOString(),
+          }))
+        if (callRows.length > 0) await (admin as any).from('call_logs').insert(callRows)
       }
     }
   }

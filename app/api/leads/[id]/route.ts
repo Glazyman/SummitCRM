@@ -311,11 +311,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         metadata: { from: existing.status, to: patch.status },
       })
 
-      // Auto-log a call when switching to a call-related status. Capture
-      // the inserted call_logs.id so the paired activity_log can reference
-      // it — letting the activity-DELETE handler cascade-remove the call.
+      // Auto-log a call when switching to a call-related status — but ONLY the
+      // FIRST time. If the lead already has any call log, a re-status is almost
+      // always a mistaken correction, not a second call, so we don't
+      // double-count. A genuine additional call is logged manually via
+      // POST /api/leads/[id]/calls. Capture the inserted call_logs.id so the
+      // paired activity_log can reference it (cascade-delete on activity remove).
       const callOutcome = STATUS_TO_CALL_OUTCOME[patch.status]
-      if (callOutcome) {
+      const { count: existingCalls } = callOutcome
+        ? await adminClient
+            .from('call_logs')
+            .select('id', { count: 'exact', head: true })
+            .eq('lead_id', id) as { count: number | null }
+        : { count: 0 }
+      if (callOutcome && !existingCalls) {
         const { data: insertedCall } = await adminClient
           .from('call_logs')
           .insert({
