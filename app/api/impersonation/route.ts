@@ -75,17 +75,20 @@ export async function POST(req: NextRequest) {
 
   store.set(VIEW_AS_COOKIE, targetId, COOKIE_OPTS)
 
-  // Audit under the REAL admin (best-effort — never block the switch).
-  await caller.admin
-    .from('activity_logs')
-    .insert({
+  // Audit under the REAL admin (best-effort — never block the switch). NOTE:
+  // the Supabase query builder is a thenable, not a Promise, so it has no
+  // .catch() — wrap the await in try/catch instead.
+  try {
+    await caller.admin.from('activity_logs').insert({
       workspace_id: caller.workspaceId,
       lead_id: null,
       user_id: caller.userId,
       type: 'impersonation_started',
       metadata: { target_user_id: targetId, target_role: target.role },
     })
-    .catch(() => null)
+  } catch {
+    // ignore audit failures
+  }
 
   return NextResponse.json({ success: true, impersonating: true })
 }
@@ -111,16 +114,17 @@ export async function DELETE() {
       .eq('is_active', true)
       .single()
     if (member) {
-      await admin
-        .from('activity_logs')
-        .insert({
+      try {
+        await admin.from('activity_logs').insert({
           workspace_id: member.workspace_id,
           lead_id: null,
           user_id: user.id,
           type: 'impersonation_stopped',
           metadata: { target_user_id: prev },
         })
-        .catch(() => null)
+      } catch {
+        // ignore audit failures
+      }
     }
   }
 
