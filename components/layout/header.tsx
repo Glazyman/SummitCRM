@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Avatar } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/components/notifications/notification-bell'
-import { ViewAsSwitcher } from '@/components/layout/view-as-switcher'
+import { ViewAsMenu } from '@/components/layout/view-as-menu'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { WorkspaceRole } from '@/types/database'
 
@@ -43,10 +43,11 @@ interface HeaderProps {
   role?:            WorkspaceRole | null
   workspaceName?:   string | null
   onMenuClick?:     () => void
-  /** Real caller's role — gates the "View as" switcher (real admins only). */
-  realRole?:        WorkspaceRole | null
-  isImpersonating?: boolean
+  /** Real caller's role — gates the "View as" menu (real admins only). */
+  realRole?:         WorkspaceRole | null
+  isImpersonating?:  boolean
   impersonatedName?: string | null
+  impersonatedEmail?: string | null
 }
 
 interface SearchLead {
@@ -59,7 +60,7 @@ interface SearchLead {
   status: string
 }
 
-export function Header({ user, role, workspaceName, onMenuClick, realRole, isImpersonating, impersonatedName }: HeaderProps) {
+export function Header({ user, role, workspaceName, onMenuClick, realRole, isImpersonating, impersonatedName, impersonatedEmail }: HeaderProps) {
   const router   = useRouter()
   const supabase = createClient()
 
@@ -165,9 +166,14 @@ export function Header({ user, role, workspaceName, onMenuClick, realRole, isImp
     runSearch()
   }
 
-  const fullName    = user?.user_metadata?.full_name as string | undefined
-  const email       = user?.email ?? ''
-  const displayName = fullName ?? email
+  // While viewing-as a teammate, the header identity shows THAT teammate (plain,
+  // uncolored) so it's clear whose view you're in. Sign Out still ends the real
+  // (admin) session; the "Back to my account" item / banner handle reverting.
+  const realFullName = user?.user_metadata?.full_name as string | undefined
+  const realEmail    = user?.email ?? ''
+  const fullName     = isImpersonating ? (impersonatedName ?? undefined) : realFullName
+  const email        = isImpersonating ? (impersonatedEmail ?? '') : realEmail
+  const displayName  = fullName ?? email
 
   return (
     <>
@@ -246,13 +252,6 @@ export function Header({ user, role, workspaceName, onMenuClick, realRole, isImp
             <Search className="h-4 w-4" />
           </button>
 
-          {/* Admin-only "view as" (impersonation) switcher */}
-          <ViewAsSwitcher
-            realRole={realRole ?? null}
-            isImpersonating={isImpersonating ?? false}
-            impersonatedName={impersonatedName ?? null}
-          />
-
           {/* One bell for everyone — mentions + lead-assigned + today's
               activities + upcoming activities, all in the same dropdown. */}
           <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-secondary transition-colors relative z-30">
@@ -316,6 +315,14 @@ export function Header({ user, role, workspaceName, onMenuClick, realRole, isImp
                     <User className="h-4 w-4 text-muted-foreground" /> Profile
                   </button>
                 </div>
+
+                {/* Admin-only "View as" (impersonation) — real admins only. */}
+                <ViewAsMenu
+                  realRole={realRole ?? null}
+                  isImpersonating={isImpersonating ?? false}
+                  impersonatedName={impersonatedName ?? null}
+                  onClose={() => setDropdownOpen(false)}
+                />
 
                 <div className="border-t border-border" />
                 <div className="py-1" role="none">

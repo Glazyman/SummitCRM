@@ -76,6 +76,7 @@ export default async function DashboardLayout({
             realRole={actor.realRole}
             isImpersonating={actor.isImpersonating}
             impersonatedName={actor.impersonatedName}
+            impersonatedEmail={actor.impersonatedEmail}
           />
 
           <main className="flex-1 overflow-y-auto scrollbar-thin">
