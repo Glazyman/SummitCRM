@@ -5,23 +5,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getActor } from '@/lib/auth/actor'
 import { apiSuccess, apiError, apiUnauthorized, apiServerError } from '@/lib/utils/api'
 
+// Effective actor: an admin viewing-as a rep edits/deletes tasks with the rep's
+// permissions (own-tasks only), and ownership checks use the rep's id.
 async function getCtx() {
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return null
+  const actor = await getActor()
+  if (!actor) return null
   const admin = createAdminClient()
-  const { data: member } = await (admin as any)
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single() as { data: { workspace_id: string; role: string } | null }
-  if (!member) return null
-  return { user, member, admin }
+  return {
+    user: { id: actor.userId },
+    member: { workspace_id: actor.workspaceId, role: actor.role },
+    admin,
+  }
 }
 
 const patchSchema = z.object({

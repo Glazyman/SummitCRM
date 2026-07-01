@@ -4,8 +4,8 @@
  * Accessible by all authenticated workspace members.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 
 function periodRange(period: string) {
   const now   = new Date()
@@ -28,20 +28,12 @@ function periodRange(period: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const supabase    = await createServerClient(cookieStore)
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+    // Effective actor — an admin viewing-as a rep gets the rep's own stats.
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const admin = createAdminClient()
-    const { data: member } = await admin
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single() as { data: { workspace_id: string } | null }
-
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+    const member = { workspace_id: actor.workspaceId }
+    const user = { id: actor.userId }
 
     const period = req.nextUrl.searchParams.get('period') ?? 'week'
     const range  = periodRange(period)

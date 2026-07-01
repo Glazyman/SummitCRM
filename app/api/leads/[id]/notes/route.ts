@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -22,17 +23,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     const cookieStore = await cookies()
     const supabase = (await createServerClient(cookieStore)) as unknown as ReturnType<typeof createAdminClient>
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { data: member } = await supabase
-      .from('workspace_members')
-      .select('workspace_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
-
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+    // Effective actor: when an admin is "viewing as" a teammate, the note is
+    // authored UNDER that teammate and the rep assignment rules apply to them.
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const member = { workspace_id: actor.workspaceId, role: actor.role }
+    const user = { id: actor.userId }
 
     const body = await req.json()
     const parsed = createNoteSchema.safeParse(body)

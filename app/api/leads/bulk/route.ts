@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 import type { LeadStatus, CallOutcome } from '@/types/database'
 
 const STATUS_TO_CALL_OUTCOME: Partial<Record<LeadStatus, CallOutcome>> = {
@@ -25,19 +26,15 @@ interface FilterSpec {
 }
 
 async function getContext() {
-  const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: member } = await supabase
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  if (!member) return null
-  return { user, member, admin: createAdminClient() }
+  // Effective actor: bulk ops are admin-gated, so an admin viewing-as a rep is
+  // (correctly) blocked; an admin viewing-as another admin acts as them.
+  const actor = await getActor()
+  if (!actor) return null
+  return {
+    user: { id: actor.userId },
+    member: { workspace_id: actor.workspaceId, role: actor.role },
+    admin: createAdminClient(),
+  }
 }
 
 // PATCH /api/leads/bulk — bulk update (status, assigned_to, batch_id).

@@ -1,31 +1,26 @@
 import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getActor } from '@/lib/auth/actor'
 import { getUsersById } from '@/lib/users'
 import { TasksClient } from './tasks-client'
 
 export const metadata: Metadata = { title: 'Tasks' }
 
 export default async function TasksPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Effective actor: impersonated teammate when an admin is "viewing as"
+  // someone, else the real user. Reps (and admins viewing-as a rep) only see
+  // their own tasks.
+  const actor = await getActor()
 
   let activities: any[]  = []
   let teamMembers:  { id: string; name: string }[] = []
   let isAdmin = false
 
-  if (user) {
+  if (actor) {
     const admin = createAdminClient()
-    const { data: member } = await (admin as any)
-      .from('workspace_members')
-      .select('workspace_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single() as { data: { workspace_id: string; role: string } | null }
-
-    if (member) {
-      isAdmin = ['admin', 'super_admin'].includes(member.role)
-      const workspaceId = member.workspace_id
+    {
+      isAdmin = ['admin', 'super_admin'].includes(actor.role)
+      const workspaceId = actor.workspaceId
 
       // Reps only see their own activities
       let actQuery = (admin as any)
@@ -34,7 +29,7 @@ export default async function TasksPage() {
         .eq('workspace_id', workspaceId)
         .order('due_at', { ascending: true })
 
-      if (!isAdmin) actQuery = actQuery.eq('assigned_to', user.id)
+      if (!isAdmin) actQuery = actQuery.eq('assigned_to', actor.userId)
 
       const [activitiesResult, membersResult] = await Promise.all([
         actQuery,
@@ -53,7 +48,7 @@ export default async function TasksPage() {
     <TasksClient
       initialActivities={activities}
       teamMembers={teamMembers}
-      currentUserId={user?.id ?? ''}
+      currentUserId={actor?.userId ?? ''}
       isAdmin={isAdmin}
     />
   )

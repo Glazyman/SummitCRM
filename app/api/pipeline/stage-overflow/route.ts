@@ -5,23 +5,19 @@
  * on the pipeline page. Server enforces rep filtering.
  */
 import { NextResponse } from 'next/server'
-import { cookies }      from 'next/headers'
-import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 import { getTagsByLeadIds } from '@/lib/lead-tags'
 
 export async function GET(req: Request) {
   try {
-    const cookieStore = await cookies()
-    const supabase    = await createServerClient(cookieStore)
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Effective actor — an admin viewing-as a rep loads the rep's stage overflow.
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()
-    const { data: member } = await admin
-      .from('workspace_members').select('workspace_id, role')
-      .eq('user_id', user.id).eq('is_active', true).single() as
-      { data: { workspace_id: string; role: string } | null }
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+    const member = { workspace_id: actor.workspaceId, role: actor.role }
+    const user = { id: actor.userId }
 
     const isAdmin = ['admin', 'super_admin'].includes(member.role)
     const { searchParams } = new URL(req.url)

@@ -3,7 +3,8 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
-import type { LeadStatus, WorkspaceRole, CallOutcome } from '@/types/database'
+import { getActor } from '@/lib/auth/actor'
+import type { LeadStatus, CallOutcome } from '@/types/database'
 
 // Statuses that represent a call attempt — auto-log a call_log row when set
 const STATUS_TO_CALL_OUTCOME: Partial<Record<LeadStatus, CallOutcome>> = {
@@ -50,17 +51,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const cookieStore = await cookies()
     const supabase = (await createServerClient(cookieStore)) as unknown as ReturnType<typeof createAdminClient>
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { data: member } = await supabase
-      .from('workspace_members')
-      .select('workspace_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single() as { data: { workspace_id: string; role: WorkspaceRole } | null; error: unknown }
-
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+    // Effective actor: impersonated teammate when an admin is "viewing as"
+    // someone, else the real user. Rep scoping + write attribution key off this.
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const member = { workspace_id: actor.workspaceId, role: actor.role }
+    const user = { id: actor.userId }
 
     let leadQuery = supabase
       .from('leads')
@@ -155,17 +151,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const cookieStore = await cookies()
     const supabase = (await createServerClient(cookieStore)) as unknown as ReturnType<typeof createAdminClient>
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { data: member } = await supabase
-      .from('workspace_members')
-      .select('workspace_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single() as { data: { workspace_id: string; role: WorkspaceRole } | null; error: unknown }
-
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+    // Effective actor: impersonated teammate when an admin is "viewing as"
+    // someone, else the real user. Rep scoping + write attribution key off this.
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const member = { workspace_id: actor.workspaceId, role: actor.role }
+    const user = { id: actor.userId }
 
     const body = await req.json()
     const parsed = patchSchema.safeParse(body)
@@ -391,20 +382,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     const { id } = await params
-    const cookieStore = await cookies()
-    const supabase = (await createServerClient(cookieStore)) as unknown as ReturnType<typeof createAdminClient>
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { data: member } = await supabase
-      .from('workspace_members')
-      .select('workspace_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single() as { data: { workspace_id: string; role: WorkspaceRole } | null; error: unknown }
-
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+    // Effective actor — an admin viewing-as a rep is treated as the rep, so a
+    // hard delete is (correctly) blocked for them.
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const member = { workspace_id: actor.workspaceId, role: actor.role }
     if (!['admin', 'super_admin'].includes(member.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }

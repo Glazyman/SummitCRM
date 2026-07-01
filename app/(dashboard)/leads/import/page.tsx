@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getActor } from '@/lib/auth/actor'
 import { getUsersById } from '@/lib/users'
 import { ImportPageClient } from './import-page-client'
 
@@ -13,19 +14,14 @@ export default async function ImportPage() {
   const supabase    = await createClient()
   const adminClient = createAdminClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { data: memberData } = await supabase
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user?.id ?? '')
-    .eq('is_active', true)
-    .single() as { data: { workspace_id: string; role: string } | null; error: unknown }
+  // Effective actor — an admin viewing-as a rep can't import (reps can't).
+  const actor = await getActor()
+  if (!actor) redirect('/login')
 
   // Reps cannot import leads
-  if (memberData?.role === 'rep') redirect('/leads')
+  if (actor.role === 'rep') redirect('/leads')
 
-  const workspaceId = memberData?.workspace_id
+  const workspaceId = actor.workspaceId
 
   const [batchesResult, membersResult] = await Promise.all([
     workspaceId
@@ -57,8 +53,8 @@ export default async function ImportPage() {
     leadCount: 0,
   }))
 
-  const isAdmin = ['admin', 'super_admin'].includes(memberData?.role ?? '')
-  const currentUserId = user?.id ?? ''
+  const isAdmin = ['admin', 'super_admin'].includes(actor.role)
+  const currentUserId = actor.userId
 
   return (
     <div className="space-y-6">

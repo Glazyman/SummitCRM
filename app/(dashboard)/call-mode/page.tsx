@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 import { resolveDailyCallTarget } from '@/lib/call-targets'
 import { getUsersById } from '@/lib/users'
 import { CallModeClient, type QueueLead, type QueuePreset } from './call-mode-client'
@@ -73,21 +74,15 @@ export default async function CallModePage({ searchParams }: PageProps) {
 
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) redirect('/login')
+    // Effective actor: impersonated teammate when an admin is "viewing as"
+    // someone, else the real user. Rep scoping + daily target key off this so an
+    // admin viewing-as a rep gets exactly the rep's queue and target.
+    const actor = await getActor()
+    if (!actor) redirect('/login')
 
-    const { data: member } = await supabase
-      .from('workspace_members')
-      .select('role, workspace_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single() as { data: { role: string; workspace_id: string } | null; error: unknown }
-
-    if (!member) return <CallModeClient leads={[]} batches={[]} queue={queue} batchId={batchId} skippedNoPhone={0} />
-
-    currentUserId = user.id
-    isAdmin = member.role === 'admin' || member.role === 'super_admin'
-    const isRep = member.role === 'rep'
+    currentUserId = actor.userId
+    isAdmin = actor.role === 'admin' || actor.role === 'super_admin'
+    const isRep = actor.role === 'rep'
     // Reps work their own assigned leads — no batch picking (admins/managers
     // can filter any batch). Enforced here, not just hidden in the UI.
     const effectiveBatchId = isRep ? null : batchId
@@ -99,8 +94,8 @@ export default async function CallModePage({ searchParams }: PageProps) {
     const [pageResult, batchesResult, workspaceResult, todayResult, membersResult] = await Promise.all([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (admin as any).rpc('get_workspace_leads_page', {
-        p_workspace_id:        member.workspace_id,
-        p_viewer_id:           user.id,
+        p_workspace_id:        actor.workspaceId,
+        p_viewer_id:           actor.userId,
         p_scope_to_rep:        isRep,
         p_search:              null,
         p_statuses:            QUEUE_STATUSES[queue],
@@ -121,29 +116,29 @@ export default async function CallModePage({ searchParams }: PageProps) {
       supabase
         .from('lead_batches')
         .select('id, name')
-        .eq('workspace_id', member.workspace_id)
+        .eq('workspace_id', actor.workspaceId)
         .order('created_at', { ascending: false }),
       supabase
         .from('workspaces')
         .select('settings')
-        .eq('id', member.workspace_id)
+        .eq('id', actor.workspaceId)
         .single(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (admin as any).rpc('get_unique_leads_called', {
-        p_workspace_id: member.workspace_id,
-        p_user_id:      user.id,
+        p_workspace_id: actor.workspaceId,
+        p_user_id:      actor.userId,
         p_since:        startOfToday.toISOString(),
       }),
       admin
         .from('workspace_members')
         .select('user_id')
-        .eq('workspace_id', member.workspace_id)
+        .eq('workspace_id', actor.workspaceId)
         .eq('is_active', true),
     ])
 
     // Workspace members for the optional full lead panel's assignment dropdowns.
     const memberIds = ((membersResult.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
-    const nameById = await getUsersById(admin, member.workspace_id, memberIds)
+    const nameById = await getUsersById(admin, actor.workspaceId, memberIds)
     teamMembers = memberIds
       .map((id) => ({ id, name: nameById.get(id) ?? 'Unknown' }))
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -155,7 +150,7 @@ export default async function CallModePage({ searchParams }: PageProps) {
       console.error('[/call-mode page] target queries failed', workspaceResult.error ?? (todayResult as { error?: unknown }).error)
     } else {
       const settings = (workspaceResult.data as { settings?: Record<string, unknown> } | null)?.settings
-      dailyTarget = resolveDailyCallTarget(settings, user.id)
+      dailyTarget = resolveDailyCallTarget(settings, actor.userId)
       calledToday = Number((todayResult as { data: number | null }).data ?? 0)
     }
 
