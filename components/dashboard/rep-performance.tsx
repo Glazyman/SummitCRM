@@ -85,30 +85,34 @@ function CallDonut({ reps, uniqueLeads }: { reps: RepStat[]; uniqueLeads: number
   }
 
   return (
-    <div className="relative [&_path]:!cursor-default [&_path]:!outline-none">
-      <ResponsiveContainer width="100%" height={200}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%" cy="50%"
-            innerRadius={58} outerRadius={80}
-            paddingAngle={2}
-            dataKey="value"
-            strokeWidth={0}
-          >
-            {data.map((d, i) => <Cell key={i} fill={d.color} />)}
-          </Pie>
-          <RTooltip
-            formatter={(val) => [`${String(val)}`]}
-            contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', background: 'hsl(var(--popover))' }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      {/* Center label — unique leads called (per person), raw calls secondary */}
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold leading-none">{uniqueLeads}</span>
-        <span className="text-[11px] text-muted-foreground">leads called</span>
-        <span className="mt-0.5 text-[10px] text-muted-foreground/70">{total} calls</span>
+    <div className="[&_path]:!cursor-default [&_path]:!outline-none">
+      {/* Chart + centered label share their own relative box so the overlay
+          centers on the donut only — not the donut + legend row below. */}
+      <div className="relative">
+        <ResponsiveContainer width="100%" height={200}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%" cy="50%"
+              innerRadius={58} outerRadius={80}
+              paddingAngle={2}
+              dataKey="value"
+              strokeWidth={0}
+            >
+              {data.map((d, i) => <Cell key={i} fill={d.color} />)}
+            </Pie>
+            <RTooltip
+              formatter={(val) => [`${String(val)}`]}
+              contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', background: 'hsl(var(--popover))' }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+        {/* Center label — unique leads called (per person), raw calls secondary */}
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-bold leading-none">{uniqueLeads}</span>
+          <span className="text-[11px] text-muted-foreground">leads called</span>
+          <span className="mt-0.5 text-[10px] text-muted-foreground/70">{total} calls</span>
+        </div>
       </div>
       {/* Legend */}
       <div className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1">

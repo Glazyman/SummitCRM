@@ -60,21 +60,25 @@ function CallDonut({ stats }: { stats: MyStats }) {
   }
 
   return (
-    <div className="relative [&_path]:!cursor-default [&_path]:!outline-none">
-      <ResponsiveContainer width="100%" height={180}>
-        <PieChart>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={52} outerRadius={72} paddingAngle={2} dataKey="value" strokeWidth={0}>
-            {data.map((d, i) => <Cell key={i} fill={d.color} />)}
-          </Pie>
-          <RTooltip
-            formatter={(val) => [String(val)]}
-            contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', background: 'hsl(var(--popover))' }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold">{stats.calls}</span>
-        <span className="text-[11px] text-muted-foreground">calls</span>
+    <div className="[&_path]:!cursor-default [&_path]:!outline-none">
+      {/* Chart + centered number share their own relative box so the overlay
+          centers on the donut only — not the donut + breakdown list below. */}
+      <div className="relative">
+        <ResponsiveContainer width="100%" height={180}>
+          <PieChart>
+            <Pie data={data} cx="50%" cy="50%" innerRadius={52} outerRadius={72} paddingAngle={2} dataKey="value" strokeWidth={0}>
+              {data.map((d, i) => <Cell key={i} fill={d.color} />)}
+            </Pie>
+            <RTooltip
+              formatter={(val) => [String(val)]}
+              contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', background: 'hsl(var(--popover))' }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-3xl font-bold leading-none">{stats.calls}</span>
+          <span className="text-[11px] text-muted-foreground">calls</span>
+        </div>
       </div>
       {/* Outcome breakdown */}
       <div className="mt-2 space-y-1">
@@ -107,7 +111,7 @@ function FollowUpRing({ stats }: { stats: MyStats }) {
           </RadialBarChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold">{pct}%</span>
+          <span className="text-3xl font-bold leading-none">{pct}%</span>
           <span className="text-[11px] text-muted-foreground">done</span>
         </div>
       </div>
