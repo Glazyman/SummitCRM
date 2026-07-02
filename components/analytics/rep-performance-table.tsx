@@ -148,7 +148,7 @@ function RepCard({ rep, rank, callView, onOpen }: { rep: RepRow; rank: number; c
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[10px] font-bold">{fuPct}%</span>
+                  <span className="text-[10px] font-bold leading-none">{fuPct}%</span>
                 </div>
               </div>
               <div className="space-y-0.5 text-xs">
