@@ -4,7 +4,7 @@ import * as React from 'react'
 import {
   Mail, Phone, Building2, Globe, MapPin,
   Package, UserRound, Sparkles,
-  Pencil, Check, X, ExternalLink,
+  Pencil, Check, X, ExternalLink, Plus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,16 @@ const FIELD_LABELS: Record<EditableField, string> = {
   linkedin_url:'LinkedIn',
 }
 
+// Secondary contact fields live in leads.custom_fields under fixed keys.
+// The primary email/phone are real columns; these are the "add another" slots.
+// Keys are shared verbatim with the PATCH /api/leads/[id] whitelist.
+const EMAIL_KEYS         = ['email_2', 'email_3', 'email_4'] as const
+const PHONE_KEYS         = ['phone_2', 'phone_3', 'phone_4'] as const
+const COMPANY_PHONE_KEYS = ['company_phone', 'company_phone_2', 'company_phone_3'] as const
+const MAX_EMAILS         = 1 + EMAIL_KEYS.length          // primary + secondaries
+const MAX_PHONES         = 1 + PHONE_KEYS.length          // primary + secondaries
+const MAX_COMPANY_PHONES = COMPANY_PHONE_KEYS.length
+
 export function LeadProfileCard({
   lead,
   teamMembers,
@@ -68,6 +78,11 @@ export function LeadProfileCard({
   const [draft,   setDraft]       = React.useState<
     Partial<LeadDetail> & { contact_state?: string; company_state?: string }
   >({})
+  // Multi-value contact fields. emails[0]/phones[0] = the primary column;
+  // the rest map onto EMAIL_KEYS/PHONE_KEYS in custom_fields, in order.
+  const [emails,        setEmails]        = React.useState<string[]>([])
+  const [phones,        setPhones]        = React.useState<string[]>([])
+  const [companyPhones, setCompanyPhones] = React.useState<string[]>([])
   const [batchEditing, setBatchEditing] = React.useState(false)
   const [batchDraft, setBatchDraft]     = React.useState('')
   const [batchSaving, setBatchSaving]   = React.useState(false)
@@ -83,11 +98,10 @@ export function LeadProfileCard({
   const interestMeta = lead.interest_status ? INTEREST_CONFIG[lead.interest_status as InterestStatus] : null
 
   function startEdit() {
+    const cf = lead.custom_fields ?? {}
     setDraft({
       first_name:  lead.first_name  ?? '',
       last_name:   lead.last_name   ?? '',
-      email:       lead.email       ?? '',
-      phone:       lead.phone       ?? '',
       title:       lead.title       ?? '',
       company:     lead.company     ?? '',
       website:     lead.website     ?? '',
@@ -95,12 +109,19 @@ export function LeadProfileCard({
       contact_state: (lead.custom_fields?.contact_state as string | undefined) ?? '',
       company_state: (lead.custom_fields?.company_state as string | undefined) ?? '',
     })
+    // Primary column first, then any populated secondary slots.
+    setEmails([lead.email ?? '', ...EMAIL_KEYS.map((k) => cf[k]).filter(Boolean)])
+    setPhones([lead.phone ?? '', ...PHONE_KEYS.map((k) => cf[k]).filter(Boolean)])
+    setCompanyPhones(COMPANY_PHONE_KEYS.map((k) => cf[k]).filter(Boolean))
     setEditing(true)
   }
 
   function cancelEdit() {
     setEditing(false)
     setDraft({})
+    setEmails([])
+    setPhones([])
+    setCompanyPhones([])
     setSaveError(null)
   }
 
@@ -108,11 +129,29 @@ export function LeadProfileCard({
     setSaving(true)
     setSaveError(null)
     try {
-      // Cast: draft contains the two extra state fields that the API
-      // PATCH route accepts and merges into custom_fields.
-      await onSave(draft as Partial<LeadDetail>)
+      // Assemble the payload: text fields + states from `draft`, plus the
+      // flattened multi-value contact lists. Index 0 → the primary column;
+      // the rest fill EMAIL_KEYS/PHONE_KEYS/COMPANY_PHONE_KEYS in order.
+      // Any unused key is sent as '' so the server clears it.
+      const emailsClean  = emails.map((e) => e.trim()).filter(Boolean)
+      const phonesClean  = phones.map((p) => p.trim()).filter(Boolean)
+      const companyClean = companyPhones.map((p) => p.trim()).filter(Boolean)
+
+      const payload: Record<string, unknown> = { ...draft }
+      // Primary email is the dedup key — only overwrite it when a value exists
+      // (the API refuses to blank it). Secondaries can be cleared freely.
+      if (emailsClean[0]) payload.email = emailsClean[0]
+      EMAIL_KEYS.forEach((k, i) => { payload[k] = emailsClean[i + 1] ?? '' })
+      payload.phone = phonesClean[0] ?? ''
+      PHONE_KEYS.forEach((k, i) => { payload[k] = phonesClean[i + 1] ?? '' })
+      COMPANY_PHONE_KEYS.forEach((k, i) => { payload[k] = companyClean[i] ?? '' })
+
+      await onSave(payload as Partial<LeadDetail>)
       setEditing(false)
       setDraft({})
+      setEmails([])
+      setPhones([])
+      setCompanyPhones([])
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Save failed')
     } finally {
@@ -251,14 +290,16 @@ export function LeadProfileCard({
           icon={<Mail className="h-3.5 w-3.5" />}
           label="Email"
           editing={editing}
-          empty={!lead.email && !editing}
+          empty={!lead.email && !EMAIL_KEYS.some((k) => lead.custom_fields?.[k]) && !editing}
         >
           {editing ? (
-            <input
+            <RepeatableInputs
+              values={emails}
+              onChange={setEmails}
               type="email"
-              value={get('email')}
-              onChange={(e) => set('email', e.target.value)}
-              className={cn(fieldInput)}
+              placeholder="name@company.com"
+              max={MAX_EMAILS}
+              addLabel="Add email"
             />
           ) : (
             <div className="space-y-1">
@@ -269,19 +310,15 @@ export function LeadProfileCard({
                   className="font-mono text-xs text-primary hover:underline"
                 />
               )}
-              {lead.custom_fields?.email_2 && (
-                <CopyableContact
-                  value={lead.custom_fields.email_2}
-                  href={`mailto:${lead.custom_fields.email_2}`}
-                  className="font-mono text-xs text-primary/70 hover:underline"
-                />
-              )}
-              {lead.custom_fields?.email_3 && (
-                <CopyableContact
-                  value={lead.custom_fields.email_3}
-                  href={`mailto:${lead.custom_fields.email_3}`}
-                  className="font-mono text-xs text-primary/70 hover:underline"
-                />
+              {EMAIL_KEYS.map((k) =>
+                lead.custom_fields?.[k] ? (
+                  <CopyableContact
+                    key={k}
+                    value={lead.custom_fields[k]}
+                    href={`mailto:${lead.custom_fields[k]}`}
+                    className="font-mono text-xs text-primary/70 hover:underline"
+                  />
+                ) : null,
               )}
             </div>
           )}
@@ -291,16 +328,36 @@ export function LeadProfileCard({
           icon={<Phone className="h-3.5 w-3.5" />}
           label="Phone"
           editing={editing}
-          empty={!lead.phone && !lead.custom_fields?.phone_2 && !editing}
+          empty={
+            !lead.phone &&
+            !PHONE_KEYS.some((k) => lead.custom_fields?.[k]) &&
+            !COMPANY_PHONE_KEYS.some((k) => lead.custom_fields?.[k]) &&
+            !editing
+          }
         >
           {editing ? (
-            <input
-              type="tel"
-              value={get('phone')}
-              onChange={(e) => set('phone', e.target.value)}
-              placeholder="Add phone…"
-              className={cn(fieldInput)}
-            />
+            <div className="space-y-2.5">
+              <RepeatableInputs
+                values={phones}
+                onChange={setPhones}
+                type="tel"
+                placeholder="Add phone…"
+                max={MAX_PHONES}
+                addLabel="Add phone"
+              />
+              <div>
+                <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Company phone</p>
+                <RepeatableInputs
+                  values={companyPhones}
+                  onChange={setCompanyPhones}
+                  type="tel"
+                  placeholder="Company phone…"
+                  max={MAX_COMPANY_PHONES}
+                  minRows={0}
+                  addLabel="Add company phone"
+                />
+              </div>
+            </div>
           ) : (
             <div className="space-y-1">
               {lead.phone && (
@@ -310,34 +367,28 @@ export function LeadProfileCard({
                   className="text-sm hover:underline"
                 />
               )}
-              {lead.custom_fields?.phone_2 && (
-                <CopyableContact
-                  value={lead.custom_fields.phone_2}
-                  href={`tel:${lead.custom_fields.phone_2}`}
-                  className="text-sm text-muted-foreground hover:underline"
-                />
-              )}
-              {lead.custom_fields?.phone_3 && (
-                <CopyableContact
-                  value={lead.custom_fields.phone_3}
-                  href={`tel:${lead.custom_fields.phone_3}`}
-                  className="text-sm text-muted-foreground hover:underline"
-                />
-              )}
-              {lead.custom_fields?.company_phone && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-1">Company</p>
+              {PHONE_KEYS.map((k) =>
+                lead.custom_fields?.[k] ? (
                   <CopyableContact
-                    value={lead.custom_fields.company_phone}
-                    href={`tel:${lead.custom_fields.company_phone}`}
+                    key={k}
+                    value={lead.custom_fields[k]}
+                    href={`tel:${lead.custom_fields[k]}`}
                     className="text-sm text-muted-foreground hover:underline"
                   />
-                  {lead.custom_fields?.company_phone_2 && (
-                    <CopyableContact
-                      value={lead.custom_fields.company_phone_2}
-                      href={`tel:${lead.custom_fields.company_phone_2}`}
-                      className="text-sm text-muted-foreground hover:underline"
-                    />
+                ) : null,
+              )}
+              {COMPANY_PHONE_KEYS.some((k) => lead.custom_fields?.[k]) && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-1">Company</p>
+                  {COMPANY_PHONE_KEYS.map((k) =>
+                    lead.custom_fields?.[k] ? (
+                      <CopyableContact
+                        key={k}
+                        value={lead.custom_fields[k]}
+                        href={`tel:${lead.custom_fields[k]}`}
+                        className="text-sm text-muted-foreground hover:underline"
+                      />
+                    ) : null,
                   )}
                 </div>
               )}
@@ -623,8 +674,8 @@ export function LeadProfileCard({
       {(() => {
         // Skip internal keys (_questionnaire etc.), already-displayed keys,
         // and any value that isn't a plain scalar.
-        const SKIP = new Set(['contact_state', 'company_state', 'email_2', 'email_3',
-          'phone_2', 'phone_3', 'company_phone', 'company_phone_2'])
+        const SKIP = new Set<string>(['contact_state', 'company_state',
+          ...EMAIL_KEYS, ...PHONE_KEYS, ...COMPANY_PHONE_KEYS])
         const entries = Object.entries(lead.custom_fields).filter(
           ([k, v]) => !k.startsWith('_') && !SKIP.has(k) && typeof v !== 'object'
         )
@@ -678,6 +729,68 @@ function ProfileField({
 
 const fieldInput =
   'h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring'
+
+// ── Repeatable contact input list ──────────────────────────────────────────
+// Renders a growable list of text inputs with a per-row remove and an "Add"
+// button. `minRows` keeps at least N rows present (1 for email/phone so the
+// primary slot always shows; 0 for optional groups like company phone).
+function RepeatableInputs({
+  values, onChange, type, placeholder, max, addLabel, minRows = 1,
+}: {
+  values:      string[]
+  onChange:    (next: string[]) => void
+  type:        'email' | 'tel'
+  placeholder: string
+  max:         number
+  addLabel:    string
+  minRows?:    number
+}) {
+  const rows = values.length < minRows
+    ? [...values, ...Array(minRows - values.length).fill('')]
+    : values
+
+  const update = (i: number, v: string) => onChange(rows.map((x, idx) => (idx === i ? v : x)))
+  const remove = (i: number) => {
+    const next = rows.filter((_, idx) => idx !== i)
+    onChange(next.length < minRows ? [...next, ...Array(minRows - next.length).fill('')] : next)
+  }
+  const add = () => { if (rows.length < max) onChange([...rows, '']) }
+
+  return (
+    <div className="space-y-1.5">
+      {rows.map((val, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <input
+            type={type}
+            value={val}
+            onChange={(e) => update(i, e.target.value)}
+            placeholder={placeholder}
+            className={cn(fieldInput, 'flex-1')}
+          />
+          {rows.length > minRows && (
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              aria-label="Remove"
+              className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      ))}
+      {rows.length < max && (
+        <button
+          type="button"
+          onClick={add}
+          className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+          <Plus className="h-3 w-3" /> {addLabel}
+        </button>
+      )}
+    </div>
+  )
+}
 
 // Re-export Linkedin icon workaround (lucide exports it as 'Linkedin' with capital L)
 function Linkedin(props: React.SVGProps<SVGSVGElement>) {

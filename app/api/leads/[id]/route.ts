@@ -120,9 +120,27 @@ const patchSchema = z.object({
   // Stored inside leads.custom_fields, not as top-level columns.
   contact_state:     stateField,
   company_state:     stateField,
+  // Secondary emails/phones (the "add another" slots in the profile card).
+  // Emails are accepted as loose strings — legacy CSV-imported email_2/3 may
+  // be non-email text, and we don't want that to block saving the lead.
+  // Empty string clears the key.
+  email_2:           z.string().max(320).optional(),
+  email_3:           z.string().max(320).optional(),
+  email_4:           z.string().max(320).optional(),
+  phone_2:           z.string().max(30).optional(),
+  phone_3:           z.string().max(30).optional(),
+  phone_4:           z.string().max(30).optional(),
+  company_phone:     z.string().max(30).optional(),
+  company_phone_2:   z.string().max(30).optional(),
+  company_phone_3:   z.string().max(30).optional(),
 })
 
-const CUSTOM_FIELDS_KEYS = ['contact_state', 'company_state'] as const
+const CUSTOM_FIELDS_KEYS = [
+  'contact_state', 'company_state',
+  'email_2', 'email_3', 'email_4',
+  'phone_2', 'phone_3', 'phone_4',
+  'company_phone', 'company_phone_2', 'company_phone_3',
+] as const
 type CustomFieldKey = typeof CUSTOM_FIELDS_KEYS[number]
 
 const nullableTextFields = [
@@ -266,7 +284,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       if (key in parsed.data) {
         touchedCustomFields = true
         const value = parsed.data[key as CustomFieldKey]
-        if (value && value.length > 0) customFieldsPatch[key] = value
+        const trimmed = value?.trim()
+        // Non-empty → store (emails lowercased to match the primary column);
+        // empty is left out here and removed from the merged object below.
+        if (trimmed) customFieldsPatch[key] = key.startsWith('email') ? trimmed.toLowerCase() : trimmed
       }
     }
     if (touchedCustomFields) {
