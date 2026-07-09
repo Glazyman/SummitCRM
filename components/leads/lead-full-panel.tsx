@@ -207,6 +207,27 @@ export function LeadFullPanel({
     }
   }
 
+  async function handleAssignLead(userId: string) {
+    if (!data) return
+    const prev = data.lead
+    const member = teamMembers.find((m) => m.id === userId)
+    // Server PATCH returns raw columns, not the joined assignee name — derive
+    // it locally from teamMembers so the panel + parent list update immediately.
+    const assignedName = userId ? (member?.name ?? null) : null
+    setData((d) => d ? { ...d, lead: { ...d.lead, assigned_to: userId || null, assigned_name: assignedName } } : d)
+    onLeadChange({ assigned_to: userId || null, assigned_name: assignedName } as Partial<LeadDetail>)
+    try {
+      const res  = await fetch(`/api/leads/${leadId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assigned_to: userId || null }) })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error ?? 'Failed to reassign lead')
+      setData((d) => d ? { ...d, lead: { ...d.lead, ...json.lead, batch_name: d.lead.batch_name, assigned_name: assignedName } } : d)
+    } catch (err) {
+      setData((d) => d ? { ...d, lead: prev } : d)
+      onLeadChange({ assigned_to: prev.assigned_to, assigned_name: prev.assigned_name } as Partial<LeadDetail>)
+      throw err
+    }
+  }
+
   async function handleStatusChange(status: LeadStatus) {
     if (!data) return
     const prev = data.lead.status
@@ -440,6 +461,7 @@ export function LeadFullPanel({
               canEditBatch={canEditBatch}
               onStatusChange={handleStatusChange}
               onInterestChange={handleInterestChange}
+              onAssign={isAdmin ? handleAssignLead : undefined}
             />
 
             {/* Tags — admin-only editing (reps see chips read-only). Hide the

@@ -32,6 +32,9 @@ interface LeadProfileCardProps {
   canEditBatch?:      boolean
   onStatusChange?:    (status: LeadStatus) => void
   onInterestChange?:  (status: InterestStatus) => void
+  /** When set (admins only), the Assigned To field becomes an editable
+   *  dropdown. Empty string = unassign. */
+  onAssign?:          (userId: string) => Promise<void>
 }
 
 type EditableField =
@@ -68,7 +71,9 @@ export function LeadProfileCard({
   canEditBatch = false, // safe default: only admins/managers move leads between batches
   onStatusChange,
   onInterestChange,
+  onAssign,
 }: LeadProfileCardProps) {
+  const [assigning, setAssigning] = React.useState(false)
   const [editing, setEditing]     = React.useState(false)
   const [saving,  setSaving]      = React.useState(false)
   const [saveError, setSaveError] = React.useState<string | null>(null)
@@ -635,9 +640,26 @@ export function LeadProfileCard({
           </ProfileField>
         )}
 
-        {/* Assigned to */}
+        {/* Assigned to — editable dropdown for admins, read-only otherwise */}
         <ProfileField icon={<UserRound className="h-3.5 w-3.5" />} label="Assigned To">
-          {lead.assigned_name ? (
+          {onAssign ? (
+            <select
+              value={lead.assigned_to ?? ''}
+              disabled={assigning}
+              onChange={async (e) => {
+                const v = e.target.value
+                setAssigning(true)
+                // Parent handles optimistic update + revert on failure.
+                try { await onAssign(v) } catch { /* reverted upstream */ } finally { setAssigning(false) }
+              }}
+              className={cn(fieldInput, assigning && 'opacity-60')}
+            >
+              <option value="">Unassigned</option>
+              {teamMembers.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          ) : lead.assigned_name ? (
             <div className="flex items-center gap-2">
               <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[9px] font-bold text-primary shrink-0">
                 {lead.assigned_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}

@@ -477,6 +477,7 @@ export default function LeadDetailClient({
                 canEditBatch={canEditBatch}
                 onStatusChange={handleStatusChange}
                 onInterestChange={handleInterestChange}
+                onAssign={isAdmin ? handleAssign : undefined}
               />
             </div>
           </div>
