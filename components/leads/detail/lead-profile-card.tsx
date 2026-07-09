@@ -93,7 +93,6 @@ export function LeadProfileCard({
   const [moveBatchSaving, setMoveBatchSaving]   = React.useState(false)
 
   const name         = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '—'
-  const initials     = [lead.first_name?.[0], lead.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
   const statusMeta   = STATUS_CONFIG[lead.status]
   const interestMeta = lead.interest_status ? INTEREST_CONFIG[lead.interest_status as InterestStatus] : null
 
@@ -168,14 +167,9 @@ export function LeadProfileCard({
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs shadow-black/5">
 
-      {/* ── Avatar + name header ── */}
-      <div className="relative border-b border-border bg-secondary/50 px-5 pb-4 pt-6">
-        <div className="flex items-start gap-4">
-          {/* Avatar */}
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-card text-lg font-bold text-foreground">
-            {initials}
-          </div>
-
+      {/* ── Name header ── */}
+      <div className="relative border-b border-border bg-secondary/50 px-5 pb-4 pt-5">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             {editing ? (
               <div className="flex gap-2">
