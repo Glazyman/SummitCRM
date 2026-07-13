@@ -9,6 +9,7 @@ import {
   Building2, User, Clock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { prefetchLeadFull } from '@/components/leads/lead-full-cache'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
@@ -147,6 +148,7 @@ function LeadTableRow({
   return (
     <tr
       onClick={onRowClick}
+      onMouseEnter={() => prefetchLeadFull(lead.id)}
       className={cn(
         'group cursor-pointer transition-colors',
         selected ? 'bg-primary/5' : 'hover:bg-muted/40'

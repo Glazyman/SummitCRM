@@ -13,6 +13,7 @@ import {
 import { STATUS_CONFIG, ALL_STATUSES, INTEREST_CONFIG, ALL_INTEREST_STATUSES } from '@/components/leads/status-config'
 import { LeadProfileCard }  from '@/components/leads/detail/lead-profile-card'
 import { TagPicker }         from '@/components/leads/tag-picker'
+import { takeLeadFull, invalidateLeadFull, type LeadFullBundle } from '@/components/leads/lead-full-cache'
 import { ActivityTimeline } from '@/components/leads/detail/activity-timeline'
 import { NoteEditor }       from '@/components/leads/detail/note-editor'
 import { FollowUpSection }  from '@/components/leads/detail/follow-up-section'
@@ -101,30 +102,39 @@ export function LeadFullPanel({
 
   React.useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setData(null)
-    setLoadError(null)
-    Promise.all([
-      // 403 (rep lost access) / 404 (lead deleted) return { error } with no
-      // lead — setData on that shape crashes the render below.
-      fetch(`/api/leads/${leadId}/full`).then(async (r) => {
-        const json = await r.json().catch(() => ({}))
-        if (!r.ok || !json.lead) throw new Error(json.error ?? 'Failed to load lead')
-        return json
-      }),
-      fetch(`/api/leads/${leadId}/questionnaire`).then((r) => r.json()).catch(() => ({ questionnaire: null })),
-    ]).then(([leadData, qData]) => {
-      if (!cancelled) {
-        setData(leadData)
-        setQuestionnaireData(qData.questionnaire ?? null)
-        setTags(leadData.tags ?? [])
-        setAvailableTags(leadData.availableTags ?? [])
-      }
-    }).catch((err: unknown) => {
-      console.error(err)
-      if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load lead')
-    })
-    .finally(() => { if (!cancelled) setLoading(false) })
+
+    // Apply a loaded bundle to state. Shared by the instant (warm) + async paths.
+    const apply = (bundle: LeadFullBundle) => {
+      if (cancelled) return
+      setData(bundle.full)
+      setQuestionnaireData(bundle.questionnaire?.questionnaire ?? null)
+      setTags(bundle.full.tags ?? [])
+      setAvailableTags(bundle.full.availableTags ?? [])
+      setLoadError(null)
+    }
+
+    // A hover prefetch may already have this lead warm → paint instantly, no
+    // spinner. Otherwise reuse the in-flight fetch (or start a cold one).
+    const res = takeLeadFull(leadId)
+    if ('ready' in res) {
+      // Warm cache hit → paint synchronously on mount, no spinner (batched).
+      apply(res.ready)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false)
+    } else {
+      setLoading(true)
+      setData(null)
+      setLoadError(null)
+      res.promise
+        .then(apply)
+        .catch((err: unknown) => {
+          console.error(err)
+          if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load lead')
+        })
+        // Drop the warm copy the fetch left behind so a later reopen (after any
+        // edit made in this panel) refetches fresh instead of serving stale data.
+        .finally(() => { invalidateLeadFull(leadId); if (!cancelled) setLoading(false) })
+    }
     return () => { cancelled = true }
   }, [leadId])
 

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { FollowUpPrompt } from '@/components/leads/detail/follow-up-prompt'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
+import { prefetchLeadFull } from '@/components/leads/lead-full-cache'
 import type { TeamMember } from '@/components/leads/detail/types'
 import type { CallOutcome, LeadStatus } from '@/types/database'
 
@@ -563,6 +564,7 @@ export function CallModeClient({
             <button
               type="button"
               onClick={() => setPanelOpen(true)}
+              onMouseEnter={() => prefetchLeadFull(lead.id)}
               title="Open full lead profile"
               className="max-w-full truncate rounded text-left text-xl font-semibold tracking-tight outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/30"
             >
@@ -576,7 +578,7 @@ export function CallModeClient({
             <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs font-medium capitalize text-muted-foreground">
               {lead.status.replace(/_/g, ' ')}
             </span>
-            <Button variant="outline" size="sm" onClick={() => setPanelOpen(true)}>
+            <Button variant="outline" size="sm" onClick={() => setPanelOpen(true)} onMouseEnter={() => prefetchLeadFull(lead.id)}>
               <PanelRightOpen className="mr-1.5 h-3.5 w-3.5" />
               Full profile
             </Button>

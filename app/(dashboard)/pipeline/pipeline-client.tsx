@@ -18,6 +18,7 @@ import {
 import { SelectMenu } from '@/components/ui/select-menu'
 import { INTEREST_CONFIG } from '@/components/leads/status-config'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
+import { prefetchLeadFull } from '@/components/leads/lead-full-cache'
 import { TagBadge } from '@/components/leads/tag-badge'
 import type { InterestStatus } from '@/types/database'
 
@@ -648,6 +649,7 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
                           onDragStart={(e) => handleDragStart(e, lead.id)}
                           onDragEnd={handleDragEnd}
                           onClick={() => setSelectedLeadId(lead.id)}
+                          onMouseEnter={() => prefetchLeadFull(lead.id)}
                           className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-secondary/40 transition-colors"
                         >
                           <div className="flex items-center gap-3 min-w-0">
@@ -742,6 +744,7 @@ function KanbanCard({
       onDragStart={e => onDragStart(e, lead.id)}
       onDragEnd={onDragEnd}
       onClick={onOpen}
+      onMouseEnter={() => prefetchLeadFull(lead.id)}
       className={cn(
         'rounded-lg border border-border bg-card shadow-xs shadow-black/5 cursor-pointer select-none',
         'transition-all duration-150',
