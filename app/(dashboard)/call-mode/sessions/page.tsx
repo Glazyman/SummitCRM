@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
 import { getUsersById } from '@/lib/users'
 import { SessionsClient, type CallSessionRow } from './sessions-client'
 
@@ -10,18 +11,14 @@ export const dynamic = 'force-dynamic'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export default async function CallSessionsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  // Effective actor: honour admin "view as" — a rep-scoped view (real rep OR an
+  // admin viewing-as a rep) must only see the rep's own sessions.
+  const actor = await getActor()
+  if (!actor) redirect('/login')
+  const member = { workspace_id: actor.workspaceId, role: actor.role }
+  const user = { id: actor.userId }
 
   const admin = createAdminClient() as any
-  const { data: member } = await admin
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-  if (!member) redirect('/dashboard')
 
   const canSeeAll = ['admin', 'super_admin', 'manager'].includes(member.role)
 
