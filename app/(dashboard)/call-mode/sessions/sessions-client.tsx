@@ -39,6 +39,8 @@ const OUTCOME_LABELS: Record<string, string> = {
   no_answer:          'no answer',
   callback_requested: 'callback',
   wrong_number:       'wrong number',
+  sold_already:       'sold already',
+  bad_lead:           'bad lead',
 }
 
 function duration(start: string, end: string | null): string {

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   PhoneCall, Phone, Globe, MapPin, Layers, SkipForward,
   Voicemail, PhoneMissed, PhoneOff, CalendarClock, CheckCircle2, X, PanelRightOpen,
+  BadgeCheck, Ban,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -13,12 +14,18 @@ import { SelectMenu } from '@/components/ui/select-menu'
 import { FollowUpPrompt } from '@/components/leads/detail/follow-up-prompt'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
 import type { TeamMember } from '@/components/leads/detail/types'
-import type { CallOutcome } from '@/types/database'
+import type { CallOutcome, LeadStatus } from '@/types/database'
 
 // NOTE: no "callbacks" preset — `callback` is not a lead status in this app
 // (callbacks live in the tasks system as follow_ups.type='callback'); the
 // Callback outcome below creates a follow-up suggestion instead.
 export type QueuePreset = 'fresh' | 'retry' | 'all'
+
+// sessionStorage key for the in-progress live session, so a page reload resumes
+// the queue where the rep left off instead of restarting at setup. Per-tab
+// (survives reload, cleared when the tab closes) and matched to the queue
+// filters before restoring.
+const SESSION_KEY = 'call-mode:live-session'
 
 export interface QueueLead {
   id:                string
@@ -62,20 +69,33 @@ const QUEUE_LABELS: Record<QueuePreset, { title: string; desc: string }> = {
   all:   { title: 'Everything',  desc: 'Fresh + retries' },
 }
 
+// Each button is either a call outcome (POST /calls) or a status disposition
+// (PATCH the lead). "Sold already" and "Bad lead" aren't call_outcome enum
+// values, so they set the lead's status instead — sold_already auto-logs an
+// "answered" call (first-time-only) via STATUS_TO_CALL_OUTCOME, and
+// do_not_contact is the app's "bad lead" (matches analytics) and drops the lead
+// out of every future queue.
+type ButtonAction =
+  | { kind: 'call';   outcome: CallOutcome }
+  | { kind: 'status'; status: LeadStatus; countsAsCall: boolean }
+
 interface OutcomeDef {
-  outcome: CallOutcome
+  key:     string   // tally + summary key (also the call_sessions.outcomes key)
   label:   string
   kbd:     string
   icon:    React.ComponentType<{ className?: string }>
   classes: string
+  action:  ButtonAction
 }
 
-const OUTCOMES: OutcomeDef[] = [
-  { outcome: 'answered',           label: 'Answered',     kbd: '1', icon: CheckCircle2,  classes: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
-  { outcome: 'voicemail',          label: 'Voicemail',    kbd: '2', icon: Voicemail,     classes: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
-  { outcome: 'no_answer',          label: 'No answer',    kbd: '3', icon: PhoneMissed,   classes: 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100' },
-  { outcome: 'callback_requested', label: 'Callback',     kbd: '4', icon: CalendarClock, classes: 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100' },
-  { outcome: 'wrong_number',       label: 'Wrong number', kbd: '5', icon: PhoneOff,      classes: 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100' },
+const BUTTONS: OutcomeDef[] = [
+  { key: 'answered',           label: 'Answered',     kbd: '1', icon: CheckCircle2,  classes: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100', action: { kind: 'call', outcome: 'answered' } },
+  { key: 'voicemail',          label: 'Voicemail',    kbd: '2', icon: Voicemail,     classes: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',        action: { kind: 'call', outcome: 'voicemail' } },
+  { key: 'no_answer',          label: 'No answer',    kbd: '3', icon: PhoneMissed,   classes: 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100',        action: { kind: 'call', outcome: 'no_answer' } },
+  { key: 'callback_requested', label: 'Callback',     kbd: '4', icon: CalendarClock, classes: 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100',                action: { kind: 'call', outcome: 'callback_requested' } },
+  { key: 'wrong_number',       label: 'Wrong number', kbd: '5', icon: PhoneOff,      classes: 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100',                action: { kind: 'call', outcome: 'wrong_number' } },
+  { key: 'sold_already',       label: 'Sold already', kbd: '6', icon: BadgeCheck,    classes: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100',    action: { kind: 'status', status: 'sold_already',   countsAsCall: true } },
+  { key: 'bad_lead',           label: 'Bad lead',     kbd: '7', icon: Ban,           classes: 'border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-200',           action: { kind: 'status', status: 'do_not_contact', countsAsCall: false } },
 ]
 
 function fmtAgo(iso: string | null): string | null {
@@ -101,10 +121,10 @@ function siteLabel(url: string): string {
   return url.replace(/^https?:\/\//i, '').replace(/\/+$/, '')
 }
 
-// Derived from OUTCOMES so a renamed outcome can't drift; callback uses the
+// Derived from BUTTONS so a renamed outcome can't drift; callback uses the
 // longer wording in history lines.
 const OUTCOME_LABELS: Record<string, string> = {
-  ...Object.fromEntries(OUTCOMES.map((o) => [o.outcome, o.label])),
+  ...Object.fromEntries(BUTTONS.map((o) => [o.key, o.label])),
   callback_requested: 'Callback requested',
 }
 
@@ -128,7 +148,7 @@ export function CallModeClient({
   const [phase,   setPhase]   = React.useState<Phase>('setup')
   const [index,   setIndex]   = React.useState(0)
   const [notes,   setNotes]   = React.useState('')
-  // Mirror of `notes` so logOutcome doesn't depend on it — keeps the callback
+  // Mirror of `notes` so runAction doesn't depend on it — keeps the callback
   // (and the window keydown listener that depends on it) stable across keystrokes.
   const notesRef = React.useRef('')
   const [posting, setPosting] = React.useState(false)
@@ -136,8 +156,13 @@ export function CallModeClient({
   const [tally,   setTally]   = React.useState<Record<string, number>>({})
   const [skipped, setSkipped] = React.useState(0)
   const [followUp, setFollowUp] = React.useState<{ leadId: string; title: string; notes: string | null } | null>(null)
+  // The live queue is a SNAPSHOT taken at "Start calling" (or restored from a
+  // reloaded session) — not the freshly-refetched `leads` prop — so calls a rep
+  // already logged (which change status and would drop out of a re-fetched
+  // queue) don't shift the queue under them.
+  const [sessionLeads, setSessionLeads] = React.useState<QueueLead[]>(leads)
   // Optional full lead panel for the current lead (read everything / edit notes,
-  // tags, intake mid-call). Opening it suspends the 1–5/S keyboard shortcuts.
+  // tags, intake mid-call). Opening it suspends the 1–7/S keyboard shortcuts.
   const [panelOpen, setPanelOpen] = React.useState(false)
   // Logged Call Mode session: created on "Start calling", finalized (tallies +
   // ended_at) when the session reaches the summary. Refs so the fire-and-forget
@@ -145,8 +170,61 @@ export function CallModeClient({
   const sessionIdRef = React.useRef<string | null>(null)
   const finalizedRef = React.useRef(false)
 
-  const lead = leads[index] as QueueLead | undefined
+  const lead = sessionLeads[index] as QueueLead | undefined
   const called = Object.values(tally).reduce((a, b) => a + b, 0)
+
+  // ── Resume an in-progress session after a page reload ──────────────────────
+  // Runs once on mount: if a saved live session matches the current queue
+  // filters, restore it (queue snapshot, position, tallies) and jump straight
+  // back into the live phase. todayCalled stays server-seeded (authoritative).
+  const hydratedRef = React.useRef(false)
+  React.useEffect(() => {
+    if (hydratedRef.current) return
+    hydratedRef.current = true
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY)
+      if (!raw) return
+      const s = JSON.parse(raw)
+      const matches =
+        s && s.queue === queue && (s.batchId ?? null) === (batchId ?? null) &&
+        Array.isArray(s.leads) && s.leads.length > 0 &&
+        typeof s.index === 'number' && s.index >= 0 && s.index < s.leads.length
+      if (matches) {
+        // Mount-only hydration from sessionStorage (batched into one render).
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setSessionLeads(s.leads)
+        setIndex(s.index)
+        setTally(s.tally && typeof s.tally === 'object' ? s.tally : {})
+        setSkipped(typeof s.skipped === 'number' ? s.skipped : 0)
+        sessionIdRef.current = typeof s.sessionId === 'string' ? s.sessionId : null
+        setPhase('live')
+      } else {
+        sessionStorage.removeItem(SESSION_KEY)
+      }
+    } catch {
+      /* corrupt / unavailable storage — start fresh */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Persist the live session on every meaningful change so a reload can resume.
+  React.useEffect(() => {
+    if (phase !== 'live') return
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        queue, batchId, leads: sessionLeads, index, tally, skipped,
+        sessionId: sessionIdRef.current,
+      }))
+    } catch {
+      /* storage full / unavailable — non-fatal, session just won't persist */
+    }
+  }, [phase, sessionLeads, index, tally, skipped, queue, batchId])
+
+  // Clear the saved session once it ends (summary reached) so a later reload
+  // starts fresh at setup.
+  React.useEffect(() => {
+    if (phase === 'done') { try { sessionStorage.removeItem(SESSION_KEY) } catch { /* noop */ } }
+  }, [phase])
 
   function setFilters(next: { queue?: QueuePreset; batch?: string | null }) {
     const q = next.queue ?? queue
@@ -157,9 +235,11 @@ export function CallModeClient({
     startTransition(() => router.replace(`/call-mode?${params.toString()}`))
   }
 
-  // Begin a session: reset tallies, create the logged call_sessions row
-  // (fire-and-forget — a failed log just means no rollup), enter the live phase.
+  // Begin a session: snapshot the current server queue, reset tallies, create
+  // the logged call_sessions row (fire-and-forget — a failed log just means no
+  // rollup), enter the live phase.
   function startSession() {
+    setSessionLeads(leads)
     setIndex(0); setTally({}); setSkipped(0); setNotes(''); notesRef.current = ''
     sessionIdRef.current = null
     finalizedRef.current = false
@@ -180,55 +260,81 @@ export function CallModeClient({
     setError(null)
     setFollowUp(null)
     setPanelOpen(false)
-    if (index + 1 >= leads.length) setPhase('done')
+    if (index + 1 >= sessionLeads.length) setPhase('done')
     else setIndex(index + 1)
   }
 
-  const logOutcome = React.useCallback(async (outcome: CallOutcome) => {
+  const runAction = React.useCallback(async (def: OutcomeDef) => {
     if (!lead || posting || followUp) return
     setPosting(true)
     setError(null)
-    try {
-      const res = await fetch(`/api/leads/${lead.id}/calls`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ outcome, notes: notesRef.current.trim() || null }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(json.error ?? 'Failed to log the call — try again.')
-        return
-      }
-      setTally((t) => ({ ...t, [outcome]: (t[outcome] ?? 0) + 1 }))
+
+    const bumpToday = () => {
       const startOfToday = new Date()
       startOfToday.setHours(0, 0, 0, 0)
       const alreadyCountedToday =
         !!lead.last_contacted_at && new Date(lead.last_contacted_at) >= startOfToday
       if (!alreadyCountedToday) setTodayCalled((c) => c + 1)
-      const suggestion = json.follow_up_suggestion as { title: string; notes: string | null } | null
-      if (suggestion) {
-        // Pause on this lead so the rep can one-tap a follow-up task; the
-        // prompt's actions (schedule or dismiss) advance the queue.
-        setFollowUp({ leadId: lead.id, title: suggestion.title, notes: suggestion.notes })
+    }
+
+    try {
+      if (def.action.kind === 'call') {
+        const res = await fetch(`/api/leads/${lead.id}/calls`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ outcome: def.action.outcome, notes: notesRef.current.trim() || null }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setError(json.error ?? 'Failed to log the call — try again.')
+          return
+        }
+        setTally((t) => ({ ...t, [def.key]: (t[def.key] ?? 0) + 1 }))
+        bumpToday()
+        const suggestion = json.follow_up_suggestion as { title: string; notes: string | null } | null
+        if (suggestion) {
+          // Pause on this lead so the rep can one-tap a follow-up task; the
+          // prompt's actions (schedule or dismiss) advance the queue.
+          setFollowUp({ leadId: lead.id, title: suggestion.title, notes: suggestion.notes })
+        } else {
+          advance()
+        }
       } else {
+        // Status disposition (Sold already / Bad lead): PATCH the lead's status.
+        // The server auto-logs an "answered" call for sold_already the first
+        // time (STATUS_TO_CALL_OUTCOME); do_not_contact logs no call.
+        const res = await fetch(`/api/leads/${lead.id}`, {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ status: def.action.status }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setError(json.error ?? 'Failed to update the lead — try again.')
+          return
+        }
+        setTally((t) => ({ ...t, [def.key]: (t[def.key] ?? 0) + 1 }))
+        // Only count toward the daily target when a call was actually logged —
+        // i.e. sold_already on a lead with no prior call. Bad lead never logs one.
+        if (def.action.countsAsCall && !lead.last_contacted_at) bumpToday()
         advance()
       }
     } catch {
-      setError('Network error — check the lead’s call history before retrying (the call may have been saved).')
+      setError('Network error — check the lead’s history before retrying (the change may have been saved).')
     } finally {
       setPosting(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lead, posting, followUp, index, leads.length])
+  }, [lead, posting, followUp, index, sessionLeads.length])
 
   const skip = React.useCallback(() => {
     if (posting || followUp) return
     setSkipped((s) => s + 1)
     advance()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posting, followUp, index, leads.length])
+  }, [posting, followUp, index, sessionLeads.length])
 
-  // Keyboard shortcuts: 1–5 = outcomes, S = skip. Ignored while typing or while
+  // Keyboard shortcuts: 1–7 = outcomes, S = skip. Ignored while typing or while
   // the full lead panel is open (its own inputs/buttons own the keyboard then).
   React.useEffect(() => {
     if (phase !== 'live' || panelOpen) return
@@ -239,13 +345,13 @@ export function CallModeClient({
       const t = e.target as HTMLElement
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
-      const def = OUTCOMES.find((o) => o.kbd === e.key)
-      if (def) { e.preventDefault(); void logOutcome(def.outcome) }
+      const def = BUTTONS.find((o) => o.kbd === e.key)
+      if (def) { e.preventDefault(); void runAction(def) }
       else if (e.key === 's' || e.key === 'S') { e.preventDefault(); skip() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [phase, panelOpen, logOutcome, skip])
+  }, [phase, panelOpen, runAction, skip])
 
   // Finalize the logged session once the summary is reached (queue exhausted or
   // End session). Stamps the final tallies + ended_at exactly once.
@@ -351,7 +457,7 @@ export function CallModeClient({
         </div>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          Shortcuts during a session: <Kbd>1</Kbd>–<Kbd>5</Kbd> log an outcome · <Kbd>S</Kbd> skips
+          Shortcuts during a session: <Kbd>1</Kbd>–<Kbd>7</Kbd> log an outcome · <Kbd>S</Kbd> skips
         </p>
         <p className="mt-2 text-center text-xs">
           <Link href="/call-mode/sessions" className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
@@ -383,9 +489,9 @@ export function CallModeClient({
 
           {called > 0 && (
             <div className="mx-auto mt-5 grid max-w-sm grid-cols-2 gap-2 text-left sm:grid-cols-3">
-              {OUTCOMES.filter((o) => (tally[o.outcome] ?? 0) > 0).map((o) => (
-                <div key={o.outcome} className={cn('rounded-lg border px-3 py-2', o.classes)}>
-                  <span className="block text-lg font-semibold">{tally[o.outcome]}</span>
+              {BUTTONS.filter((o) => (tally[o.key] ?? 0) > 0).map((o) => (
+                <div key={o.key} className={cn('rounded-lg border px-3 py-2', o.classes)}>
+                  <span className="block text-lg font-semibold">{tally[o.key]}</span>
                   <span className="block text-xs">{o.label}</span>
                 </div>
               ))}
@@ -409,7 +515,7 @@ export function CallModeClient({
   }
 
   // ── Live session ─────────────────────────────────────────────────────────
-  const progress = leads.length > 0 ? (index / leads.length) * 100 : 0
+  const progress = sessionLeads.length > 0 ? (index / sessionLeads.length) * 100 : 0
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
@@ -418,7 +524,7 @@ export function CallModeClient({
         <div className="flex items-center gap-2 text-sm font-medium">
           <PhoneCall className="h-4 w-4 text-primary" />
           Call Mode
-          <span className="text-muted-foreground">· {index + 1} / {leads.length}</span>
+          <span className="text-muted-foreground">· {index + 1} / {sessionLeads.length}</span>
           {dailyTarget > 0 && (
             <span className={cn(
               'whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
@@ -525,12 +631,12 @@ export function CallModeClient({
 
         {/* Outcome buttons */}
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {OUTCOMES.map((o) => (
+          {BUTTONS.map((o) => (
             <button
-              key={o.outcome}
+              key={o.key}
               type="button"
               disabled={posting || !!followUp}
-              onClick={() => void logOutcome(o.outcome)}
+              onClick={() => void runAction(o)}
               className={cn(
                 'flex items-center justify-between gap-2 rounded-lg border px-3 py-3 text-sm font-medium transition-colors',
                 'outline-none focus-visible:ring-[3px] focus-visible:ring-ring/30',
@@ -568,8 +674,8 @@ export function CallModeClient({
       {(called > 0 || skipped > 0) && (
         <div className="mt-4 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span className="font-medium text-foreground">{called} logged</span>
-          {OUTCOMES.filter((o) => (tally[o.outcome] ?? 0) > 0).map((o) => (
-            <span key={o.outcome}>{o.label}: {tally[o.outcome]}</span>
+          {BUTTONS.filter((o) => (tally[o.key] ?? 0) > 0).map((o) => (
+            <span key={o.key}>{o.label}: {tally[o.key]}</span>
           ))}
           {skipped > 0 && <span>Skipped: {skipped}</span>}
         </div>
