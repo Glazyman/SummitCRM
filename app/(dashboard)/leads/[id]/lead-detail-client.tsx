@@ -436,7 +436,7 @@ export default function LeadDetailClient({
       />
 
       {followUpPrompt && (
-        <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6">
+        <div className="w-full pt-4">
           <FollowUpPrompt
             leadId={lead.id}
             title={followUpPrompt.title}
@@ -450,7 +450,7 @@ export default function LeadDetailClient({
       )}
 
       {/* ── Two-column desktop layout ─────────────────────────────────── */}
-      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
+      <div className="w-full flex-1 py-6">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
 
           {/* ── Left: Profile card (sticky on lg; collapsible on mobile) ── */}

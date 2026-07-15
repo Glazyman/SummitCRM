@@ -73,7 +73,7 @@ export function SessionsClient({ sessions, names, batchNames, canSeeAll }: Props
   const visible = repFilter ? sessions.filter((s) => s.user_id === repFilter) : sessions
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
+    <div className="w-full py-6 sm:py-10">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">

@@ -318,7 +318,7 @@ function AnalyticsContent({ userRole }: Props) {
     <div className="min-h-screen bg-background">
       {/* Sticky header */}
       <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <div className="w-full">
           <div className="flex items-center justify-between gap-3 py-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 shrink-0">
@@ -360,7 +360,7 @@ function AnalyticsContent({ userRole }: Props) {
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
+      <div className="w-full py-6 space-y-6">
         {activeTab === 'overview' && (
           <OverviewCards overview={overview} loading={isAdmin ? loadingReps : false} reps={reps} />
         )}

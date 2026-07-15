@@ -80,7 +80,7 @@ export default async function DashboardLayout({
           />
 
           <main className="flex-1 overflow-y-auto scrollbar-thin">
-            <div className="mx-auto w-full max-w-[1400px] px-4 py-5 lg:px-6">
+            <div className="w-full px-4 py-5 lg:px-6">
               {children}
             </div>
           </main>

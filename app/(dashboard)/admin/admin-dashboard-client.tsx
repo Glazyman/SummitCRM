@@ -158,7 +158,7 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
     <div className="min-h-screen bg-background">
       {/* ── Sticky header ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <div className="w-full">
           <div className="flex items-center justify-between gap-4 py-4">
             {/* Title */}
             <div className="flex items-center gap-3 min-w-0">
@@ -200,7 +200,7 @@ function AdminDashboardContent({ isAdmin, isManager, userRole }: AdminDashboardC
       </div>
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
+      <div className="w-full py-6 space-y-6">
 
         {/* Quick actions */}
         <QuickActionsBar isAdmin={isAdmin} quotaAlerts={quotaAlerts} />
