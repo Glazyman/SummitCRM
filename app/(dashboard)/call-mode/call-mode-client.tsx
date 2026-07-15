@@ -16,11 +16,9 @@ import { LeadFullPanel } from '@/components/leads/lead-full-panel'
 import { prefetchLeadFull } from '@/components/leads/lead-full-cache'
 import type { TeamMember } from '@/components/leads/detail/types'
 import type { CallOutcome, LeadStatus } from '@/types/database'
+import { FETCH_CAP, type QueueLead, type QueuePreset, type QueueResponse } from '@/lib/call-mode/types'
 
-// NOTE: no "callbacks" preset — `callback` is not a lead status in this app
-// (callbacks live in the tasks system as follow_ups.type='callback'); the
-// Callback outcome below creates a follow-up suggestion instead.
-export type QueuePreset = 'fresh' | 'retry' | 'all'
+export type { QueueLead, QueuePreset }
 
 // sessionStorage key for the in-progress live session, so a page reload resumes
 // the queue where the rep left off instead of restarting at setup. Per-tab
@@ -28,28 +26,10 @@ export type QueuePreset = 'fresh' | 'retry' | 'all'
 // filters before restoring.
 const SESSION_KEY = 'call-mode:live-session'
 
-export interface QueueLead {
-  id:                string
-  first_name:        string | null
-  last_name:         string | null
-  email:             string | null
-  website:           string | null
-  phone:             string
-  company:           string | null
-  title:             string | null
-  status:            string
-  batch_name:        string | null
-  last_contacted_at: string | null
-  last_call_outcome: string | null
-  state:             string | null
-}
-
 interface Props {
-  leads:          QueueLead[]
   batches:        { id: string; name: string }[]
   queue:          QueuePreset
   batchId:        string | null
-  skippedNoPhone: number
   currentUserId?: string
   /** Whether the caller is an admin — gates batch edits etc. in the full panel. */
   isAdmin?:       boolean
@@ -60,7 +40,11 @@ interface Props {
   calledToday?:   number
   /** Admin-set daily call target (per-rep override or workspace default). */
   dailyTarget?:   number
-  /** Total leads matching the filters — the queue itself is capped per session. */
+  /**
+   * Leads matching the filters, counted server-side without shipping the rows.
+   * Drives the setup count + the Start button; the rows themselves are fetched
+   * from /api/call-mode/queue when the rep presses "Start calling".
+   */
   totalMatching?: number
 }
 
@@ -132,7 +116,7 @@ const OUTCOME_LABELS: Record<string, string> = {
 type Phase = 'setup' | 'live' | 'done'
 
 export function CallModeClient({
-  leads, batches, queue, batchId, skippedNoPhone, currentUserId, loadError,
+  batches, queue, batchId, currentUserId, loadError,
   isAdmin = false, teamMembers = [],
   calledToday = 0, dailyTarget = 0, totalMatching = 0,
 }: Props) {
@@ -157,11 +141,15 @@ export function CallModeClient({
   const [tally,   setTally]   = React.useState<Record<string, number>>({})
   const [skipped, setSkipped] = React.useState(0)
   const [followUp, setFollowUp] = React.useState<{ leadId: string; title: string; notes: string | null } | null>(null)
-  // The live queue is a SNAPSHOT taken at "Start calling" (or restored from a
-  // reloaded session) — not the freshly-refetched `leads` prop — so calls a rep
-  // already logged (which change status and would drop out of a re-fetched
-  // queue) don't shift the queue under them.
-  const [sessionLeads, setSessionLeads] = React.useState<QueueLead[]>(leads)
+  // The live queue is a SNAPSHOT fetched once at "Start calling" (or restored
+  // from a reloaded session) and then left alone — so calls a rep already
+  // logged (which change status and would drop out of a re-fetched queue) can't
+  // shift the queue index under them.
+  const [sessionLeads, setSessionLeads] = React.useState<QueueLead[]>([])
+  // Building the queue for this session (the /api/call-mode/queue round trip).
+  const [starting, setStarting] = React.useState(false)
+  // Why the queue build failed / produced nothing callable — shown on setup.
+  const [startError, setStartError] = React.useState<string | null>(null)
   // Optional full lead panel for the current lead (read everything / edit notes,
   // tags, intake mid-call). Opening it suspends the 1–7/S keyboard shortcuts.
   const [panelOpen, setPanelOpen] = React.useState(false)
@@ -228,6 +216,8 @@ export function CallModeClient({
   }, [phase])
 
   function setFilters(next: { queue?: QueuePreset; batch?: string | null }) {
+    // A failed build belongs to the old filters — don't carry it over.
+    setStartError(null)
     const q = next.queue ?? queue
     const b = next.batch === undefined ? batchId : next.batch
     const params = new URLSearchParams()
@@ -236,23 +226,52 @@ export function CallModeClient({
     startTransition(() => router.replace(`/call-mode?${params.toString()}`))
   }
 
-  // Begin a session: snapshot the current server queue, reset tallies, create
-  // the logged call_sessions row (fire-and-forget — a failed log just means no
-  // rollup), enter the live phase.
-  function startSession() {
-    setSessionLeads(leads)
-    setIndex(0); setTally({}); setSkipped(0); setNotes(''); notesRef.current = ''
-    sessionIdRef.current = null
-    finalizedRef.current = false
-    setPhase('live')
-    fetch('/api/call-sessions', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ queue_preset: queue, batch_id: batchId, queue_size: leads.length }),
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (j?.id) sessionIdRef.current = j.id })
-      .catch(() => {})
+  // Begin a session: BUILD the queue (the page only knows how many leads match
+  // — the rows are fetched here so the setup screen never has to wait on them),
+  // snapshot it, reset tallies, create the logged call_sessions row
+  // (fire-and-forget — a failed log just means no rollup), enter the live phase.
+  async function startSession() {
+    if (starting) return
+    setStarting(true)
+    setStartError(null)
+    try {
+      const params = new URLSearchParams({ queue })
+      if (batchId) params.set('batch', batchId)
+      const res = await fetch(`/api/call-mode/queue?${params.toString()}`)
+      if (!res.ok) throw new Error(`queue ${res.status}`)
+      const data = (await res.json()) as QueueResponse
+      const built = data.leads ?? []
+
+      // Every match lacked a usable phone (totalMatching counts matches, not
+      // callable ones) — say so instead of dropping into an empty live screen.
+      if (built.length === 0) {
+        setStartError(
+          data.skippedNoPhone > 0
+            ? `No callable leads — all ${data.skippedNoPhone} matching lead${data.skippedNoPhone === 1 ? '' : 's'} have no phone number.`
+            : 'No leads match this queue any more. Try another preset.',
+        )
+        return
+      }
+
+      setSessionLeads(built)
+      setIndex(0); setTally({}); setSkipped(0); setNotes(''); notesRef.current = ''
+      sessionIdRef.current = null
+      finalizedRef.current = false
+      setPhase('live')
+      fetch('/api/call-sessions', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ queue_preset: queue, batch_id: batchId, queue_size: built.length }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => { if (j?.id) sessionIdRef.current = j.id })
+        .catch(() => {})
+    } catch (err) {
+      console.error('[call-mode] queue build failed', err)
+      setStartError('Could not build the queue. Try again.')
+    } finally {
+      setStarting(false)
+    }
   }
 
   function advance() {
@@ -427,32 +446,32 @@ export function CallModeClient({
               The queue failed to load — refresh the page to retry.
             </p>
           )}
+          {startError && !loadError && (
+            <p className="mt-4 text-sm text-destructive">{startError}</p>
+          )}
 
           <div className="mt-5 flex items-center justify-between border-t pt-4">
             <div className="text-sm text-muted-foreground">
               {isPending ? (
-                'Loading queue…'
+                'Counting leads…'
               ) : (
                 <>
-                  <span className="font-semibold text-foreground">{leads.length}</span>
-                  {' '}lead{leads.length === 1 ? '' : 's'} in the queue
-                  {totalMatching > leads.length && (
+                  <span className="font-semibold text-foreground">{totalMatching.toLocaleString()}</span>
+                  {' '}lead{totalMatching === 1 ? '' : 's'} matching
+                  {totalMatching > FETCH_CAP && (
                     <span className="block text-xs">
-                      of {totalMatching} matching — finish this session and start another for the rest
+                      this session takes the first {FETCH_CAP.toLocaleString()} — start another for the rest
                     </span>
-                  )}
-                  {skippedNoPhone > 0 && (
-                    <span className="block text-xs">({skippedNoPhone} matching lead{skippedNoPhone === 1 ? '' : 's'} skipped — no phone number)</span>
                   )}
                 </>
               )}
             </div>
             <Button
-              disabled={isPending || leads.length === 0 || !!loadError}
-              onClick={startSession}
+              disabled={isPending || starting || totalMatching === 0 || !!loadError}
+              onClick={() => { void startSession() }}
             >
               <PhoneCall className="mr-1.5 h-4 w-4" />
-              Start calling
+              {starting ? 'Building queue…' : 'Start calling'}
             </Button>
           </div>
         </div>
