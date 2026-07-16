@@ -270,16 +270,29 @@ export default function PipelineClient({ stages, initialLeads, initialStageCount
   }
 
   const wonStageIds = new Set(stages.filter(s => s.is_won).map(s => s.id))
-  const lostStageIds = new Set(stages.filter(s => s.is_lost).map(s => s.id))
   // Leads currently in the "Seeking Buyer" pipeline stage (deals with no buyer yet).
   const seekingBuyerStage = stages.find(s => s.name.trim().toLowerCase() === 'seeking buyer')
 
-  // Without filters, the four numbers come from the server (accurate across the
-  // full workspace). With a filter active, recompute from the filtered set so
-  // the cards match the filtered board.
+  // "Deals in Progress" = active mid-funnel stages ONLY: Intro Made, Data
+  // Requested, and LOI / Negotiation. (Interested + Seeking Buyer are earlier
+  // stages; Won/Lost are terminal — none of those count as "in progress".)
+  // Matched by name so it tracks the M&A stage set the same way seekingBuyerStage does.
+  const inProgressStageIds = new Set(
+    stages
+      .filter(s => {
+        const n = s.name.trim().toLowerCase()
+        return n === 'intro made' || n === 'data requested' || n.startsWith('loi')
+      })
+      .map(s => s.id)
+  )
+
+  // Without filters, the numbers come from the server (accurate across the full
+  // workspace). With a filter active, recompute from the filtered set so the
+  // cards match the filtered board. Deals in Progress is derived from
+  // effectiveStageCounts, which is already accurate in both modes.
   const totalLeads      = filtersActive ? filteredLeads.length : totals.total_leads
   const dealsWon        = filtersActive ? filteredLeads.filter(l => l.pipeline_stage_id && wonStageIds.has(l.pipeline_stage_id)).length : totals.deals_won
-  const dealsInProgress = filtersActive ? filteredLeads.filter(l => l.pipeline_stage_id && !wonStageIds.has(l.pipeline_stage_id) && !lostStageIds.has(l.pipeline_stage_id)).length : totals.deals_in_progress
+  const dealsInProgress = [...inProgressStageIds].reduce((sum, id) => sum + (effectiveStageCounts[id] ?? 0), 0)
   const unassigned      = effectiveStageCounts['__unassigned__'] ?? 0
   const seekingBuyer = seekingBuyerStage ? (effectiveStageCounts[seekingBuyerStage.id] ?? 0) : 0
 
