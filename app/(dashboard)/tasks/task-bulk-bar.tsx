@@ -3,7 +3,7 @@
 import * as React from 'react'
 import {
   X, ChevronDown, Trash2, UserRound, CheckCircle2, Circle,
-  CalendarClock, Flag, Phone, ArrowUpRight,
+  CalendarClock, Flag, Phone, ArrowUpRight, RotateCcw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,9 @@ interface Props {
   onPatch:       (patch: BulkTaskPatch) => void
   onReschedule:  (target: RescheduleTarget) => void
   onDelete:      () => void
+  /** Leads behind the selected tasks — "Reset to New" acts on these. */
+  leadCount:     number
+  onResetLeads:  () => void
 }
 
 /**
@@ -36,9 +39,10 @@ interface Props {
  */
 export function TaskBulkBar({
   selectedCount, teamMembers, isAdmin, busy,
-  onClear, onPatch, onReschedule, onDelete,
+  onClear, onPatch, onReschedule, onDelete, leadCount, onResetLeads,
 }: Props) {
   const [deleteConfirm, setDeleteConfirm] = React.useState(false)
+  const [resetConfirm,  setResetConfirm]  = React.useState(false)
 
   if (selectedCount === 0) return null
 
@@ -148,11 +152,46 @@ export function TaskBulkBar({
             </DropdownMenu>
           )}
 
+          {/* Reset to New — admin only (the leads bulk API is admin-gated).
+              Resets the LEADS behind the selected tasks: status → new, their
+              call logs + open tasks erased. Own confirm that says so. */}
+          {isAdmin && leadCount > 0 && (
+            !resetConfirm ? (
+              <Button
+                variant="outline" size="sm" disabled={busy}
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => { setResetConfirm(true); setDeleteConfirm(false) }}
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Reset to New
+              </Button>
+            ) : (
+              <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 dark:border-amber-800 dark:bg-amber-950/30">
+                <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                  Reset {leadCount} {leadCount === 1 ? 'lead' : 'leads'}? Erases their calls + open tasks
+                </span>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-amber-800 underline hover:text-amber-900 dark:text-amber-300"
+                  onClick={() => { onResetLeads(); setResetConfirm(false) }}
+                >
+                  Confirm
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setResetConfirm(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            )
+          )}
+
           {!deleteConfirm ? (
             <Button
               variant="outline" size="sm" disabled={busy}
               className="h-8 gap-1.5 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
-              onClick={() => setDeleteConfirm(true)}
+              onClick={() => { setDeleteConfirm(true); setResetConfirm(false) }}
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </Button>

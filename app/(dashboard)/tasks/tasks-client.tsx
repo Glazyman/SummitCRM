@@ -204,12 +204,13 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
     method: 'PATCH' | 'DELETE',
     body: Record<string, unknown>,
     optimistic: (prev: Activity[]) => Activity[],
+    url = '/api/tasks/bulk',
   ) {
     setBulkBusy(true)
     setActivities(optimistic)
     clearSelection()
     try {
-      const res = await fetch('/api/tasks/bulk', {
+      const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(body),
@@ -244,6 +245,19 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
   function bulkDelete() {
     const ids = new Set(selectedVisible.map((a) => a.id))
     runBulk('DELETE', { ids: [...ids] }, (prev) => prev.filter((a) => !ids.has(a.id)))
+  }
+
+  // "Reset to New" acts on the LEADS behind the selected tasks: lead status →
+  // new, and the server erases their call logs + every open task on them.
+  const selectedLeadIds = useMemo(
+    () => [...new Set(selectedVisible.map((a) => a.lead?.id).filter((id): id is string => !!id))],
+    [selectedVisible],
+  )
+  function bulkResetLeads() {
+    const leadIds = new Set(selectedLeadIds)
+    runBulk('PATCH', { ids: [...leadIds], reset: true },
+      (prev) => prev.filter((a) => a.completed_at || !a.lead || !leadIds.has(a.lead.id)),
+      '/api/leads/bulk')
   }
 
   // ── Calendar-specific filtered activities ────────────────────────────────
@@ -749,6 +763,8 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
         onPatch={bulkPatch}
         onReschedule={bulkReschedule}
         onDelete={bulkDelete}
+        leadCount={selectedLeadIds.length}
+        onResetLeads={bulkResetLeads}
       />
 
       {/* Lead full panel — opened when clicking an activity row (list view) */}
