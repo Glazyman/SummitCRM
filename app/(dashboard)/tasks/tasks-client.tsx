@@ -4,18 +4,20 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
   Phone, ArrowUpRight, CheckCircle2, Circle, Clock,
-  Plus, X, User, List, CalendarDays,
+  Plus, X, User, List, CalendarDays, ListChecks,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { CalendarPicker, TimePicker, splitDateTime, joinDateTime, toLocalDatetimeInput } from '@/components/ui/calendar-picker'
 import { useTakenSlots } from '@/hooks'
 import { LeadFullPanel } from '@/components/leads/lead-full-panel'
 import { TasksCalendar, toLocalDateKey, fmtTime } from './tasks-calendar'
+import { TaskBulkBar, type BulkTaskPatch, type RescheduleTarget } from './task-bulk-bar'
 import type { TeamMember } from '@/components/leads/detail/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -86,6 +88,18 @@ function isOverdue(iso: string): boolean {
   return !isUntimed(d) && d.getTime() < now.getTime()
 }
 
+/** Same local time of day as `iso`, moved to the target day. */
+function rescheduledDueAt(iso: string, target: RescheduleTarget): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (target === 'tomorrow')    day.setDate(day.getDate() + 1)
+  if (target === 'next_monday') day.setDate(day.getDate() + (((8 - day.getDay()) % 7) || 7))
+  if (target === 'plus_week')   day.setTime(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7).getTime())
+  day.setHours(d.getHours(), d.getMinutes(), 0, 0)
+  return day.toISOString()
+}
+
 /** Tomorrow at 9 AM in local time. */
 function defaultActivityDueAt(): string {
   const d = new Date()
@@ -118,6 +132,9 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
   const [calendarFilterAssigned, setCalendarFilterAssigned] = useState('')
   const [calendarFilterStatus,   setCalendarFilterStatus]   = useState('open')
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const [selected,   setSelected]   = useState<Set<string>>(new Set())
+  const [selectMode, setSelectMode] = useState(false)   // phone only — desktop always shows checkboxes
+  const [bulkBusy,   setBulkBusy]   = useState(false)
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -158,6 +175,76 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
       return true
     })
   }, [activities, search, filterType, filterAssigned, filterDone, justCompleted])
+
+  // ── Selection ─────────────────────────────────────────────────────────────
+  // Only rows still on screen count, so changing a filter never lets a bulk
+  // action hit tasks the user can no longer see.
+  const selectedVisible = useMemo(() => filtered.filter((a) => selected.has(a.id)), [filtered, selected])
+  const allSelected  = filtered.length > 0 && selectedVisible.length === filtered.length
+  const someSelected = selectedVisible.length > 0 && !allSelected
+
+  function toggleSelect(id: string) {
+    setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  function toggleSelectAll() {
+    setSelected(allSelected ? new Set() : new Set(filtered.map((a) => a.id)))
+  }
+  function clearSelection() {
+    setSelected(new Set())
+    setSelectMode(false)
+  }
+
+  async function reloadActivities() {
+    const res  = await fetch('/api/tasks')
+    const json = await res.json() as { data?: { activities: Activity[] } }
+    if (json.data?.activities) setActivities(json.data.activities)
+  }
+
+  async function runBulk(
+    method: 'PATCH' | 'DELETE',
+    body: Record<string, unknown>,
+    optimistic: (prev: Activity[]) => Activity[],
+  ) {
+    setBulkBusy(true)
+    setActivities(optimistic)
+    clearSelection()
+    try {
+      const res = await fetch('/api/tasks/bulk', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+      })
+      if (!res.ok) await reloadActivities()   // roll back to the server's truth
+    } catch {
+      await reloadActivities()
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  function bulkPatch(patch: BulkTaskPatch) {
+    const ids = new Set(selectedVisible.map((a) => a.id))
+    const now = new Date().toISOString()
+    runBulk('PATCH', { ids: [...ids], ...patch }, (prev) => prev.map((a) => {
+      if (!ids.has(a.id)) return a
+      if ('completed' in patch)  return { ...a, completed_at: patch.completed ? (a.completed_at ?? now) : null }
+      if ('priority' in patch)   return { ...a, priority: patch.priority }
+      if ('type' in patch)       return { ...a, type: patch.type }
+      return { ...a, assigned_to: patch.assignedTo }
+    }))
+  }
+
+  function bulkReschedule(target: RescheduleTarget) {
+    const dueAts = Object.fromEntries(selectedVisible.map((a) => [a.id, rescheduledDueAt(a.due_at, target)]))
+    runBulk('PATCH', { ids: Object.keys(dueAts), dueAts }, (prev) =>
+      prev.map((a) => dueAts[a.id] ? { ...a, due_at: dueAts[a.id] } : a)
+        .sort((x, y) => x.due_at.localeCompare(y.due_at)))
+  }
+
+  function bulkDelete() {
+    const ids = new Set(selectedVisible.map((a) => a.id))
+    runBulk('DELETE', { ids: [...ids] }, (prev) => prev.filter((a) => !ids.has(a.id)))
+  }
 
   // ── Calendar-specific filtered activities ────────────────────────────────
   const calendarFiltered = useMemo(() => {
@@ -392,10 +479,29 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
           ]}
           className="w-40"
         />
+
+        {/* Phone: checkboxes only appear in select mode (desktop always has them) */}
+        <div className="flex w-full items-center gap-3 lg:hidden">
+          <button
+            onClick={() => selectMode ? clearSelection() : setSelectMode(true)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all',
+              selectMode ? 'bg-foreground text-background border-foreground' : 'border-border bg-background text-muted-foreground',
+            )}
+          >
+            <ListChecks className="h-3.5 w-3.5" /> {selectMode ? 'Cancel' : 'Select'}
+          </button>
+          {selectMode && filtered.length > 0 && (
+            <button onClick={toggleSelectAll} className="text-[12px] font-semibold text-primary">
+              {allSelected ? 'Deselect all' : `Select all (${filtered.length})`}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Mobile card list — replaces the wide table below lg */}
-      <div className="space-y-2 lg:hidden">
+      {/* Bottom padding while selecting so the floating bulk bar never hides the last row */}
+      <div className={cn('space-y-2 lg:hidden', selectedVisible.length > 0 && 'pb-48')}>
         {filtered.length === 0 && (
           <div className="rounded-xl border border-border py-12 text-center text-muted-foreground text-sm">
             {activities.length === 0 ? 'No tasks yet.' : 'No tasks match the current filters.'}
@@ -405,25 +511,37 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
           const due  = fmtDate(a.due_at)
           const done = !!a.completed_at
           const assignee = teamMembers.find((m) => m.id === a.assigned_to)
+          const isSelected = selected.has(a.id)
           return (
             <div
               key={a.id}
-              onClick={() => setSelectedActivity(a)}
+              onClick={() => selectMode ? toggleSelect(a.id) : setSelectedActivity(a)}
               className={cn(
                 'rounded-xl border border-border bg-card p-3.5 transition-colors',
-                done ? 'opacity-50' : 'active:bg-muted/40',
+                done && !isSelected ? 'opacity-50' : 'active:bg-muted/40',
+                isSelected && 'border-primary/50 bg-primary/5',
                 !done && due.bucket === 'past'  && 'border-l-2 border-l-red-500',
                 !done && due.bucket === 'today' && 'border-l-2 border-l-amber-500',
               )}
             >
               <div className="flex items-start gap-3">
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleDone(a) }}
-                  className={cn('mt-0.5 shrink-0', done ? 'text-emerald-500' : 'text-muted-foreground')}
-                  title={done ? 'Mark open' : 'Mark done'}
-                >
-                  {done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
-                </button>
+                {selectMode ? (
+                  <Checkbox
+                    checked={isSelected}
+                    onChange={() => toggleSelect(a.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-0.5 h-5 w-5"
+                    aria-label="Select task"
+                  />
+                ) : (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleDone(a) }}
+                    className={cn('mt-0.5 shrink-0', done ? 'text-emerald-500' : 'text-muted-foreground')}
+                    title={done ? 'Mark open' : 'Mark done'}
+                  >
+                    {done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                  </button>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className={cn(
@@ -448,13 +566,15 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
                     <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"><User className="h-3 w-3" />{assignee.name}</p>
                   )}
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteActivity(a.id) }}
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
-                  title="Delete"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                {!selectMode && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteActivity(a.id) }}
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
+                    title="Delete"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -462,10 +582,19 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
       </div>
 
       {/* Table — desktop only (mobile uses the card list above) */}
-      <div className="hidden lg:block rounded-xl border border-border overflow-hidden">
+      <div className={cn('hidden lg:block rounded-xl border border-border overflow-hidden', selectedVisible.length > 0 && 'mb-20')}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40">
+              <th className="w-10 pl-4 pr-1 py-2.5">
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onChange={toggleSelectAll}
+                  disabled={filtered.length === 0}
+                  aria-label="Select all tasks"
+                />
+              </th>
               <th className="w-10 px-3 py-2.5" />
               <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">Type</th>
               <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">Task</th>
@@ -480,7 +609,7 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
           <tbody className="divide-y divide-border">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="py-16 text-center text-muted-foreground text-sm">
+                <td colSpan={10} className="py-16 text-center text-muted-foreground text-sm">
                   {activities.length === 0 ? 'No tasks yet.' : 'No tasks match the current filters.'}
                 </td>
               </tr>
@@ -511,9 +640,18 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
                     done && !linger ? 'opacity-40' : 'hover:bg-muted/30',
                     bucketTint,
                     linger && 'bg-emerald-50/50 dark:bg-emerald-950/20',
-                    selectedActivity?.id === a.id && 'bg-primary/5'
+                    (selectedActivity?.id === a.id || selected.has(a.id)) && 'bg-primary/5'
                   )}
                 >
+                  {/* Bulk select */}
+                  <td className="pl-4 pr-1 py-3" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selected.has(a.id)}
+                      onChange={() => toggleSelect(a.id)}
+                      aria-label="Select task"
+                    />
+                  </td>
+
                   {/* Complete toggle */}
                   <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <button
@@ -601,6 +739,17 @@ export function TasksClient({ initialActivities, teamMembers, currentUserId, isA
           </tbody>
         </table>
       </div>
+
+      <TaskBulkBar
+        selectedCount={selectedVisible.length}
+        teamMembers={teamMembers}
+        isAdmin={isAdmin ?? false}
+        busy={bulkBusy}
+        onClear={clearSelection}
+        onPatch={bulkPatch}
+        onReschedule={bulkReschedule}
+        onDelete={bulkDelete}
+      />
 
       {/* Lead full panel — opened when clicking an activity row (list view) */}
       {selectedActivity?.lead && (
