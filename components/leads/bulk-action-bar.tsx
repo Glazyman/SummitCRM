@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { X, ChevronDown, Trash2, UserRound, Tag, CheckCircle2 } from 'lucide-react'
+import { X, ChevronDown, Trash2, UserRound, Tag, CheckCircle2, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,6 +24,7 @@ interface BulkActionBarProps {
   onBulkAssign:  (userId: string) => void
   onBulkBatch:   (batchId: string) => void
   onBulkDelete:  () => void
+  onBulkReset:   () => void
 }
 
 /**
@@ -40,8 +41,10 @@ export function BulkActionBar({
   onBulkAssign,
   onBulkBatch,
   onBulkDelete,
+  onBulkReset,
 }: BulkActionBarProps) {
   const [deleteConfirm, setDeleteConfirm] = React.useState(false)
+  const [resetConfirm,  setResetConfirm]  = React.useState(false)
 
   if (selectedCount === 0) return null
 
@@ -145,6 +148,42 @@ export function BulkActionBar({
             </DropdownMenu>
           )}
 
+          {/* Reset to New — admin only. Wipes call history + open tasks, so it
+              gets its own confirm that says exactly that. */}
+          {isAdmin && (
+            !resetConfirm ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => { setResetConfirm(true); setDeleteConfirm(false) }}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset to New
+              </Button>
+            ) : (
+              <div className="flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 dark:border-amber-800 dark:bg-amber-950/30">
+                <span className="whitespace-nowrap text-xs font-medium text-amber-800 dark:text-amber-300">
+                  Reset {selectedCount.toLocaleString()}? Erases their calls + open tasks
+                </span>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-amber-800 underline hover:text-amber-900 dark:text-amber-300"
+                  onClick={() => { onBulkReset(); setResetConfirm(false) }}
+                >
+                  Confirm
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setResetConfirm(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            )
+          )}
+
           {/* Delete — manager+ only */}
           {isAdmin && (
             <>
@@ -153,7 +192,7 @@ export function BulkActionBar({
                   variant="outline"
                   size="sm"
                   className="h-8 gap-1.5 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
-                  onClick={() => setDeleteConfirm(true)}
+                  onClick={() => { setDeleteConfirm(true); setResetConfirm(false) }}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete

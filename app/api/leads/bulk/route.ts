@@ -39,6 +39,10 @@ async function getContext() {
 
 // PATCH /api/leads/bulk — bulk update (status, assigned_to, batch_id).
 // Accepts EITHER { ids: [...] } OR { scope: 'all_matching', filter: {...} }.
+// `reset: true` = "Reset to New": status → new, PLUS every call log and every
+// open task on those leads is deleted, as if they were never called. Deleting
+// the call logs lets the call_logs triggers null last_contacted_at /
+// last_call_outcome. Notes, tags, pipeline stage and completed tasks are kept.
 export async function PATCH(req: NextRequest) {
   const ctx = await getContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -48,10 +52,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await req.json().catch(() => ({}))
-  const { ids, scope, filter, status, assigned_to, batch_id } = body as {
+  const { ids, scope, filter, assigned_to, batch_id, reset } = body as {
     ids?: string[]; scope?: 'all_matching'; filter?: FilterSpec
     status?: LeadStatus; assigned_to?: string | null; batch_id?: string | null
+    reset?: boolean
   }
+  const status: LeadStatus | undefined = reset ? 'new' : (body as { status?: LeadStatus }).status
 
   if (status === undefined && assigned_to === undefined && batch_id === undefined)
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -118,7 +124,7 @@ export async function PATCH(req: NextRequest) {
         lead_id:      id,
         user_id:      user.id,
         type:         'lead_status_changed',
-        metadata:     { to: status, bulk: true },
+        metadata:     reset ? { to: status, bulk: true, reset: true } : { to: status, bulk: true },
       }))
       await (admin as any).from('activity_logs').insert(activityRows)
 
@@ -145,6 +151,27 @@ export async function PATCH(req: NextRequest) {
           }))
         if (callRows.length > 0) await (admin as any).from('call_logs').insert(callRows)
       }
+    }
+  }
+
+  if (reset && effectiveIds.length > 0) {
+    const CHUNK = 200
+    for (let i = 0; i < effectiveIds.length; i += CHUNK) {
+      const chunk = effectiveIds.slice(i, i + CHUNK)
+      const { error: callErr } = await (admin as any)
+        .from('call_logs')
+        .delete()
+        .eq('workspace_id', member.workspace_id)
+        .in('lead_id', chunk)
+      if (callErr) return NextResponse.json({ error: callErr.message }, { status: 500 })
+
+      const { error: taskErr } = await (admin as any)
+        .from('follow_ups')
+        .delete()
+        .eq('workspace_id', member.workspace_id)
+        .in('lead_id', chunk)
+        .is('completed_at', null)
+      if (taskErr) return NextResponse.json({ error: taskErr.message }, { status: 500 })
     }
   }
 

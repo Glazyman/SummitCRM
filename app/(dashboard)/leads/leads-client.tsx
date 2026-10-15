@@ -418,6 +418,29 @@ export function LeadsClient({
     router.refresh()
   }
 
+  /** "Reset to New" — status new + erase call history and open tasks (server). */
+  async function handleBulkReset() {
+    const ids = selectAllMatching ? null : [...selectedIds]
+    if (ids) {
+      setLeads((prev) =>
+        prev.map((l) => ids.includes(l.id)
+          ? { ...l, status: 'new', last_contacted_at: null, last_call_outcome: null, updated_at: new Date().toISOString() }
+          : l)
+      )
+    }
+    handleClearSelection()
+    try {
+      await fetch('/api/leads/bulk', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(bulkBody({ reset: true })),
+      })
+    } catch (err) {
+      console.error('[bulk reset]', err)
+    }
+    router.refresh()
+  }
+
   async function handleBulkAssign(userId: string) {
     const ids    = selectAllMatching ? null : [...selectedIds]
     const member = teamMembers.find((m) => m.id === userId)
@@ -825,6 +848,7 @@ export function LeadsClient({
         onBulkAssign={handleBulkAssign}
         onBulkBatch={handleBulkBatch}
         onBulkDelete={handleBulkDelete}
+        onBulkReset={handleBulkReset}
       />
 
       {/* ── Create lead modal ── */}
