@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getActor } from '@/lib/auth/actor'
+import { selectAll } from '@/lib/supabase/select-all'
+import { firstCalls, inCallPeriod } from '@/lib/first-calls'
 
 function periodRange(period: string) {
   const now   = new Date()
@@ -43,12 +45,12 @@ export async function GET(req: NextRequest) {
     const startOfToday = new Date(now)
     startOfToday.setHours(0, 0, 0, 0)
 
-    const [callsRes, followUpsRes, leadsRes, callsTodayRes, interestedTodayRes, followUpsSetTodayRes] = await Promise.all([
-      admin.from('call_logs')
-        .select('outcome, called_at')
+    const [history, followUpsRes, leadsRes, interestedTodayRes, followUpsSetTodayRes] = await Promise.all([
+      selectAll<{ id: string; lead_id: string; outcome: string; called_at: string }>((from, to) => admin.from('call_logs')
+        .select('id, lead_id, outcome, called_at')
         .eq('workspace_id', wsId)
         .eq('logged_by', uid)
-        .gte('called_at', range.start),
+        .lt('called_at', range.end).order('id').range(from, to)),
       admin.from('follow_ups')
         .select('completed_at, due_at')
         .eq('workspace_id', wsId)
@@ -58,11 +60,6 @@ export async function GET(req: NextRequest) {
         .eq('workspace_id', wsId)
         .eq('assigned_to', uid)
         .is('deleted_at', null),
-      admin.from('call_logs')
-        .select('outcome')
-        .eq('workspace_id', wsId)
-        .eq('logged_by', uid)
-        .gte('called_at', startOfToday.toISOString()),
       admin.from('leads')
         .select('id', { count: 'exact', head: true })
         .eq('workspace_id', wsId)
@@ -77,19 +74,19 @@ export async function GET(req: NextRequest) {
         .gte('created_at', startOfToday.toISOString()),
     ])
 
-    const calls     = (callsRes.data ?? []) as Array<{ outcome: string; called_at: string }>
+    const calls = inCallPeriod(firstCalls(history), range.start, range.end)
     const followUps = (followUpsRes.data ?? []) as Array<{ completed_at: string | null; due_at: string }>
     const leads     = (leadsRes.data ?? []) as Array<{ status: string }>
-    const callsTodayRows = (callsTodayRes.data ?? []) as Array<{ outcome: string }>
+    const callsTodayRows = calls.filter(c => c.called_at >= startOfToday.toISOString())
 
     const callsByOutcome: Record<string, number> = {}
     for (const c of calls) callsByOutcome[c.outcome] = (callsByOutcome[c.outcome] ?? 0) + 1
 
     const terminal = new Set(['do_not_contact', 'wrong_number', 'sold_already'])
-    const conversationsToday = callsTodayRows.filter((c) => c.outcome === 'answered' || c.outcome === 'callback_requested').length
+    const conversationsToday = new Set(callsTodayRows.filter(c => c.outcome === 'answered' || c.outcome === 'callback_requested').map(c => c.lead_id)).size
 
     return NextResponse.json({
-      calls:              calls.length,
+      calls:              new Set(calls.map(c => c.lead_id)).size,
       callsByOutcome,
       followUpsPending:   followUps.filter(f => !f.completed_at).length,
       followUpsOverdue:   followUps.filter(f => !f.completed_at && new Date(f.due_at) < now).length,
@@ -97,7 +94,7 @@ export async function GET(req: NextRequest) {
       leadsAssigned:      leads.length,
       leadsActive:        leads.filter(l => !terminal.has(l.status)).length,
       funnel: {
-        calls_made: callsTodayRows.length,
+        calls_made: new Set(callsTodayRows.map(c => c.lead_id)).size,
         conversations: conversationsToday,
         interested: interestedTodayRes.count ?? 0,
         follow_ups_set: followUpsSetTodayRes.count ?? 0,

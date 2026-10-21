@@ -18,7 +18,7 @@ export function AnalyticsExportButton({ view, start, end }: Props) {
   const handleExport = async () => {
     setDownloading(true)
     try {
-      const params = new URLSearchParams({ view })
+      const params = new URLSearchParams({ view, tz: Intl.DateTimeFormat().resolvedOptions().timeZone })
       if (start) params.set('start', start)
       if (end)   params.set('end',   end)
       const res  = await fetch(`/api/analytics/export?${params.toString()}`)
@@ -32,6 +32,8 @@ export function AnalyticsExportButton({ view, start, end }: Props) {
       URL.revokeObjectURL(url)
       setDone(true)
       setTimeout(() => setDone(false), 2500)
+    } catch {
+      alert('Export failed. Please try again.')
     } finally {
       setDownloading(false)
     }
@@ -39,6 +41,7 @@ export function AnalyticsExportButton({ view, start, end }: Props) {
 
   return (
     <Button
+      aria-label="Export CSV"
       variant="outline"
       size="sm"
       onClick={handleExport}

@@ -77,9 +77,10 @@ function CallDonut({ stats }: { stats: MyStats }) {
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-3xl font-bold leading-none">{stats.calls}</span>
-          <span className="text-[11px] text-muted-foreground">calls</span>
+          <span className="text-[11px] text-muted-foreground">leads called</span>
         </div>
       </div>
+      <p className="text-center text-[11px] text-muted-foreground">Each lead counts once, on its first call date.</p>
       {/* Outcome breakdown */}
       <div className="mt-2 space-y-1">
         {data.map(d => (
@@ -144,7 +145,7 @@ function FollowUpRing({ stats }: { stats: MyStats }) {
 
 // ── Main component ────────────────────────────────────────────────────────
 export function MyActivityPanel() {
-  const [period, setPeriod]   = React.useState<Period>('week')
+  const [period, setPeriod]   = React.useState<Period>('today')
   const [stats, setStats]     = React.useState<MyStats | null>(null)
   const [loading, setLoading] = React.useState(true)
 
@@ -159,7 +160,9 @@ export function MyActivityPanel() {
     }
   }, [])
 
-  React.useEffect(() => { load(period) }, [period, load])
+  // Synchronize the selected period with server data.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  React.useEffect(() => { void load(period) }, [period, load])
 
   // Refresh when user switches back to this tab or returns from another page
   React.useEffect(() => {
@@ -215,7 +218,7 @@ export function MyActivityPanel() {
           <div className="border-t border-border px-5 py-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Daily Conversion Funnel</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <FunnelStat label="Calls made" value={stats.funnel?.calls_made ?? 0} />
+              <FunnelStat label="Leads called" value={stats.funnel?.calls_made ?? 0} />
               <FunnelStat label="Conversations" value={stats.funnel?.conversations ?? 0} />
               <FunnelStat label="Interested" value={stats.funnel?.interested ?? 0} />
               <FunnelStat label="Follow-ups set" value={stats.funnel?.follow_ups_set ?? 0} />

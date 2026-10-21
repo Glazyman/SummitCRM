@@ -8,10 +8,11 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server'
-import { cookies }      from 'next/headers'
-import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { getActor } from '@/lib/auth/actor'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getUsersByIdsFull } from '@/lib/users'
 import { selectAll } from '@/lib/supabase/select-all'
+import { firstCalls, inCallPeriod } from '@/lib/first-calls'
 
 type RepRow = {
   user_id:              string
@@ -31,96 +32,36 @@ type RepRow = {
 
 export async function GET(req: Request) {
   try {
-    const cookieStore = await cookies()
-    const supabase    = await createServerClient(cookieStore)
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!['admin', 'super_admin'].includes(actor.role)) return NextResponse.json({ error: 'Admin role required' }, { status: 403 })
     const admin = createAdminClient()
-    const { data: member } = await admin
-      .from('workspace_members').select('workspace_id, role')
-      .eq('user_id', user.id).eq('is_active', true).single() as
-      { data: { workspace_id: string; role: string } | null }
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (!['admin', 'super_admin'].includes(member.role)) {
-      return NextResponse.json({ error: 'Admin role required' }, { status: 403 })
-    }
 
     const { searchParams } = new URL(req.url)
     const now   = new Date()
     const start = searchParams.get('start') ?? new Date(new Date(now).setDate(now.getDate() - 30)).toISOString()
     const end   = searchParams.get('end')   ?? now.toISOString()
-    const wsId  = member.workspace_id
+    const wsId  = actor.workspaceId
+    if (!Number.isFinite(Date.parse(start)) || !Number.isFinite(Date.parse(end)) || Date.parse(start) >= Date.parse(end))
+      return NextResponse.json({ error: 'Invalid date range' }, { status: 400 })
+    const timezone = searchParams.get('tz') ?? 'UTC'
+    let dateFormat: Intl.DateTimeFormat
+    try { dateFormat = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }) }
+    catch { return NextResponse.json({ error: 'Invalid timezone' }, { status: 400 }) }
 
-    const { data, error } = await admin.rpc('get_reps_analytics', {
-      p_workspace_id: wsId,
-      p_start:        start,
-      p_end:          end,
-    })
-
-    if (error) {
-      console.error('[get_reps_analytics]', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    const payload = (data ?? {}) as {
-      reps?:     RepRow[]
-      overview?: Record<string, number>
-      period?:   { start: string; end: string }
-    }
-    const repsRaw = payload.reps ?? []
-
-    // Attach name + email via users-cache.
-    const memberIds = repsRaw.map((r) => r.user_id)
-    const memberUsers = await getUsersByIdsFull(admin, wsId, memberIds)
-    const nameById = new Map(
-      memberUsers.map(u => [u.id, { name: (u.user_metadata?.full_name as string | undefined) ?? null, email: u.email ?? '' }])
-    )
-
-    // Per-rep unique leads called in the range (distinct lead_id per rep) — so
-    // each rep card can show "leads called" (one per lead) vs raw "calls".
-    const { data: uniqByRep } = await admin.rpc('get_unique_leads_called_by_rep_range', {
-      p_workspace_id: wsId, p_start: start, p_end: end,
-    }) as { data: Array<{ user_id: string; leads_called: number }> | null }
-    const uniqByRepMap = new Map((uniqByRep ?? []).map(u => [u.user_id, Number(u.leads_called)]))
-
-    // Leads each rep MARKED interested in the range (from the interest-change
-    // log) — "what did this rep do that day", unlike the current-snapshot
-    // interested count below.
-    // Best-effort: a missing enum value or log hiccup must not take the whole
-    // panel down — the counts just read 0.
-    const marks = await selectAll<{ user_id: string | null }>((from, to) =>
-      (admin as any).from('activity_logs').select('user_id')
-        .eq('workspace_id', wsId).eq('type', 'interest_status_changed').eq('metadata->>to', 'interested')
-        .gte('created_at', start).lt('created_at', end).range(from, to)).catch((err) => { console.error('[interested marks]', err); return [] })
-    const marksByRep = new Map<string, number>()
-    for (const m of marks) if (m.user_id) marksByRep.set(m.user_id, (marksByRep.get(m.user_id) ?? 0) + 1)
-
-    const reps = repsRaw.map((r) => ({
-      ...r,
-      user_email:   nameById.get(r.user_id)?.email ?? '',
-      full_name:    nameById.get(r.user_id)?.name  ?? null,
-      unique_leads: uniqByRepMap.get(r.user_id) ?? 0,
-      interested_marked: marksByRep.get(r.user_id) ?? 0,
-    }))
-
-    // last_contacted_at only answers "called since X" — for a window that ends
-    // in the past (Pick day) count distinct leads straight from call_logs.
-    const endsNow = Date.now() - Date.parse(end) < 5 * 60_000
-    const pastUnique = endsNow ? null : new Set(
-      (await selectAll<{ lead_id: string }>((from, to) =>
-        (admin as any).from('call_logs').select('lead_id')
-          .eq('workspace_id', wsId).gte('called_at', start).lt('called_at', end).range(from, to)))
-        .map((c) => c.lead_id),
-    ).size
-
-    // unique leads = distinct leads called in the range (one per lead) via the
-    // denormalized last_contacted_at — exact for the presets (all end "now").
-    // The lead-status counts are a CURRENT workspace snapshot (lead states are
-    // not call events, so they aren't date-filtered).
-    const [uniqRes, interestedRes, notInterestedRes, badLeadsRes, contactedRes] = await Promise.all([
-      admin.from('leads').select('id', { count: 'exact', head: true })
-        .eq('workspace_id', wsId).gte('last_contacted_at', start).lte('last_contacted_at', end).is('deleted_at', null),
+    // All independent database reads start together instead of four network waves.
+    const [aggregate, callHistory, marks, completions, interestedRes, notInterestedRes, badLeadsRes, contactedRes] = await Promise.all([
+      admin.rpc('get_reps_analytics', { p_workspace_id: wsId, p_start: start, p_end: end }),
+      selectAll<{ id: string; lead_id: string; logged_by: string; outcome: string; called_at: string }>((from, to) =>
+        (admin as any).from('call_logs').select('id, lead_id, logged_by, outcome, called_at')
+          .eq('workspace_id', wsId).lt('called_at', end).order('id').range(from, to)),
+      selectAll<{ id: string; lead_id: string; user_id: string | null; created_at: string }>((from, to) =>
+        (admin as any).from('activity_logs').select('id, lead_id, user_id, created_at')
+          .eq('workspace_id', wsId).eq('type', 'interest_status_changed').eq('metadata->>to', 'interested')
+          .gte('created_at', start).lt('created_at', end).order('id').range(from, to)),
+      selectAll<{ assigned_to: string }>((from, to) =>
+        (admin as any).from('follow_ups').select('assigned_to')
+          .eq('workspace_id', wsId).gte('completed_at', start).lt('completed_at', end).order('id').range(from, to)),
       admin.from('leads').select('id', { count: 'exact', head: true })
         .eq('workspace_id', wsId).eq('interest_status', 'interested').is('deleted_at', null),
       admin.from('leads').select('id', { count: 'exact', head: true })
@@ -132,14 +73,84 @@ export async function GET(req: Request) {
       // "new"; lead-status % should be of the leads actually worked.
       admin.from('leads').select('id', { count: 'exact', head: true })
         .eq('workspace_id', wsId).not('last_contacted_at', 'is', null).is('deleted_at', null),
-    ]) as Array<{ count: number | null }>
+    ])
+    const calls = inCallPeriod(firstCalls(callHistory), start, end)
+    const repFirstCalls = inCallPeriod(firstCalls(callHistory, true), start, end)
+    if (aggregate.error) throw aggregate.error
+    const payload = (aggregate.data ?? {}) as { reps?: RepRow[]; overview?: Record<string, number>; period?: { start: string; end: string } }
+    const repsRaw = [...(payload.reps ?? [])]
+    const currentIds = new Set(repsRaw.map(r => r.user_id))
+    const contributors = new Set([
+      ...repFirstCalls.map(call => call.logged_by || 'unattributed'),
+      ...marks.map(mark => mark.user_id || 'unattributed'),
+      ...completions.map(task => task.assigned_to || 'unattributed'),
+    ])
+    for (const id of contributors) if (!currentIds.has(id)) repsRaw.push({
+      user_id: id, role: 'historical', calls: 0, calls_answered: 0, calls_voicemail: 0,
+      calls_no_answer: 0, calls_wrong_number: 0, follow_ups_pending: 0, follow_ups_overdue: 0,
+      follow_ups_completed: 0, leads_assigned: 0, leads_active: 0, leads_new: 0,
+    })
+    const memberUsers = await getUsersByIdsFull(admin, wsId, repsRaw.map(r => r.user_id).filter(id => id !== 'unattributed'))
+    const nameById = new Map(memberUsers.map(u => [u.id, { name: u.user_metadata?.full_name ?? null, email: u.email ?? '' }]))
+    const byRep = new Map<string, typeof calls>()
+    for (const call of repFirstCalls) {
+      const id = call.logged_by || 'unattributed'
+      if (!byRep.has(id)) byRep.set(id, [])
+      byRep.get(id)!.push(call)
+    }
+    const markedByRep = new Map<string, Set<string>>()
+    for (const mark of marks) if (mark.lead_id) {
+      const id = mark.user_id || 'unattributed'
+      if (!markedByRep.has(id)) markedByRep.set(id, new Set())
+      markedByRep.get(id)!.add(mark.lead_id)
+    }
+    const completedByRep = new Map<string, number>()
+    for (const task of completions) completedByRep.set(task.assigned_to || 'unattributed', (completedByRep.get(task.assigned_to || 'unattributed') ?? 0) + 1)
+    const reps = repsRaw.map(r => {
+      const repCalls = byRep.get(r.user_id) ?? []
+      return {
+        ...r, user_email: nameById.get(r.user_id)?.email ?? '', full_name: nameById.get(r.user_id)?.name ?? (r.user_id === 'unattributed' ? 'Unattributed activity' : r.role === 'historical' && !nameById.has(r.user_id) ? 'Former teammate' : null),
+        active_days: new Set(repCalls.map(c => dateFormat.format(new Date(c.called_at)))).size,
+        last_call_at: repCalls.reduce<string | null>((last, c) => !last || c.called_at > last ? c.called_at : last, null),
+        calls: repCalls.length, unique_leads: new Set(repCalls.map(c => c.lead_id).filter(Boolean)).size,
+        calls_answered: repCalls.filter(c => c.outcome === 'answered').length,
+        calls_voicemail: repCalls.filter(c => c.outcome === 'voicemail').length,
+        calls_no_answer: repCalls.filter(c => c.outcome === 'no_answer').length,
+        calls_wrong_number: repCalls.filter(c => c.outcome === 'wrong_number').length,
+        calls_callback: repCalls.filter(c => c.outcome === 'callback_requested').length,
+        interested_marked: markedByRep.get(r.user_id)?.size ?? 0,
+        follow_ups_completed: completedByRep.get(r.user_id) ?? 0,
+      }
+    })
+    const daily = new Map<string, { date: string; calls: number; leads: Set<string>; interested: Set<string> }>()
+    const dayFor = (iso: string) => {
+      const parts = dateFormat.formatToParts(new Date(iso))
+      const get = (type: string) => parts.find(p => p.type === type)?.value
+      const date = `${get('year')}-${get('month')}-${get('day')}`
+      if (!daily.has(date)) daily.set(date, { date, calls: 0, leads: new Set(), interested: new Set() })
+      return daily.get(date)!
+    }
+    for (const call of calls) { const day = dayFor(call.called_at); day.calls++; if (call.lead_id) day.leads.add(call.lead_id) }
+    for (const mark of marks) if (mark.lead_id) dayFor(mark.created_at).interested.add(mark.lead_id)
 
+    // Current workspace state is separate from activity in the selected period.
+
+    if ([interestedRes, notInterestedRes, badLeadsRes, contactedRes].some(r => 'error' in r && r.error)) throw new Error('Could not load lead totals')
     return NextResponse.json({
       reps,
+      historyStart: calls.reduce<string | undefined>((first, call) => !first || call.called_at < first ? call.called_at : first, undefined),
+      daily: [...daily.values()].sort((a, b) => a.date.localeCompare(b.date)).map(d => ({ date: d.date, calls: d.calls, unique_leads: d.leads.size, interested: d.interested.size })),
       overview: {
         ...(payload.overview ?? {}),
-        unique_leads:    pastUnique ?? uniqRes.count ?? 0,
-        interested_marked: marks.length,
+        total: calls.length,
+        answered: calls.filter(c => c.outcome === 'answered').length,
+        voicemail: calls.filter(c => c.outcome === 'voicemail').length,
+        no_answer: calls.filter(c => c.outcome === 'no_answer').length,
+        wrong_number: calls.filter(c => c.outcome === 'wrong_number').length,
+        callback: calls.filter(c => c.outcome === 'callback_requested').length,
+        unique_leads: new Set(calls.map(c => c.lead_id).filter(Boolean)).size,
+        interested_marked: new Set(marks.map(m => m.lead_id).filter(Boolean)).size,
+        follow_ups_completed: completions.length,
         interested:      interestedRes.count    ?? 0,
         not_interested:  notInterestedRes.count ?? 0,
         bad_leads:       badLeadsRes.count       ?? 0,

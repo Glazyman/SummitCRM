@@ -23,19 +23,21 @@ function dotLabel(dotClass: string, text: string) {
 type Size = 'sm' | 'md' | 'lg'
 
 export function StatusSelect({
-  value, onChange, size = 'md', className, disabled,
+  value, onChange, size = 'md', className, disabled, open, onOpenChange,
 }: {
   value: LeadStatus
   onChange: (s: LeadStatus) => void
   size?: Size
   className?: string
   disabled?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   // Always include the current value so the trigger shows it even if it's not
   // one of the quick-pick statuses (e.g. interested/replied/converted).
   const statuses = ALL_STATUSES.includes(value) ? ALL_STATUSES : [value, ...ALL_STATUSES]
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as LeadStatus)} indicatorPosition="right" disabled={disabled}>
+    <Select value={value} onValueChange={(v) => onChange(v as LeadStatus)} indicatorPosition="right" disabled={disabled} open={open} onOpenChange={onOpenChange}>
       <SelectTrigger size={size} className={cn('w-full', className)}>
         <SelectValue />
       </SelectTrigger>
@@ -51,16 +53,18 @@ export function StatusSelect({
 }
 
 export function InterestSelect({
-  value, onChange, size = 'md', className, disabled,
+  value, onChange, size = 'md', className, disabled, open, onOpenChange,
 }: {
   value: InterestStatus
   onChange: (s: InterestStatus) => void
   size?: Size
   className?: string
   disabled?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as InterestStatus)} indicatorPosition="right" disabled={disabled}>
+    <Select value={value} onValueChange={(v) => onChange(v as InterestStatus)} indicatorPosition="right" disabled={disabled} open={open} onOpenChange={onOpenChange}>
       <SelectTrigger size={size} className={cn('w-full', className)}>
         <SelectValue placeholder="Interest" />
       </SelectTrigger>

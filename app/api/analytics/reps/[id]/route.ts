@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { selectAll } from '@/lib/supabase/select-all'
+import { firstCalls, inCallPeriod } from '@/lib/first-calls'
+import { getActor } from '@/lib/auth/actor'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 type Params = { params: Promise<{ id: string }> }
@@ -8,36 +10,20 @@ type Params = { params: Promise<{ id: string }> }
 export async function GET(req: NextRequest, { params }: Params) {
   try {
     const { id: repId } = await params
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(repId)) return NextResponse.json({ error: 'Invalid rep' }, { status: 400 })
     const start = req.nextUrl.searchParams.get('start')
     const end = req.nextUrl.searchParams.get('end')
 
-    const supabase = await createClient()
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+    const actor = await getActor()
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!['admin', 'super_admin'].includes(actor.role)) return NextResponse.json({ error: 'Admin required' }, { status: 403 })
+    if ((start && !Number.isFinite(Date.parse(start))) || (end && !Number.isFinite(Date.parse(end)))) return NextResponse.json({ error: 'Invalid dates' }, { status: 400 })
     const admin = createAdminClient()
-    const { data: member } = await (admin as any)
-      .from('workspace_members')
-      .select('workspace_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
+    const member = { workspace_id: actor.workspaceId }
 
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (!['admin', 'super_admin'].includes(member.role)) {
-      return NextResponse.json({ error: 'Admin required' }, { status: 403 })
-    }
-
-    let callsQuery = (admin as any)
-      .from('call_logs')
-      .select('id, lead_id, outcome, notes, called_at')
-      .eq('workspace_id', member.workspace_id)
-      .eq('logged_by', repId)
-      .order('called_at', { ascending: false })
-      .limit(200)
-
-    if (start) callsQuery = callsQuery.gte('called_at', start)
-    if (end) callsQuery = callsQuery.lte('called_at', end)
+    const callsQuery = selectAll<{ id: string; lead_id: string | null; outcome: string; notes: string | null; called_at: string }>((from, to) => admin.from('call_logs')
+      .select('id, lead_id, outcome, notes, called_at').eq('workspace_id', member.workspace_id)
+      .eq('logged_by', repId).order('id').range(from, to))
 
     let followUpsQuery = (admin as any)
       .from('follow_ups')
@@ -47,12 +33,12 @@ export async function GET(req: NextRequest, { params }: Params) {
       .order('due_at', { ascending: true })
       .limit(500)
 
-    if (start) followUpsQuery = followUpsQuery.gte('created_at', start)
-    if (end) followUpsQuery = followUpsQuery.lte('created_at', end)
+    if (start && end) followUpsQuery = followUpsQuery.or(`completed_at.is.null,and(completed_at.gte.${new Date(start).toISOString()},completed_at.lt.${new Date(end).toISOString()})`)
 
     const [callsRes, fuRes] = await Promise.all([callsQuery, followUpsQuery])
 
-    const calls = (callsRes.data ?? []) as Array<{ id: string; lead_id: string | null; outcome: string; notes: string | null; called_at: string }>
+    if (fuRes.error) throw fuRes.error
+    const calls = inCallPeriod(firstCalls(callsRes), start ?? new Date(0).toISOString(), end ?? new Date().toISOString()).sort((a, b) => Date.parse(b.called_at) - Date.parse(a.called_at))
     const followUps = (fuRes.data ?? []) as Array<{ id: string; lead_id: string; title: string; notes: string | null; due_at: string; completed_at: string | null; created_at: string }>
 
     const leadIds = Array.from(new Set([

@@ -1,120 +1,40 @@
-/**
- * GET /api/analytics/export
- * CSV export of current analytics view. manager+
- * Query param: view=email-metrics|campaigns|reps|batches|funnel
- */
 import { NextResponse } from 'next/server'
-import { cookies }      from 'next/headers'
-import { createServerClient, createAdminClient } from '@/lib/supabase/server'
+import { GET as getAnalytics } from '../reps/route'
+import type { CallOverview, RepRow } from '@/components/analytics/types'
 
-function toCsv(headers: string[], rows: Record<string,unknown>[]): string {
-  const escape = (v: unknown) => {
-    const s = String(v ?? '')
-    return s.includes(',') || s.includes('"') || s.includes('\n')
-      ? `"${s.replace(/"/g, '""')}"`
-      : s
+function toCsv(headers: string[], rows: Record<string, unknown>[]) {
+  const escape = (value: unknown) => {
+    let text = String(value ?? '')
+    if (typeof value === 'string' && /^[=+@\-\t\r]/.test(text)) text = `'${text}`
+    return /[,"\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
   }
-  return [
-    headers.join(','),
-    ...rows.map(r => headers.map(h => escape(r[h])).join(',')),
-  ].join('\n')
+  return [headers.join(','), ...rows.map(row => headers.map(key => escape(row[key])).join(','))].join('\r\n')
 }
 
+/** Export the same authorized, date-scoped data used by the Analytics page. */
 export async function GET(req: Request) {
-  try {
-    const cookieStore = await cookies()
-    const supabase    = await createServerClient(cookieStore)
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const adminClient = createAdminClient()
-    const { data: member } = await adminClient
-      .from('workspace_members').select('workspace_id, role')
-      .eq('user_id', user.id).eq('is_active', true).single() as
-      { data: { workspace_id: string; role: string } | null }
-    if (!member) return NextResponse.json({ error: 'No workspace' }, { status: 403 })
-    if (!['manager','admin','super_admin'].includes(member.role)) {
-      return NextResponse.json({ error: 'Manager role required' }, { status: 403 })
-    }
-
-    const { searchParams } = new URL(req.url)
-    const view  = searchParams.get('view') ?? 'email-metrics'
-    const now   = new Date()
-    const start = searchParams.get('start') ?? new Date(new Date(now).setDate(now.getDate() - 30)).toISOString()
-    const end   = searchParams.get('end')   ?? new Date().toISOString()
-
-    let csv = ''
-    let filename = 'analytics'
-
-    if (view === 'campaigns') {
-      const { data: rows } = await adminClient.from('campaigns')
-        .select('name, status, total_leads, emails_sent, emails_opened, emails_replied, emails_bounced, started_at')
-        .eq('workspace_id', member.workspace_id)
-        .gte('created_at', start).lte('created_at', end)
-        .order('created_at', { ascending: false }) as { data: Array<Record<string,unknown>> | null }
-      const headers = ['name','status','total_leads','emails_sent','emails_opened','emails_replied','emails_bounced','started_at']
-      csv = toCsv(headers, rows ?? [])
-      filename = 'campaigns'
-
-    } else if (view === 'reps') {
-      const [membersRes, emailsRes] = await Promise.all([
-        adminClient.from('workspace_members')
-          .select('user_id, role, users:user_id(email, raw_user_meta_data)')
-          .eq('workspace_id', member.workspace_id).eq('is_active', true),
-        adminClient.from('emails').select('sent_by, status')
-          .eq('workspace_id', member.workspace_id)
-          .gte('sent_at', start).lte('sent_at', end),
-      ]) as [
-        { data: Array<{ user_id: string; role: string; users: { email: string; raw_user_meta_data: Record<string,unknown> } | null }> | null },
-        { data: Array<{ sent_by: string | null; status: string }> | null }
-      ]
-      const emailMap = new Map<string,{ sent:number;opened:number;replied:number }>()
-      for (const e of emailsRes.data ?? []) {
-        if (!e.sent_by) continue
-        const c = emailMap.get(e.sent_by) ?? {sent:0,opened:0,replied:0}
-        c.sent++
-        if(['opened','clicked','replied'].includes(e.status)) c.opened++
-        if(e.status==='replied') c.replied++
-        emailMap.set(e.sent_by, c)
-      }
-      const r = (n:number,d:number) => d>0?Math.round((n/d)*1000)/10:0
-      const data = (membersRes.data ?? []).map(m => {
-        const meta = m.users?.raw_user_meta_data as Record<string,unknown>|undefined
-        const c = emailMap.get(m.user_id)??{sent:0,opened:0,replied:0}
-        return { name:(meta?.full_name??m.users?.email??''), role:m.role, emails_sent:c.sent, open_rate:r(c.opened,c.sent), reply_rate:r(c.replied,c.sent) }
-      })
-      csv = toCsv(['name','role','emails_sent','open_rate','reply_rate'], data as Record<string,unknown>[])
-      filename = 'rep-performance'
-
-    } else {
-      // Default: time-series
-      const { data: rows } = await adminClient.from('emails')
-        .select('sent_at, status').eq('workspace_id', member.workspace_id)
-        .gte('sent_at', start).lte('sent_at', end).not('sent_at','is',null) as
-        { data: Array<{ sent_at: string; status: string }> | null }
-      const dayMap = new Map<string,{sent:number;opened:number;replied:number;bounced:number}>()
-      for (const e of rows ?? []) {
-        const d = e.sent_at.slice(0,10)
-        const c = dayMap.get(d)??{sent:0,opened:0,replied:0,bounced:0}
-        c.sent++
-        if(['opened','clicked','replied'].includes(e.status)) c.opened++
-        if(e.status==='replied') c.replied++
-        if(e.status==='bounced') c.bounced++
-        dayMap.set(d, c)
-      }
-      const data = Array.from(dayMap.entries()).sort().map(([date,v])=>({date,...v}))
-      csv = toCsv(['date','sent','opened','replied','bounced'], data as Record<string,unknown>[])
-      filename = 'email-metrics'
-    }
-
-    return new NextResponse(csv, {
-      headers: {
-        'Content-Type':        'text/csv',
-        'Content-Disposition': `attachment; filename="${filename}-${start.slice(0,10)}-to-${end.slice(0,10)}.csv"`,
-      },
-    })
-  } catch (err) {
-    console.error('[GET /api/analytics/export]', err)
-    return NextResponse.json({ error: 'Failed' }, { status: 500 })
+  const params = new URL(req.url).searchParams
+  const view = params.get('view') ?? 'overview'
+  if (!['overview', 'reps'].includes(view)) return NextResponse.json({ error: 'Unknown analytics view' }, { status: 400 })
+  const response = await getAnalytics(req)
+  if (!response.ok) return response
+  const data = await response.json() as { reps: RepRow[]; overview: CallOverview; period: { start: string; end: string } }
+  let rows: Record<string, unknown>[]
+  let headers: string[]
+  if (view === 'reps') {
+    headers = ['name', 'role', 'active_days', 'last_call_at', 'leads_called', 'answered', 'answer_rate_percent', 'voicemail', 'no_answer', 'wrong_number', 'callbacks', 'marked_interested', 'follow_ups_completed', 'current_pending', 'current_overdue', 'current_assigned']
+    rows = data.reps.map(r => ({ name: r.full_name || r.user_email, role: r.role, active_days: r.active_days ?? 0, last_call_at: r.last_call_at ?? '', leads_called: r.unique_leads,
+      answered: r.calls_answered, answer_rate_percent: r.calls ? Math.round(r.calls_answered / r.calls * 100) : '',
+      voicemail: r.calls_voicemail, no_answer: r.calls_no_answer, wrong_number: r.calls_wrong_number, callbacks: r.calls_callback ?? 0,
+      marked_interested: r.interested_marked ?? 0, follow_ups_completed: r.follow_ups_completed,
+      current_pending: r.role === 'historical' ? '' : r.follow_ups_pending, current_overdue: r.role === 'historical' ? '' : r.follow_ups_overdue, current_assigned: r.role === 'historical' ? '' : r.leads_assigned }))
+  } else {
+    headers = ['metric', 'value', 'scope']
+    const periodKeys = ['total', 'unique_leads', 'answered', 'voicemail', 'no_answer', 'wrong_number', 'callback', 'interested_marked', 'follow_ups_completed']
+    rows = Object.entries(data.overview).filter(([metric]) => metric !== 'total').map(([metric, value]) => ({ metric: metric === 'unique_leads' ? 'leads_called' : metric, value, scope: periodKeys.includes(metric) ? 'selected period' : 'current snapshot' }))
   }
+  return new NextResponse(toCsv(headers, rows), { headers: {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': `attachment; filename="analytics-${view}-${data.period.start.slice(0, 10)}-to-${data.period.end.slice(0, 10)}.csv"`,
+  } })
 }

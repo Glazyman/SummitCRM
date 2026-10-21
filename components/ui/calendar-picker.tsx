@@ -100,10 +100,14 @@ export function CalendarPicker({
   value,
   onChange,
   className,
+  placeholder = 'Pick a date',
+  showYear = false,
 }: {
   value:     string      // "YYYY-MM-DD"
   onChange:  (v: string) => void
   className?: string
+  placeholder?: string
+  showYear?: boolean
 }) {
   const [open,    setOpen]    = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
@@ -122,12 +126,16 @@ export function CalendarPicker({
     value ? new Date(value + 'T12:00').getMonth()     : today.month
   )
 
+  // Portal content mounts only after hydration.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => { setMounted(true) }, [])
 
   // Sync view to selected value whenever we open
   React.useEffect(() => {
     if (open && value) {
       const d = new Date(value + 'T12:00')
+      // Synchronize the calendar panel when opening a newly selected range.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setViewYear(d.getFullYear())
       setViewMonth(d.getMonth())
     }
@@ -173,7 +181,7 @@ export function CalendarPicker({
 
   const displayValue = value
     ? new Date(value + 'T12:00').toLocaleDateString(undefined, {
-        weekday: 'short', month: 'short', day: 'numeric',
+        weekday: showYear ? undefined : 'short', year: showYear ? 'numeric' : undefined, month: 'short', day: 'numeric',
       })
     : undefined
 
@@ -192,7 +200,7 @@ export function CalendarPicker({
         )}
       >
         <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="truncate">{displayValue ?? 'Pick a date'}</span>
+        <span className="truncate">{displayValue ?? placeholder}</span>
       </button>
 
       {open && mounted && createPortal(
@@ -301,6 +309,8 @@ export function TimePicker({
   const menuRef     = React.useRef<HTMLDivElement>(null)
   const selectedRef = React.useRef<HTMLButtonElement>(null)
 
+  // Portal content mounts only after hydration.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => { setMounted(true) }, [])
 
   React.useEffect(() => {

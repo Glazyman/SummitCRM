@@ -44,7 +44,7 @@ export function CallsTodayCard() {
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <div className="flex items-center gap-2">
           <PhoneCall className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Calls Made Today</h2>
+          <h2 className="text-sm font-semibold">Leads Called Today{!loading && ` · ${calls.length}`}</h2>
         </div>
         <button
           type="button"
@@ -56,6 +56,7 @@ export function CallsTodayCard() {
         </button>
       </div>
 
+      <p className="px-5 py-2 text-xs text-muted-foreground">First calls today · each lead counts once</p>
       <div className="max-h-[320px] overflow-y-auto">
         {loading ? (
           // Skeleton rows — fixed height matches the real cards so the
@@ -78,7 +79,7 @@ export function CallsTodayCard() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     {call.lead ? (
-                      <Link href={`/leads/${call.lead.id}`} className="text-sm font-medium hover:underline truncate block">
+                      <Link prefetch={false} href={`/leads/${call.lead.id}`} className="text-sm font-medium hover:underline truncate block">
                         {call.lead.name}
                       </Link>
                     ) : (

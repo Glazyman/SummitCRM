@@ -4,15 +4,16 @@
  * components/admin/date-range-picker.tsx
  *
  * Preset-based date range selector that syncs state via URL params.
- * Presets: Today, 7 Days, 30 Days, All Time — plus "Pick day" (a single
- * calendar day) when the caller passes `day` + `onDayChange`.
+ * Presets: Today, 7 Days, 30 Days, All Time, with an always-visible calendar day
+ * navigator when the caller passes `day` + `onDayChange`.
  */
 
-import React, { useState } from 'react'
+import React from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Button }   from '@/components/ui/button'
-import { Calendar, CalendarSearch } from 'lucide-react'
-import { DayNav, todayYmd } from '@/components/ui/day-nav'
+import { Calendar } from 'lucide-react'
+import { todayYmd } from '@/components/ui/day-nav'
+import { PeriodDates } from '@/components/ui/period-dates'
+import { resolveDateRange } from '@/lib/date-ranges'
 import { cn } from '@/lib/utils'
 import type { DateRangePreset } from './types'
 
@@ -34,13 +35,17 @@ interface DateRangePickerProps {
   value:    DateRangePreset
   onChange: (preset: DateRangePreset) => void
   className?: string
-  /** Enables the "Pick day" option: the chosen "YYYY-MM-DD" (local day). */
+  /** Enables the visible calendar navigator: the chosen "YYYY-MM-DD" (local day). */
   day?:         string
   onDayChange?: (ymd: string) => void
+  start?: string
+  end?: string
+  historyStart?: string
+  onRangeChange?: (from: string, through: string) => void
 }
 
-export function DateRangePicker({ value, onChange, className, day, onDayChange }: DateRangePickerProps) {
-  const dayMode = !!onDayChange && value === 'day'
+export function DateRangePicker({ value, onChange, className, day, onDayChange, start, end, historyStart, onRangeChange }: DateRangePickerProps) {
+  const resolved = resolveDateRange(value, day || todayYmd())
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
     <div className="flex flex-1 items-center gap-1 rounded-lg border bg-background p-1 sm:flex-none">
@@ -62,23 +67,9 @@ export function DateRangePicker({ value, onChange, className, day, onDayChange }
           <span className="hidden sm:inline">{p.label}</span>
         </button>
       ))}
-      {onDayChange && (
-        <button
-          onClick={() => { onChange('day'); if (!day) onDayChange(todayYmd()) }}
-          className={cn(
-            'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition-all whitespace-nowrap sm:flex-none sm:px-3',
-            dayMode
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-          )}
-        >
-          <CalendarSearch className="hidden h-3.5 w-3.5 sm:block" />
-          <span className="sm:hidden">Day</span>
-          <span className="hidden sm:inline">Pick day</span>
-        </button>
-      )}
+
     </div>
-    {dayMode && <DayNav value={day || todayYmd()} onChange={onDayChange!} />}
+    {onDayChange && <PeriodDates preset={value} start={start || resolved.start} end={end || resolved.end} day={day || todayYmd()} historyStart={historyStart} onDayChange={onDayChange} onRangeChange={onRangeChange || ((from) => onDayChange(from))} />}
     </div>
   )
 }

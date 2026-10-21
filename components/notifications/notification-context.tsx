@@ -115,12 +115,14 @@ export function NotificationProvider({ userId, children }: Props) {
     if (!userId) return
     let cleanup: (() => void) | undefined
 
-    import('@supabase/supabase-js').then(({ createClient }) => {
+    let cancelled = false
+    import('@/lib/supabase/client').then(({ createClient }) => {
+      if (cancelled) return
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       if (!url || !key) return
 
-      const supabase = createClient(url, key)
+      const supabase = createClient()
       const channel = supabase
         .channel(`notifications:${userId}`)
         .on(
@@ -140,7 +142,7 @@ export function NotificationProvider({ userId, children }: Props) {
       cleanup = () => { supabase.removeChannel(channel) }
     })
 
-    return () => { cleanup?.() }
+    return () => { cancelled = true; cleanup?.() }
   }, [userId, addRealtime])
 
   return (

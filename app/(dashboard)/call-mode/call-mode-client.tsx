@@ -128,6 +128,8 @@ export function CallModeClient({
   // semantics — a retry-queue lead called earlier today must not re-count);
   // re-seeded from the server on refresh.
   const [todayCalled, setTodayCalled] = React.useState(calledToday)
+  // Keep the server-authoritative target in sync after refresh.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => { setTodayCalled(calledToday) }, [calledToday])
 
   const [phase,   setPhase]   = React.useState<Phase>('setup')
@@ -290,11 +292,12 @@ export function CallModeClient({
     setError(null)
 
     const bumpToday = () => {
-      const startOfToday = new Date()
-      startOfToday.setHours(0, 0, 0, 0)
-      const alreadyCountedToday =
-        !!lead.last_contacted_at && new Date(lead.last_contacted_at) >= startOfToday
-      if (!alreadyCountedToday) setTodayCalled((c) => c + 1)
+      // The server counts first calls across history, so recalls cannot advance the target.
+      void fetch('/api/rep/my-stats?period=today').then(async response => {
+        if (!response.ok) return
+        const stats = await response.json()
+        if (typeof stats.funnel?.calls_made === 'number') setTodayCalled(stats.funnel.calls_made)
+      }).catch(() => {})
     }
 
     try {

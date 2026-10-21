@@ -276,10 +276,18 @@ function NavLink({
   collapsed?: boolean
 }) {
   const Icon = item.icon
+  const router = useRouter()
+  const prefetchTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  React.useEffect(() => () => clearTimeout(prefetchTimer.current), [])
+  const warm = () => { if (!active) router.prefetch(item.href) }
 
   return (
     <Link
       href={item.href}
+      prefetch={false}
+      onMouseEnter={() => { prefetchTimer.current = setTimeout(warm, 120) }}
+      onMouseLeave={() => clearTimeout(prefetchTimer.current)}
+      onFocus={warm}
       title={collapsed ? item.label : undefined}
       className={cn(
         'flex items-center rounded-xl text-[13.5px] font-medium transition-all duration-150',

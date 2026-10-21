@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { interestedLeadsPage } from '@/lib/leads-interested-filter'
 import { getActor } from '@/lib/auth/actor'
 import { getUsersById } from '@/lib/users'
 import { LeadsClient }       from './leads-client'
@@ -38,6 +39,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   let workspaceId   = ''
   let role          = 'rep'
   let leads:         LeadRow[] = []
+  let matchingInterestedIds: string[] | undefined
   let totalCount    = 0
   let statusCounts: StatusCount[] = []
   let batches:      { id: string; name: string }[] = []
@@ -76,7 +78,11 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       const adminForLeads = createAdminClient()
 
       const [pageResult, batchesResult, membersResult] = await Promise.all([
-        (adminForLeads as any).rpc('get_workspace_leads_page', {
+        sParam('interested_start') && sParam('interested_end')
+          ? interestedLeadsPage(adminForLeads, workspaceId, actor.userId, isRep, sParam, perPage === 0 ? ALL_PAGE_HARD_CAP : perPage, perPage === 0 ? 0 : (page - 1) * perPage)
+          // RPC signature is newer than the manually maintained generated types.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          : (adminForLeads as any).rpc('get_workspace_leads_page', {
           p_workspace_id:        workspaceId,
           p_viewer_id:           actor.userId,
           p_scope_to_rep:        isRep,
@@ -109,6 +115,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
           .eq('is_active', true),
       ])
 
+      if ('matchingIds' in pageResult) matchingInterestedIds = pageResult.matchingIds
       const payload = (pageResult.data ?? {}) as {
         rows?: Array<Record<string, unknown>>
         total_count?: number
@@ -136,8 +143,16 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       }
       const rawLeads = (payload.rows ?? []) as unknown as RawLead[]
 
+      // The list needs contact fields, not full intake/import records for every row.
+      // Full details still load from /full when a lead is opened.
+      const contactFields = new Set(['email_2', 'email_3', 'email_4', 'phone_2', 'phone_3', 'phone_4', 'company_phone', 'company_phone_2', 'company_phone_3'])
       leads = rawLeads.map((lead) => ({
-        ...lead,
+        id: lead.id, workspace_id: lead.workspace_id,
+        first_name: lead.first_name, last_name: lead.last_name,
+        email: lead.email, phone: lead.phone, company: lead.company, title: lead.title,
+        website: lead.website, linkedin_url: lead.linkedin_url, status: lead.status,
+        batch_id: lead.batch_id, assigned_to: lead.assigned_to,
+        created_at: lead.created_at, updated_at: lead.updated_at,
         interest_status:   (lead.interest_status as InterestStatus) ?? 'pending',
         pipeline_stage_id: lead.pipeline_stage_id ?? null,
         batch_name:        lead.batch_id ? batchNames.get(lead.batch_id) ?? null : null,
@@ -146,7 +161,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         last_call_outcome: lead.last_call_outcome ?? null,
         last_activity_at:  lead.last_activity_at  ?? null,
         tags:              [],
-        custom_fields:     lead.custom_fields ?? {},
+        custom_fields: Object.fromEntries(Object.entries(lead.custom_fields ?? {}).filter(([key, value]) => contactFields.has(key) && typeof value === 'string')),
       }))
 
       totalCount = payload.total_count ?? 0
@@ -157,6 +172,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
     }
   } catch (err) {
     console.error('[/leads page]', err)
+    if (sParam('interested_start')) throw err
   }
 
   return (
@@ -166,6 +182,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       </div>
     }>
       <LeadsClient
+        matchingInterestedIds={matchingInterestedIds}
         initialLeads={leads}
         totalCount={totalCount}
         statusCounts={statusCounts}

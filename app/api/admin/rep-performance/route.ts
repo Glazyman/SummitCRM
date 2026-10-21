@@ -11,6 +11,7 @@ import { createServerClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveDailyCallTarget } from '@/lib/call-targets'
 import { getUsersById } from '@/lib/users'
 import { selectAll } from '@/lib/supabase/select-all'
+import { firstCalls, inCallPeriod } from '@/lib/first-calls'
 
 /** Parse "YYYY-MM-DD" into a Date at local midnight. Falls back to today. */
 function parseAnchor(raw: string | null): Date {
@@ -92,66 +93,35 @@ export async function GET(req: NextRequest) {
     }
     const wsId = member.workspace_id
 
-    // Fetch everything in parallel.
-    // Call stats use get_call_stats_by_rep — a SQL aggregate RPC that returns a
-    // single jsonb row, bypassing PostgREST's 1000-row cap. All call paths
-    // (Log Call UI, status PATCH, bulk PATCH) write to call_logs, so that table
-    // is the single source of truth; the old activity_logs synthetic count was
-    // removed because it double-counted bulk calls.
-    const [membersRes, callStatsRes, followUpsRes, leadsRes,
-           leadsCalledInPeriodRes, workspaceRes, uniqueLeadsRes] = await Promise.all([
+    // First calls are selected across history before applying the date window.
+    const [membersRes, followUpsRes, leadsRes, workspaceRes, callLeadRows] = await Promise.all([
       admin.from('workspace_members').select('user_id, role').eq('workspace_id', wsId).eq('is_active', true),
-      // RPC aggregate — bypasses PostgREST row limit; returns [{logged_by, outcome, cnt}]
-      admin.rpc('get_call_stats_by_rep', {
-        p_workspace_id: wsId,
-        p_start:        range.start,
-        p_end:          range.end,
-      }),
-      admin.from('follow_ups')
-        .select('assigned_to, completed_at, due_at')
-        .eq('workspace_id', wsId),
+      selectAll<{ assigned_to: string; completed_at: string | null; due_at: string }>((from, to) =>
+        admin.from('follow_ups').select('assigned_to, completed_at, due_at')
+          .eq('workspace_id', wsId).order('id').range(from, to)).then(data => ({ data })),
       // RPC aggregate — bypasses PostgREST row limit
       admin.rpc('get_leads_assigned_status_counts', { p_workspace_id: wsId }),
-      // Unique leads each rep called IN THIS PERIOD — bounded range.
-      admin.rpc('get_unique_leads_called_by_rep_range', {
-        p_workspace_id: wsId,
-        p_start:        range.start,
-        p_end:          range.end,
-      }),
       // Workspace settings → default daily target + per-rep overrides
       admin.from('workspaces').select('settings').eq('id', wsId).single(),
-      // Workspace-level UNIQUE leads called in the range (one per lead, NOT raw
-      // call count) — the "per person" headline figure, matches the analytics
-      // page. Uses the denormalized last_contacted_at. count(leads) avoids the
-      // double-count you'd get summing per-rep uniques.
-      admin.from('leads').select('id', { count: 'exact', head: true })
-        .eq('workspace_id', wsId)
-        .gte('last_contacted_at', range.start)
-        .lt('last_contacted_at', range.end)
-        .is('deleted_at', null),
+      selectAll<{ id: string; lead_id: string; called_at: string; logged_by: string; outcome: string }>((from, to) =>
+        admin.from('call_logs').select('id, lead_id, called_at, logged_by, outcome').eq('workspace_id', wsId)
+          .lt('called_at', range.end).order('id').range(from, to)),
     ])
-    // last_contacted_at only answers "called since X" — for a window that ends
-    // in the past (a picked day) count distinct leads straight from call_logs.
-    const endsNow = Date.now() - Date.parse(range.end) < 5 * 60_000
-    const uniqueLeads = endsNow
-      ? (uniqueLeadsRes as { count: number | null }).count ?? 0
-      : new Set((await selectAll<{ lead_id: string }>((from, to) =>
-          (admin as any).from('call_logs').select('lead_id')
-            .eq('workspace_id', wsId).gte('called_at', range.start).lt('called_at', range.end).range(from, to)))
-          .map((c) => c.lead_id)).size
+    const uniqueLeads = inCallPeriod(firstCalls(callLeadRows), range.start, range.end).length
+    const firstByRep = inCallPeriod(firstCalls(callLeadRows, true), range.start, range.end)
 
     // Leads each rep MARKED interested in the window (interest-change log).
-    // Best-effort: a missing enum value or log hiccup must not take the whole
-    // panel down — the counts just read 0.
-    const marks = await selectAll<{ user_id: string | null }>((from, to) =>
-      (admin as any).from('activity_logs').select('user_id')
+    const marks = await selectAll<{ user_id: string | null; lead_id: string }>((from, to) =>
+      (admin as any).from('activity_logs').select('user_id, lead_id')
         .eq('workspace_id', wsId).eq('type', 'interest_status_changed').eq('metadata->>to', 'interested')
-        .gte('created_at', range.start).lt('created_at', range.end).range(from, to)).catch((err) => { console.error('[interested marks]', err); return [] })
+        .gte('created_at', range.start).lt('created_at', range.end).order('id').range(from, to))
     const marksByRep = new Map<string, number>()
-    for (const m of marks) if (m.user_id) marksByRep.set(m.user_id, (marksByRep.get(m.user_id) ?? 0) + 1)
+    const seenMarks = new Set<string>()
+    for (const m of marks) if (m.user_id && m.lead_id && !seenMarks.has(`${m.user_id}:${m.lead_id}`)) {
+      seenMarks.add(`${m.user_id}:${m.lead_id}`)
+      marksByRep.set(m.user_id, (marksByRep.get(m.user_id) ?? 0) + 1)
+    }
 
-    const leadsCalledRows = (leadsCalledInPeriodRes.data ?? []) as Array<{ user_id: string; leads_called: number }>
-    const leadsCalledByUser = new Map(leadsCalledRows.map((r) => [r.user_id, Number(r.leads_called)]))
 
     const wsSettings = (workspaceRes.data as { settings?: Record<string, unknown> } | null)?.settings ?? {}
     const targetForUser = (uid: string) => resolveDailyCallTarget(wsSettings, uid)
@@ -159,16 +129,6 @@ export async function GET(req: NextRequest) {
     const members   = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
     const memberIds = members.map((m) => m.user_id)
     const nameById  = await getUsersById(admin, wsId, memberIds)
-
-    // Build per-rep call stats from RPC result [{logged_by, outcome, cnt}]
-    const callStatsRows = (callStatsRes.data ?? []) as Array<{ logged_by: string; outcome: string; cnt: number }>
-    const callsByUserOutcome = new Map<string, Map<string, number>>()
-    for (const row of callStatsRows) {
-      if (!row.logged_by) continue
-      const outcomeMap = callsByUserOutcome.get(row.logged_by) ?? new Map<string, number>()
-      outcomeMap.set(row.outcome, Number(row.cnt))
-      callsByUserOutcome.set(row.logged_by, outcomeMap)
-    }
 
     const followUps = (followUpsRes.data ?? []) as Array<{ assigned_to: string | null; completed_at: string | null; due_at: string }>
     // RPC returns [{assigned_to, status, cnt}] — expand into flat rows so filter logic works unchanged
@@ -185,9 +145,10 @@ export async function GET(req: NextRequest) {
       .map(m => {
         const uid = m.user_id
 
-        // Calls in period — from aggregate RPC, no row-cap risk
-        const outcomeMap = callsByUserOutcome.get(uid) ?? new Map<string, number>()
-        const callsByOutcome: Record<string, number> = Object.fromEntries(outcomeMap)
+        // First calls by this rep, within the selected period
+        const myCalls = firstByRep.filter(c => c.logged_by === uid)
+        const callsByOutcome: Record<string, number> = {}
+        for (const call of myCalls) callsByOutcome[call.outcome] = (callsByOutcome[call.outcome] ?? 0) + 1
 
         // Follow-ups
         const myFUs = followUps.filter(f => f.assigned_to === uid)
@@ -208,7 +169,7 @@ export async function GET(req: NextRequest) {
           id:               uid,
           name:             nameById.get(uid) ?? uid,
           role:             m.role,
-          calls:            [...outcomeMap.values()].reduce((s, n) => s + n, 0),
+          calls:            myCalls.length,
           callsByOutcome,
           followUpsPending:  fuPending,
           followUpsOverdue:  fuOverdue,
@@ -218,14 +179,14 @@ export async function GET(req: NextRequest) {
           // Unique leads called in the selected period (day/week/month).
           // Plus the rep's daily target — UI decides whether to show
           // "X / Target" (day view) or just "X" (week/month view).
-          leadsCalledInPeriod: leadsCalledByUser.get(uid) ?? 0,
+          leadsCalledInPeriod: myCalls.length,
           dailyCallTarget:     targetForUser(uid),
           interestedMarked:    marksByRep.get(uid) ?? 0,
         }
       })
-      .sort((a, b) => b.calls - a.calls)
+      .sort((a, b) => b.leadsCalledInPeriod - a.leadsCalledInPeriod)
 
-    return NextResponse.json({ reps, range, uniqueLeads })
+    return NextResponse.json({ reps, range, uniqueLeads, historyStart: callLeadRows.reduce<string | undefined>((first, call) => !first || call.called_at < first ? call.called_at : first, undefined) })
   } catch (err) {
     console.error('[GET /api/admin/rep-performance]', err)
     return NextResponse.json({ error: 'Failed to load rep performance' }, { status: 500 })

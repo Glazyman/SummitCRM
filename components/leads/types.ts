@@ -54,6 +54,8 @@ export interface LeadFilters {
   batchId:    string | null
   assignedTo: string | null
   myLeads:    boolean
+  interestedStart: string
+  interestedEnd: string
   coldOnly:   boolean
   dateFrom:   string          // ISO date string or ''
   dateTo:     string          // ISO date string or ''
@@ -70,6 +72,8 @@ export const DEFAULT_FILTERS: LeadFilters = {
   batchId:    null,
   assignedTo: null,
   myLeads:    false,
+  interestedStart: '',
+  interestedEnd: '',
   coldOnly:   false,
   dateFrom:   '',
   dateTo:     '',

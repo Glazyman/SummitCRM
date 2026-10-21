@@ -1,16 +1,18 @@
 'use client'
 
 import * as React from 'react'
-import { Phone, Calendar, Users, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Phone, Users, RefreshCw, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { DayNav, dayRange, todayYmd } from '@/components/ui/day-nav'
+import { todayYmd } from '@/components/ui/day-nav'
+import { DateRangePicker } from '@/components/admin/date-range-picker'
+import { resolveDateRange } from '@/lib/date-ranges'
 import {
-  PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer, Legend,
+  PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer,
 } from 'recharts'
 
 // Rolling date-range presets — match the analytics page exactly. 'day' is a
 // single picked calendar day.
-type Preset = 'today' | '7d' | '30d' | 'all' | 'day'
+type Preset = 'today' | '7d' | '30d' | 'all' | 'day' | 'custom'
 
 interface RepStat {
   id:                string
@@ -31,26 +33,6 @@ interface RepStat {
   interestedMarked?:   number
 }
 
-const PRESET_LABELS: Record<Preset, string> = {
-  today: 'Today',
-  '7d':  'Last 7 days',
-  '30d': 'Last 30 days',
-  all:   'All time',
-  day:   'Pick day',
-}
-
-// Rolling [start, end] for a preset — identical semantics to the analytics page.
-function presetRange(preset: Preset): { start: string; end: string } {
-  const now = new Date()
-  const end = now.toISOString()
-  let start = new Date(now)
-  if (preset === 'today')    { start.setHours(0, 0, 0, 0) }
-  else if (preset === '7d')  { start.setDate(start.getDate() - 7) }
-  else if (preset === 'all') { start = new Date('1970-01-01T00:00:00Z') }
-  else                       { start.setDate(start.getDate() - 30) }
-  return { start: start.toISOString(), end }
-}
-
 const OUTCOME_META: Record<string, { label: string; color: string }> = {
   answered:           { label: 'Answered',    color: '#10b981' },
   voicemail:          { label: 'Voicemail',   color: '#a855f7' },
@@ -60,9 +42,7 @@ const OUTCOME_META: Record<string, { label: string; color: string }> = {
 }
 
 // ── Donut chart for call outcomes ─────────────────────────────────────────
-// Center = UNIQUE leads called (one per lead, "per person") to match the
-// analytics page; the slices are call outcomes (which sum to raw calls), and
-// raw call count is shown as a small secondary line.
+// Center and outcomes count first calls only; repeat logs never add leads.
 function CallDonut({ reps, uniqueLeads }: { reps: RepStat[]; uniqueLeads: number }) {
   const totals: Record<string, number> = {}
   for (const rep of reps) {
@@ -112,11 +92,10 @@ function CallDonut({ reps, uniqueLeads }: { reps: RepStat[]; uniqueLeads: number
             />
           </PieChart>
         </ResponsiveContainer>
-        {/* Center label — unique leads called (per person), raw calls secondary */}
+        {/* Center label — leads called once */}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-2xl font-bold leading-none">{uniqueLeads}</span>
           <span className="text-[11px] text-muted-foreground">leads called</span>
-          <span className="mt-0.5 text-[10px] text-muted-foreground/70">{total} calls</span>
         </div>
       </div>
       {/* Legend */}
@@ -134,7 +113,7 @@ function CallDonut({ reps, uniqueLeads }: { reps: RepStat[]; uniqueLeads: number
 
 // ── Horizontal bar per rep ────────────────────────────────────────────────
 function RepCallBars({ reps }: { reps: RepStat[] }) {
-  const maxCalls = Math.max(1, ...reps.map(r => r.calls))
+  const maxCalls = Math.max(1, ...reps.map(r => r.leadsCalledInPeriod))
 
   return (
     <div className="space-y-2.5">
@@ -146,7 +125,6 @@ function RepCallBars({ reps }: { reps: RepStat[] }) {
               <span className="font-medium truncate max-w-[120px]">{rep.name.split(' ')[0]}</span>
               <span className="text-muted-foreground">
                 <span className="font-medium text-foreground">{rep.leadsCalledInPeriod}</span> leads
-                <span className="text-muted-foreground/60"> · {rep.calls} calls</span>
               </span>
             </div>
             {rep.calls > 0 ? (
@@ -156,7 +134,7 @@ function RepCallBars({ reps }: { reps: RepStat[] }) {
                     key={outcome}
                     title={`${OUTCOME_META[outcome]?.label ?? outcome}: ${count}`}
                     style={{
-                      width: `${(count / maxCalls) * 100}%`,
+                      width: `${(count / rep.calls) * (rep.leadsCalledInPeriod / maxCalls) * 100}%`,
                       background: OUTCOME_META[outcome]?.color ?? '#94a3b8',
                     }}
                   />
@@ -193,35 +171,47 @@ function CallsByRepPanel({ reps }: { reps: RepStat[] }) {
 
 // ── Main component ────────────────────────────────────────────────────────
 export function RepPerformancePanel() {
-  // Default to "All time" — shows the full call history by default (per user
-  // request); the Today/7d/30d presets narrow it down.
-  const [preset, setPreset]   = React.useState<Preset>('all')
+  // Open the dashboard on today; other ranges remain available.
+  const [preset, setPreset]   = React.useState<Preset>('today')
   const [day, setDay]         = React.useState(todayYmd)
+  const [customRange, setCustomRange] = React.useState({ from: '', through: '' })
+  const [historyStart, setHistoryStart] = React.useState<string>()
+  const dates = React.useMemo(() => resolveDateRange(preset, day, customRange.from, customRange.through), [preset, day, customRange])
   const [reps, setReps]       = React.useState<RepStat[]>([])
   const [uniqueLeads, setUniqueLeads] = React.useState(0)   // unique leads called in range (per person)
   const [loading, setLoading] = React.useState(true)
   const [error, setError]     = React.useState<string | null>(null)
 
-  const load = React.useCallback(async (p: Preset, d: string) => {
+  const requestId = React.useRef(0)
+  const load = React.useCallback(async () => {
+    const request = ++requestId.current
     setLoading(true); setError(null)
     try {
-      const { start, end } = p === 'day' ? dayRange(d) : presetRange(p)
+      const { start, end } = dates
       const res  = await fetch(`/api/admin/rep-performance?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
+      if (request !== requestId.current) return
+      setHistoryStart(json.historyStart)
       setReps(json.reps ?? [])
       setUniqueLeads(json.uniqueLeads ?? 0)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load')
+      if (request === requestId.current) setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
-      setLoading(false)
+      if (request === requestId.current) setLoading(false)
     }
-  }, [])
-
-  React.useEffect(() => { load(preset, day) }, [preset, day, load])
+  }, [dates])
 
   React.useEffect(() => {
-    const handler = () => { if (document.visibilityState === 'visible') load(preset, day) }
+    // Fetch external data for the current period.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load()
+    const counter = requestId
+    return () => { counter.current++ }
+  }, [preset, day, load])
+
+  React.useEffect(() => {
+    const handler = () => { if (document.visibilityState === 'visible') load() }
     document.addEventListener('visibilitychange', handler)
     return () => document.removeEventListener('visibilitychange', handler)
   }, [preset, day, load])
@@ -239,21 +229,11 @@ export function RepPerformancePanel() {
           <h2 className="text-sm font-semibold">Rep Performance</h2>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Date-range presets — same options as the analytics page */}
-          <div className="flex rounded-lg border border-border overflow-hidden">
-            {(Object.keys(PRESET_LABELS) as Preset[]).map(p => (
-              <button key={p} type="button" onClick={() => setPreset(p)}
-                className={cn('px-3 py-1 text-xs font-medium transition-colors whitespace-nowrap',
-                  preset === p ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                )}>
-                {PRESET_LABELS[p]}
-              </button>
-            ))}
-          </div>
+          <DateRangePicker value={preset} onChange={setPreset} day={day} start={dates.start} end={dates.end} historyStart={loading ? undefined : historyStart}
+            onDayChange={value => { setDay(value); setPreset('day') }}
+            onRangeChange={(from, through) => { setCustomRange({ from, through }); setPreset('custom') }} />
 
-          {preset === 'day' && <DayNav value={day} onChange={setDay} />}
-
-          <button type="button" onClick={() => load(preset, day)}
+          <button type="button" aria-label="Refresh rep performance" onClick={() => load()}
             className={cn('text-muted-foreground hover:text-foreground transition-colors', loading && 'animate-spin')}>
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
@@ -276,9 +256,10 @@ export function RepPerformancePanel() {
                 <Phone className="h-3 w-3" /> Call Outcomes
               </p>
               <CallDonut reps={reps} uniqueLeads={uniqueLeads} />
+              <p className="mt-2 text-xs text-muted-foreground">Each lead counts once, on its first call date.</p>
             </div>
             <div className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Calls per Rep</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Leads called per Rep</p>
               <CallsByRepPanel reps={reps} />
             </div>
           </div>
@@ -294,11 +275,10 @@ export function RepPerformancePanel() {
                     <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Rep</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground"
                         title="Unique leads called in the selected period">
-                      {isToday ? 'Leads / Target' : 'Leads in period'}
+                      {isToday ? 'Calls / Target' : 'Leads called'}
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-400"
                         title="Leads this rep marked interested in the selected period">Interested</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Calls</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Answered</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Voicemail</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">No Answer</th>
@@ -354,12 +334,6 @@ export function RepPerformancePanel() {
                         <span className={cn('text-sm font-semibold tabular-nums',
                           rep.interestedMarked ? 'text-emerald-600' : 'text-muted-foreground/40')}>
                           {rep.interestedMarked ?? 0}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={cn('inline-flex items-center justify-center h-7 w-7 rounded-full text-sm font-bold',
-                          rep.calls > 0 ? 'bg-primary/10 text-primary' : 'text-muted-foreground/40')}>
-                          {rep.calls}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center text-sm" style={{ color: rep.callsByOutcome.answered ? '#10b981' : undefined }}>

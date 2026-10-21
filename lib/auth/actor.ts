@@ -1,4 +1,5 @@
 import 'server-only'
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -47,11 +48,15 @@ export interface Actor {
  * and route; new/updated callsites should use this so impersonation is honoured
  * consistently.
  */
-export async function getActor(): Promise<Actor | null> {
+export const getAuthenticatedUser = cache(async () => {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+})
+
+// Request-only memoization. Authorization is verified again on each new request.
+export const getActor = cache(async (): Promise<Actor | null> => {
+  const user = await getAuthenticatedUser()
   if (!user) return null
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,7 +122,7 @@ export async function getActor(): Promise<Actor | null> {
     impersonatedName: name,
     impersonatedEmail: email,
   }
-}
+})
 
 /** True when the effective role meets or exceeds `admin`. */
 export function actorIsAdmin(actor: Actor): boolean {

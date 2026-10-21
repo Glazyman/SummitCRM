@@ -6,13 +6,14 @@
  * Replaces the prior lib/users-cache.ts that 30s-cached the entire
  * Supabase project listUsers() scan. The RPCs are workspace-scoped
  * (for getUsersById) and run inside Postgres — no full-account scans,
- * no cache to invalidate.
+ * display metadata cached for 60 seconds; authorization is verified separately.
  *
  * Public API mirrors the old cache module so callsites only need to
  * change their import path.
  */
 
-import type { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { unstable_cache } from 'next/cache'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -47,38 +48,40 @@ function toCachedUser(u: RpcUserRow): CachedUser {
   }
 }
 
+// Cache display metadata only. Membership/role checks stay live in getActor().
+// Explicit workspace + sorted IDs prevent cross-workspace cache collisions.
+const getDisplayUsers = unstable_cache(async (workspaceId: string, memberIds: string[]): Promise<RpcUserRow[]> => {
+  const admin = createAdminClient()
+  const { data, error } = await (admin as unknown as AdminWithRpc).rpc('get_users_by_ids', {
+    p_workspace_id: workspaceId, p_user_ids: memberIds,
+  })
+  if (error) throw new Error(`get_users_by_ids failed: ${error.message}`)
+  return (data ?? []) as RpcUserRow[]
+}, ['workspace-display-users-v1'], { revalidate: 60 })
+
 /**
  * Returns Map<userId, displayName> for the given member IDs.
  * Display name preference: user_metadata.full_name → email → id.
  */
 export async function getUsersById(
-  adminClient:  AdminClient,
+  _adminClient: AdminClient,
   workspaceId:  string,
   memberIds:    string[],
 ): Promise<Map<string, string>> {
   if (memberIds.length === 0) return new Map()
-  const { data, error } = await (adminClient as unknown as AdminWithRpc).rpc(
-    'get_users_by_ids',
-    { p_workspace_id: workspaceId, p_user_ids: memberIds },
-  )
-  if (error) throw new Error(`get_users_by_ids failed: ${error.message}`)
-  const rows = (data ?? []) as RpcUserRow[]
+  const rows = await getDisplayUsers(workspaceId, [...new Set(memberIds)].sort())
   return new Map(rows.map((u) => [u.id, displayName(u)] as const))
 }
 
 /** Same as getUsersById but returns full CachedUser objects (email + metadata). */
 export async function getUsersByIdsFull(
-  adminClient:  AdminClient,
+  _adminClient: AdminClient,
   workspaceId:  string,
   memberIds:    string[],
 ): Promise<CachedUser[]> {
   if (memberIds.length === 0) return []
-  const { data, error } = await (adminClient as unknown as AdminWithRpc).rpc(
-    'get_users_by_ids',
-    { p_workspace_id: workspaceId, p_user_ids: memberIds },
-  )
-  if (error) throw new Error(`get_users_by_ids failed: ${error.message}`)
-  return ((data ?? []) as RpcUserRow[]).map(toCachedUser)
+  const rows = await getDisplayUsers(workspaceId, [...new Set(memberIds)].sort())
+  return rows.map(toCachedUser)
 }
 
 /** Find a user by email (case-insensitive). Returns null if not found. Service-role only. */

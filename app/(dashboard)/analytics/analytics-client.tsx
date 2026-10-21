@@ -1,21 +1,22 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import {
-  RepPerformanceTable, AnalyticsExportButton,
-} from '@/components/analytics'
-import type { RepRow, CallOverview, AnalyticsTab } from '@/components/analytics'
+import { usePathname, useSearchParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
+import { RepPerformanceTable } from '@/components/analytics/rep-performance-table'
+import { AnalyticsExportButton } from '@/components/analytics/analytics-export-button'
+import type { RepRow, CallOverview, AnalyticsTab } from '@/components/analytics/types'
+import type { ActivityDay } from '@/components/analytics/activity-insights'
+import { resolveDateRange } from '@/lib/date-ranges'
 import { DateRangePicker } from '@/components/admin/date-range-picker'
 import type { DateRangePreset } from '@/components/admin/types'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button }  from '@/components/ui/button'
-import { Badge }   from '@/components/ui/badge'
-import { RefreshCw, BarChart2, Phone, Calendar, Users, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { RefreshCw, BarChart2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { dayRange, dayLabel, todayYmd } from '@/components/ui/day-nav'
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/pie-chart'
+import { dayLabel, todayYmd } from '@/components/ui/day-nav'
+
+const OverviewCards = dynamic(() => import('@/components/analytics/overview-cards').then(m => m.OverviewCards), { loading: () => <div className="h-64 animate-pulse rounded-xl bg-muted" /> })
+const ActivityInsights = dynamic(() => import('@/components/analytics/activity-insights').then(m => m.ActivityInsights), { loading: () => <div className="h-64 animate-pulse rounded-xl bg-muted" /> })
 
 interface TabConfig { id: AnalyticsTab; label: string; minRole: string }
 
@@ -35,239 +36,17 @@ const EMPTY_OVERVIEW: CallOverview = {
   follow_ups_due: 0, follow_ups_overdue: 0, leads_total: 0, leads_active: 0, contacted_total: 0,
 }
 
-const OUTCOME_COLORS: Record<string, string> = {
-  answered:  '#10b981',
-  voicemail: '#a855f7',
-  no_answer: '#94a3b8',
-  wrong:     '#ef4444',
-  callback:  '#f59e0b',
-}
-
-// ── Call-outcome donut ────────────────────────────────────────────────────
-// A clean donut wheel: each outcome is one ring slice, sized by its share of
-// total calls. Centre shows the headline figure (unique leads called).
-function CallDonut({
-  data, centerValue, centerLabel,
-}: {
-  data: { name: string; value: number; color: string }[]
-  centerValue: React.ReactNode
-  centerLabel: string
-}) {
-  return (
-    <div className="relative self-center [&_path]:!outline-none">
-      <ResponsiveContainer width="100%" height={196}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%" cy="50%"
-            innerRadius={56} outerRadius={80}
-            paddingAngle={2}
-            dataKey="value"
-            nameKey="name"
-            strokeWidth={0}
-          >
-            {data.map((d, i) => <Cell key={i} fill={d.color} />)}
-          </Pie>
-          <RTooltip
-            formatter={(v, n) => [String(v), String(n)]}
-            contentStyle={{ border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', background: 'hsl(var(--popover))' }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      {/* Pinned to the chart height (196px), not the wrapper — the wrapper can
-          be stretched taller by the grid row, which would push this below the
-          donut hole. top-0 h-[196px] keeps it centered in the ring. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[196px] flex flex-col items-center justify-center">
-        <span className="text-xl font-bold leading-none">{centerValue}</span>
-        <span className="mt-0.5 text-[10px] text-muted-foreground text-center px-2 leading-tight">{centerLabel}</span>
-      </div>
-    </div>
-  )
-}
-
-// ── Overview summary cards ────────────────────────────────────────────────
-function OverviewCards({ overview, loading, reps }: { overview: CallOverview; loading: boolean; reps: RepRow[] }) {
-  const answerRate = overview.total > 0 ? Math.round(overview.answered / overview.total * 100) : 0
-  const donutData = [
-    { name: 'Answered',  value: overview.answered,     color: OUTCOME_COLORS.answered  },
-    { name: 'Voicemail', value: overview.voicemail,    color: OUTCOME_COLORS.voicemail },
-    { name: 'No Answer', value: overview.no_answer,    color: OUTCOME_COLORS.no_answer },
-    { name: 'Wrong #',   value: overview.wrong_number, color: OUTCOME_COLORS.wrong     },
-    { name: 'Callback',  value: overview.callback,     color: OUTCOME_COLORS.callback  },
-  ].filter(d => d.value > 0)
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Call summary + donut */}
-      <Card className="lg:col-span-2">
-        <CardContent className="pt-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Phone className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">Call Summary</span>
-          </div>
-          {loading ? (
-            <div className="h-[200px] animate-pulse bg-muted rounded-xl" />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* Call-outcome donut */}
-              {donutData.length > 0 ? (
-                <CallDonut
-                  data={donutData}
-                  centerValue={overview.unique_leads}
-                  centerLabel="leads called"
-                />
-              ) : (
-                <div className="flex h-[196px] items-center justify-center text-sm text-muted-foreground">
-                  No calls in this period.
-                </div>
-              )}
-              {/* Breakdown */}
-              <div className="flex flex-col justify-center space-y-2.5">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
-                  Call outcomes · % of {overview.total.toLocaleString()} call{overview.total === 1 ? '' : 's'}
-                </p>
-                {donutData.map(d => (
-                  <div key={d.name} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} />
-                      <span className="text-muted-foreground">{d.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold tabular-nums">{d.value}</span>
-                      <span className="text-[10px] text-muted-foreground w-8 text-right">
-                        {overview.total > 0 ? `${Math.round(d.value / overview.total * 100)}%` : '0%'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {overview.total === 0 && (
-                  <p className="text-sm text-muted-foreground">No calls in this period.</p>
-                )}
-
-                {/* Lead status — current snapshot, not call outcomes */}
-                <div className="mt-1 border-t border-border pt-2.5 space-y-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Lead status · % of contacted</p>
-                  {([
-                    { label: 'Interested',     value: overview.interested,     dot: 'bg-emerald-500' },
-                    { label: 'Not interested', value: overview.not_interested, dot: 'bg-muted-foreground/50' },
-                    { label: 'Bad leads',      value: overview.bad_leads,      dot: 'bg-destructive' },
-                  ] as const).map(s => (
-                    <div key={s.label} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className={cn('h-2.5 w-2.5 rounded-full', s.dot)} />
-                        <span className="text-muted-foreground">{s.label}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold tabular-nums">{s.value}</span>
-                        <span className="text-[10px] text-muted-foreground w-8 text-right">
-                          {overview.contacted_total > 0 ? `${Math.min(100, Math.round(s.value / overview.contacted_total * 100))}%` : '—'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Stats column */}
-      <div className="space-y-4">
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Phone className="h-3.5 w-3.5 text-emerald-500" />
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Answer Rate</span>
-            </div>
-            {loading ? <div className="h-12 animate-pulse bg-muted rounded" /> : (
-              <>
-                <p className="text-4xl font-bold">{answerRate}%</p>
-                <p className="text-xs text-muted-foreground mt-1">{overview.answered} answered of {overview.total} calls</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Follow-ups</span>
-            </div>
-            {loading ? <div className="h-12 animate-pulse bg-muted rounded" /> : (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-500" /> Pending</span>
-                  <span className="font-bold">{overview.follow_ups_due}</span>
-                </div>
-                {overview.follow_ups_overdue > 0 && (
-                  <div className="flex items-center justify-between text-sm rounded-md bg-destructive/10 px-2 py-1">
-                    <span className="text-destructive flex items-center gap-1.5"><AlertTriangle className="h-3 w-3" /> Overdue</span>
-                    <span className="font-bold text-destructive">{overview.follow_ups_overdue}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1.5"><Users className="h-3 w-3" /> Leads Active</span>
-                  <span className="font-bold">{overview.leads_active} / {overview.leads_total}</span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-      </div>
-
-      {/* Calls by rep — bar chart (reps on x-axis, calls on y-axis) */}
-      {reps.length > 0 && <RepCallsChart reps={reps} loading={loading} />}
-    </div>
-  )
-}
-
-// ── Calls-by-rep bar chart (reui/shadcn chart style) ──────────────────────
-function RepCallsChart({ reps, loading }: { reps: RepRow[]; loading: boolean }) {
-  // y-axis = UNIQUE leads called per rep (one per lead, the "54" logic), not
-  // raw call dials (the "65"). Matches the per-person framing elsewhere.
-  const data = [...reps]
-    .map(r => ({ rep: (r.full_name ?? r.user_email)?.split(' ')[0] ?? '—', leads: r.unique_leads }))
-    .sort((a, b) => b.leads - a.leads)
-  const chartConfig = { leads: { label: 'Leads called', color: '#4b8f7a' } } satisfies ChartConfig
-
-  return (
-    <Card>
-      <CardContent className="pt-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Phone className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Leads Called by Rep</span>
-        </div>
-        {loading ? (
-          <div className="h-[260px] animate-pulse bg-muted rounded-xl" />
-        ) : (
-          <ChartContainer config={chartConfig} className="aspect-auto h-[260px] w-full">
-            <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-              <CartesianGrid vertical={false} strokeDasharray="3 3" />
-              <XAxis dataKey="rep" tickLine={false} axisLine={false} tickMargin={8} interval={0} angle={data.length > 6 ? -30 : 0} textAnchor={data.length > 6 ? 'end' : 'middle'} height={data.length > 6 ? 48 : 24} />
-              <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
-              <ChartTooltip content={<ChartTooltipContent nameKey="leads" />} />
-              <Bar dataKey="leads" fill="var(--color-leads)" radius={[6, 6, 0, 0]} maxBarSize={64} />
-            </BarChart>
-          </ChartContainer>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
 // ── Main analytics component ──────────────────────────────────────────────
 interface Props { userRole: string; userId: string }
 
 function AnalyticsContent({ userRole }: Props) {
-  const router       = useRouter()
   const pathname     = usePathname()
   const searchParams = useSearchParams()
-  const range        = (searchParams.get('range') as DateRangePreset) ?? '30d'
+  const rawRange = searchParams.get('range')
+  const range: DateRangePreset = ['today', '7d', '30d', 'all', 'day', 'custom'].includes(rawRange ?? '') ? rawRange as DateRangePreset : '30d'
   // "Pick day" — a single local calendar day, kept in the URL so it survives refresh.
-  const day          = searchParams.get('day') ?? todayYmd()
+  const rawDay = searchParams.get('day') ?? ''
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(rawDay) && !isNaN(Date.parse(rawDay)) ? rawDay : todayYmd()
   const tabParam     = searchParams.get('tab') as AnalyticsTab ?? 'overview'
 
   const isRep   = userRole === 'rep'
@@ -276,50 +55,75 @@ function AnalyticsContent({ userRole }: Props) {
   const visibleTabs = TABS.filter(t => canSee(t.minRole, userRole))
   const activeTab   = visibleTabs.find(t => t.id === tabParam) ? tabParam : visibleTabs[0]?.id ?? 'overview'
 
-  const { start, end } = React.useMemo(() => {
-    if (range === 'day') return dayRange(day)
-    const now = new Date()
-    const end = now.toISOString()
-    let start = new Date(now)
-    if (range === 'today')   { start.setHours(0, 0, 0, 0) }
-    else if (range === '7d') { start.setDate(start.getDate() - 7) }
-    else if (range === 'all'){ start = new Date('1970-01-01T00:00:00Z') }
-    else                      { start.setDate(start.getDate() - 30) }
-    return { start: start.toISOString(), end }
-  }, [range, day])
+  const from = searchParams.get('from') ?? ''
+  const through = searchParams.get('through') ?? ''
+  const { start, end } = React.useMemo(() => resolveDateRange(range, day, from, through), [range, day, from, through])
+  const [historyStart, setHistoryStart] = useState<string>()
 
   const [overview,  setOverview]  = useState<CallOverview>(EMPTY_OVERVIEW)
   const [reps,      setReps]      = useState<RepRow[]>([])
 
-  const [loadingReps,    setLR] = useState(false)
+  const [daily, setDaily] = useState<ActivityDay[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const requestId = React.useRef(0)
+  const [loadingReps, setLR] = useState(true)
 
-  const fetchReps = useCallback(async () => {
+  const responseCache = React.useRef(new Map<string, { at: number; request: Promise<{ reps: RepRow[]; overview: CallOverview; daily: ActivityDay[]; historyStart?: string }> }>())
+  const fetchReps = useCallback(async (force = false) => {
     if (!isAdmin) return
+    const request = ++requestId.current
     setLR(true)
+    setError(null)
     try {
-      const res = await fetch(`/api/analytics/reps?start=${start}&end=${end}`)
-      if (res.ok) {
-        const d = await res.json()
-        setReps(d.reps ?? [])
-        if (d.overview) setOverview(d.overview)
+      const params = new URLSearchParams({ start, end, tz: Intl.DateTimeFormat().resolvedOptions().timeZone })
+      const key = params.toString()
+      let cached = responseCache.current.get(key)
+      if (force || !cached || Date.now() - cached.at > 15_000) {
+        const pending = fetch(`/api/analytics/reps?${params}`).then(async res => {
+          const result = await res.json()
+          if (!res.ok) throw new Error(result.error || 'Unable to load analytics')
+          return result
+        })
+        cached = { at: Date.now(), request: pending }
+        responseCache.current.set(key, cached)
+        if (responseCache.current.size > 8) responseCache.current.delete(responseCache.current.keys().next().value!)
+        pending.catch(() => { if (responseCache.current.get(key)?.request === pending) responseCache.current.delete(key) })
       }
-    } catch {} finally { setLR(false) }
+      const data = await cached.request
+      if (request !== requestId.current) return
+      setReps(data.reps ?? [])
+      setOverview(data.overview ?? EMPTY_OVERVIEW)
+      setDaily(data.daily ?? [])
+      setHistoryStart(data.historyStart)
+    } catch (err) {
+      if (request === requestId.current) setError(err instanceof Error ? err.message : 'Unable to load analytics')
+    } finally { if (request === requestId.current) setLR(false) }
   }, [start, end, isAdmin])
 
   useEffect(() => {
+    // Start an external data request whenever the selected period changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchReps()
+    const counter = requestId
+    return () => { counter.current++ }
   }, [fetchReps])
 
   const setParam = (key: string, value: string) => {
     const p = new URLSearchParams(searchParams.toString())
     p.set(key, value)
-    router.replace(`${pathname}?${p.toString()}`, { scroll: false })
+    window.history.replaceState(null, '', `${pathname}?${p.toString()}`)
   }
   const setDay = (ymd: string) => {
     const p = new URLSearchParams(searchParams.toString())
     p.set('range', 'day')
     p.set('day', ymd)
-    router.replace(`${pathname}?${p.toString()}`, { scroll: false })
+    window.history.replaceState(null, '', `${pathname}?${p.toString()}`)
+  }
+
+  const setCustomRange = (first: string, last: string) => {
+    const p = new URLSearchParams(searchParams.toString())
+    p.set('range', 'custom'); p.set('from', first); p.set('through', last)
+    window.history.replaceState(null, '', `${pathname}?${p}`)
   }
 
   const isLoading = loadingReps
@@ -337,13 +141,13 @@ function AnalyticsContent({ userRole }: Props) {
               <div>
                 <h1 className="text-lg font-semibold">{isRep ? 'My Analytics' : 'Team Analytics'}</h1>
                 <p className="text-xs text-muted-foreground">
-                  {range === 'day' ? `${dayLabel(day)} · ` : ''}{reps.length > 0 && !isRep ? `${reps.length} reps · ` : ''}{overview.unique_leads} called · {overview.total} calls · {overview.leads_total} leads
+                  {loadingReps ? 'Loading analytics…' : error ? 'Data unavailable' : `${range === 'day' ? dayLabel(day) + ' · ' : ''}${reps.length} contributors · ${overview.unique_leads.toLocaleString()} leads called`}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <AnalyticsExportButton view={activeTab} start={start} end={end} />
-              <Button variant="outline" size="sm" onClick={() => { void fetchReps() }}
+              <Button variant="outline" size="sm" onClick={() => { void fetchReps(true) }}
                 disabled={isLoading} className="gap-1.5 h-9">
                 <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
                 <span className="hidden sm:inline">Refresh</span>
@@ -353,7 +157,7 @@ function AnalyticsContent({ userRole }: Props) {
           {/* Own row at every width — with "Pick day" open the controls are too
               wide to share the title row. */}
           <div className="pb-3">
-            <DateRangePicker value={range} onChange={v => setParam('range', v)} day={day} onDayChange={setDay} className="w-full md:w-auto" />
+            <DateRangePicker value={range} onChange={v => setParam('range', v)} day={day} onDayChange={setDay} start={start} end={end} historyStart={loadingReps ? undefined : historyStart} onRangeChange={setCustomRange} className="w-full md:w-auto" />
           </div>
 
           {/* Tab bar */}
@@ -372,12 +176,13 @@ function AnalyticsContent({ userRole }: Props) {
 
       {/* Content */}
       <div className="w-full py-6 space-y-6">
-        {activeTab === 'overview' && (
-          <OverviewCards overview={overview} loading={isAdmin ? loadingReps : false} reps={reps} />
-        )}
+        {error ? <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm"><p>{error}</p><button type="button" className="mt-2 underline" onClick={() => void fetchReps(true)}>Try again</button></div> : activeTab === 'overview' && <>
+          <ActivityInsights overview={overview} reps={reps} daily={daily} loading={loadingReps} />
+          <OverviewCards overview={overview} loading={loadingReps} reps={reps} />
+        </>}
 
-        {activeTab === 'reps' && isAdmin && (
-          <RepPerformanceTable reps={reps} loading={loadingReps} start={start} end={end} />
+        {!error && activeTab === 'reps' && isAdmin && (
+          <RepPerformanceTable overview={overview} reps={reps} loading={loadingReps} start={start} end={end} />
         )}
 
       </div>

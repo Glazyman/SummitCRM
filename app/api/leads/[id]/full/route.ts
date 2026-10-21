@@ -137,7 +137,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       .flatMap((r) => (Array.isArray(r.tags) ? r.tags : r.tags ? [r.tags] : []))
     const availableTags = (allTagsRes.data ?? []) as TagRow[]
 
-    return NextResponse.json({ lead, activity, emails, followUps, calls, teamMembers, tags, availableTags, currentUserId, isAdmin })
+    return NextResponse.json({ lead, activity, emails, followUps, calls, teamMembers, tags, availableTags, currentUserId, isAdmin, questionnaire: (rawLead.custom_fields as Record<string, unknown> | null)?._questionnaire ?? null })
   } catch (err) {
     console.error('[GET /api/leads/[id]/full]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -1,14 +1,18 @@
 export interface RepRow {
+  active_days?: number
+  last_call_at?: string | null
   user_id:             string
   user_email:          string
   full_name:           string | null
   role:                string
+  /** First calls per rep/lead; same count as unique_leads. */
   calls:               number
   /** Distinct leads this rep called in the period (one per lead). */
   unique_leads:        number
   calls_answered:      number
   calls_voicemail:     number
   calls_no_answer:     number
+  calls_callback?:     number
   calls_wrong_number:  number
   follow_ups_pending:  number
   follow_ups_overdue:  number
@@ -28,6 +32,9 @@ export interface BatchRow {
 }
 
 export interface CallOverview {
+  interested_marked?: number
+  follow_ups_completed?: number
+  /** Leads first called in the period. */
   total:            number
   /** Distinct leads called in the period — one per lead (excludes repeat calls). */
   unique_leads:     number

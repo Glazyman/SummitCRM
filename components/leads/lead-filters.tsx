@@ -1,273 +1,73 @@
 'use client'
 
 import * as React from 'react'
-import { Search, X, User } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { CalendarPicker } from '@/components/ui/calendar-picker'
-import { todayYmd, shiftYmd } from '@/components/ui/day-nav'
+import { todayYmd, dayRange, shiftYmd } from '@/components/ui/day-nav'
 import { INTEREST_CONFIG, ALL_INTEREST_STATUSES } from './status-config'
-import type { LeadFilters, InterestStatus } from './types'
+import type { LeadFilters } from './types'
 
-interface FilterBatch  { id: string; name: string }
-interface FilterMember { id: string; name: string }
-
-interface LeadFiltersProps {
-  filters:     LeadFilters
-  batches:     FilterBatch[]
-  teamMembers: FilterMember[]
-  isAdmin:     boolean
-  isRep?:      boolean
-  onChange:    (patch: Partial<LeadFilters>) => void
-  onClear:     () => void
+interface Props {
+  filters: LeadFilters
+  batches: { id: string; name: string }[]
+  teamMembers: { id: string; name: string }[]
+  isAdmin: boolean
+  isRep?: boolean
+  onChange: (patch: Partial<LeadFilters>) => void
+  onClear: () => void
 }
 
-// Above this many reps the rep filter falls back to a searchable menu —
-// a row of 20 pills is slower to scan than a list.
-const MAX_REP_PILLS = 6
-
-type AddedPreset = 'any' | 'today' | '7d' | '30d' | 'custom'
-
-function addedPresetOf(from: string, to: string): AddedPreset {
-  const today = todayYmd()
-  if (!from && !to) return 'any'
-  if (from === today && to === today) return 'today'
-  if (!to && from === shiftYmd(today, -6))  return '7d'
-  if (!to && from === shiftYmd(today, -29)) return '30d'
-  return 'custom'
-}
-
-/**
- * Leads filters, all visible on the page (no Filters dropdown). Status lives
- * in the LeadStatusBar above; this row adds interest, rep, batch and the
- * "added" (created) date — each one click.
- */
-export function LeadFiltersPanel({
-  filters,
-  batches,
-  teamMembers,
-  isAdmin,
-  isRep,
-  onChange,
-  onClear,
-}: LeadFiltersProps) {
-  const searchRef = React.useRef<HTMLInputElement>(null)
-  const [customDates, setCustomDates] = React.useState(false)
-
-  // Debounced search
-  const [localSearch, setLocalSearch] = React.useState(filters.search)
-  const searchTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  function handleSearch(v: string) {
-    setLocalSearch(v)
-    clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => onChange({ search: v, page: 1 }), 300)
-  }
-
-  const hasActiveFilters =
-    filters.statuses.length > 0 || filters.interests.length > 0 || !!filters.batchId ||
-    !!filters.assignedTo || filters.coldOnly || !!filters.dateFrom || !!filters.dateTo ||
-    filters.myLeads || !!filters.search
-
-  function toggleInterest(interest: InterestStatus) {
-    const next = filters.interests.includes(interest)
-      ? filters.interests.filter((s) => s !== interest)
-      : [...filters.interests, interest]
-    onChange({ interests: next, page: 1 })
-  }
-
-  const added = addedPresetOf(filters.dateFrom, filters.dateTo)
-  const showCustom = customDates || added === 'custom'
-  function setAdded(p: AddedPreset) {
-    const today = todayYmd()
-    setCustomDates(p === 'custom')
-    if (p === 'any')   onChange({ dateFrom: '', dateTo: '', page: 1 })
-    if (p === 'today') onChange({ dateFrom: today, dateTo: today, page: 1 })
-    if (p === '7d')    onChange({ dateFrom: shiftYmd(today, -6),  dateTo: '', page: 1 })
-    if (p === '30d')   onChange({ dateFrom: shiftYmd(today, -29), dateTo: '', page: 1 })
-  }
-
-  const pill = (active: boolean) => cn(
-    'inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-medium transition-all',
-    active
-      ? 'border-primary/50 bg-primary/10 text-primary shadow-sm'
-      : 'border-border bg-background text-muted-foreground hover:text-foreground hover:shadow-sm',
-  )
-  const groupLabel = 'mr-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70'
-
+export function LeadFiltersPanel({ filters: f, batches, teamMembers, isAdmin, isRep, onChange, onClear }: Props) {
+  const [search, setSearch] = React.useState(f.search)
+  const timer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [previousSearch, setPreviousSearch] = React.useState(f.search)
+  if (previousSearch !== f.search) { setPreviousSearch(f.search); setSearch(f.search) }
+  React.useEffect(() => () => clearTimeout(timer.current), [])
+  const change = (patch: Partial<LeadFilters>) => onChange({ ...patch, page: 1 })
+  const today = dayRange(todayYmd())
+  const interestedToday = f.interestedStart === today.start && f.interestedEnd === today.end
+  const pill = (active: boolean) => cn('h-8 shrink-0 rounded-md border px-3 text-xs font-medium transition-colors', active ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground')
+  const active = !!(f.search || f.statuses.length || f.interests.length || f.batchId || f.assignedTo || f.myLeads || f.coldOnly || f.dateFrom || f.dateTo || f.interestedStart)
+  const field = 'space-y-1.5 min-w-0'
+  const label = 'block text-[11px] font-medium text-muted-foreground'
   return (
-    <div className="space-y-3">
-
-      {/* ── Search row ── */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+    <div className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-4">
+      <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            ref={searchRef}
-            type="search"
-            value={localSearch}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search name, email, or company…"
-            className={cn(
-              'h-9 w-full rounded-lg border border-input bg-background pl-9 pr-9 text-sm',
-              'placeholder:text-muted-foreground transition-colors',
-              'focus:outline-none focus:ring-2 focus:ring-ring',
-              // type="search" gets a native ✕ from WebKit/Chromium — hide it,
-              // we render our own clear button below.
-              '[&::-webkit-search-cancel-button]:hidden',
-            )}
-          />
-          {localSearch && (
-            <button
-              type="button"
-              onClick={() => { setLocalSearch(''); onChange({ search: '', page: 1 }); searchRef.current?.focus() }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
+          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <input type="search" aria-label="Search leads" value={search} placeholder="Search name, company, or email…"
+            className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-ring [&::-webkit-search-cancel-button]:hidden"
+            onChange={e => { const value = e.target.value; setSearch(value); clearTimeout(timer.current); timer.current = setTimeout(() => change({ search: value }), 300) }} />
+          {search && <button type="button" aria-label="Clear search" className="absolute right-3 top-2.5 text-muted-foreground" onClick={() => { clearTimeout(timer.current); setSearch(''); change({ search: '' }) }}><X className="h-4 w-4" /></button>}
         </div>
-
-        <div className="flex shrink-0 items-center gap-1.5">
-          {!isRep && (
-            <button
-              type="button"
-              onClick={() => onChange({ myLeads: !filters.myLeads, page: 1 })}
-              className={cn(pill(filters.myLeads), 'h-9 text-sm')}
-            >
-              <User className="h-3.5 w-3.5" />
-              My Leads
-            </button>
-          )}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={() => { setLocalSearch(''); setCustomDates(false); onClear() }}
-              className="flex h-9 items-center gap-1 rounded-lg border border-border bg-background px-2.5 text-sm text-muted-foreground transition-all hover:shadow-sm"
-            >
-              <X className="h-3.5 w-3.5" />
-              Clear all
-            </button>
-          )}
-        </div>
+        {active && <button type="button" className="shrink-0 text-xs text-muted-foreground hover:text-foreground" onClick={() => { clearTimeout(timer.current); setSearch(''); onClear() }}>Clear all</button>}
       </div>
-
-      {/* ── Quick filters — always on the page ── */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
-
-        {/* Interest */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={groupLabel}>Interest</span>
-          {ALL_INTEREST_STATUSES.map((interest) => {
-            const meta   = INTEREST_CONFIG[interest]
-            const active = filters.interests.includes(interest)
-            return (
-              <button
-                key={interest}
-                type="button"
-                onClick={() => toggleInterest(interest)}
-                className={cn(pill(false), active && cn(meta.badge, 'shadow-sm'))}
-              >
-                <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', active ? meta.dot : 'bg-current opacity-40')} />
-                {meta.label}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Rep (admin) */}
-        {isAdmin && teamMembers.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className={groupLabel}>Rep</span>
-            {teamMembers.length <= MAX_REP_PILLS ? (
-              <>
-                <button type="button" className={pill(!filters.assignedTo)} onClick={() => onChange({ assignedTo: null, page: 1 })}>
-                  All
-                </button>
-                {teamMembers.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={pill(filters.assignedTo === m.id)}
-                    onClick={() => onChange({ assignedTo: filters.assignedTo === m.id ? null : m.id, page: 1 })}
-                  >
-                    {m.name.split(' ')[0]}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className={pill(filters.assignedTo === 'unassigned')}
-                  onClick={() => onChange({ assignedTo: filters.assignedTo === 'unassigned' ? null : 'unassigned', page: 1 })}
-                >
-                  Unassigned
-                </button>
-              </>
-            ) : (
-              <SelectMenu
-                value={filters.assignedTo ?? ''}
-                onChange={(v) => onChange({ assignedTo: v || null, page: 1 })}
-                nullable
-                nullLabel="All reps"
-                size="sm"
-                searchable
-                options={[
-                  { value: 'unassigned', label: 'Unassigned' },
-                  ...teamMembers.map((m) => ({ value: m.id, label: m.name })),
-                ]}
-                className="w-40"
-              />
-            )}
-          </div>
-        )}
-
-        {/* Batch */}
-        {batches.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            <span className={groupLabel}>Batch</span>
-            <SelectMenu
-              value={filters.batchId ?? ''}
-              onChange={(v) => onChange({ batchId: v || null, page: 1 })}
-              nullable
-              nullLabel="All batches"
-              size="sm"
-              searchable={batches.length > 6}
-              options={batches.map((b) => ({ value: b.id, label: b.name }))}
-              className="w-44"
-            />
-          </div>
-        )}
-
-        {/* Added (lead created) */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={groupLabel}>Added</span>
-          {([
-            ['any',    'Any time'],
-            ['today',  'Today'],
-            ['7d',     '7 days'],
-            ['30d',    '30 days'],
-            ['custom', 'Custom'],
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={pill(value === 'custom' ? showCustom : !showCustom && added === value)}
-              onClick={() => setAdded(value)}
-            >
-              {label}
-            </button>
-          ))}
-          {showCustom && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-36">
-                <CalendarPicker value={filters.dateFrom} onChange={(v) => onChange({ dateFrom: v, page: 1 })} className="h-8" />
-              </div>
-              <span className="text-xs text-muted-foreground">→</span>
-              <div className="w-36">
-                <CalendarPicker value={filters.dateTo} onChange={(v) => onChange({ dateTo: v, page: 1 })} className="h-8" />
-              </div>
-            </div>
-          )}
-        </div>
+      <div className="flex flex-wrap items-center gap-2" aria-label="Quick lead filters">
+        <span className="mr-1 text-xs text-muted-foreground">Quick filters</span>
+        <button type="button" aria-pressed={interestedToday} className={pill(interestedToday)} title="Leads marked interested today, based on recorded interest changes" onClick={() => change({ interestedStart: interestedToday ? '' : today.start, interestedEnd: interestedToday ? '' : today.end, interests: [], statuses: [], coldOnly: false })}>Interested today</button>
+        <button type="button" aria-pressed={f.interests.length === 1 && f.interests[0] === 'interested' && !f.interestedStart} className={pill(f.interests.length === 1 && f.interests[0] === 'interested' && !f.interestedStart)} onClick={() => change({ interests: f.interests.length === 1 && f.interests[0] === 'interested' && !f.interestedStart ? [] : ['interested'], interestedStart: '', interestedEnd: '', coldOnly: false })}>All interested</button>
+        <button type="button" aria-pressed={f.statuses.length === 1 && f.statuses[0] === 'new'} className={pill(f.statuses.length === 1 && f.statuses[0] === 'new')} onClick={() => change({ statuses: f.statuses.length === 1 && f.statuses[0] === 'new' ? [] : ['new'], interestedStart: '', interestedEnd: '', coldOnly: false })}>New leads</button>
+        <button type="button" aria-pressed={f.statuses.length === 2 && f.statuses.includes('no_answer') && f.statuses.includes('voicemail')} className={pill(f.statuses.length === 2 && f.statuses.includes('no_answer') && f.statuses.includes('voicemail'))} onClick={() => change({ statuses: f.statuses.length === 2 && f.statuses.includes('no_answer') && f.statuses.includes('voicemail') ? [] : ['no_answer', 'voicemail'], interestedStart: '', interestedEnd: '', coldOnly: false })}>Try again</button>
+        {!isRep && <button type="button" aria-pressed={f.myLeads} className={pill(f.myLeads)} onClick={() => change({ myLeads: !f.myLeads, assignedTo: null })}>My leads</button>}
+        {isAdmin && <button type="button" aria-pressed={f.assignedTo === 'unassigned'} className={pill(f.assignedTo === 'unassigned')} onClick={() => change({ assignedTo: f.assignedTo === 'unassigned' ? null : 'unassigned', myLeads: false })}>Unassigned</button>}
       </div>
+      <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-3 xl:grid-cols-5">
+        <div className={field}><span className={label}>Interest</span>
+          <SelectMenu value={f.interests.length === 1 ? f.interests[0] : ''} nullable nullLabel={f.interests.length > 1 ? `${f.interests.length} selected` : 'Any interest'} size="sm" options={ALL_INTEREST_STATUSES.map(v => ({ value: v, label: INTEREST_CONFIG[v].label }))} onChange={v => change({ interests: v ? [v as LeadFilters['interests'][number]] : [] })} className="w-full" />
+        </div>
+        {isAdmin && <div className={field}><span className={label}>Assigned to</span><SelectMenu value={f.assignedTo ?? ''} nullable nullLabel="All reps" size="sm" searchable options={[{ value: 'unassigned', label: 'Unassigned' }, ...teamMembers.map(m => ({ value: m.id, label: m.name }))]} onChange={v => change({ assignedTo: v || null, myLeads: false })} className="w-full" /></div>}
+        {batches.length > 0 && <div className={field}><span className={label}>Batch</span><SelectMenu value={f.batchId ?? ''} nullable nullLabel="All batches" size="sm" searchable options={batches.map(b => ({ value: b.id, label: b.name }))} onChange={v => change({ batchId: v || null })} className="w-full" /></div>}
+        <div className={field}><span className={label}>Added from</span><CalendarPicker value={f.dateFrom} onChange={v => change({ dateFrom: v })} className="h-8 w-full" /></div>
+        <div className={field}><span className={label}>Added through</span><CalendarPicker value={f.dateTo} onChange={v => change({ dateTo: v })} className="h-8 w-full" /></div>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span>Added:</span>
+        {[['Today', todayYmd()], ['Last 7 days', shiftYmd(todayYmd(), -6)], ['Last 30 days', shiftYmd(todayYmd(), -29)]].map(([label, from]) => <button key={label} type="button" className="hover:text-foreground hover:underline" onClick={() => change({ dateFrom: from, dateTo: todayYmd() })}>{label}</button>)}
+        {(f.dateFrom || f.dateTo) && <button type="button" onClick={() => change({ dateFrom: '', dateTo: '' })}>Any time ×</button>}
+      </div>
+      {f.interestedStart && <p className="text-xs text-muted-foreground">Marked interested today · recorded changes only; earlier interest history was not captured.</p>}
     </div>
   )
 }

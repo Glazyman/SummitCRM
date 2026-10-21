@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getActor } from '@/lib/auth/actor'
+import { selectAll } from '@/lib/supabase/select-all'
+import { firstCalls } from '@/lib/first-calls'
 
 export async function GET() {
   try {
@@ -14,18 +16,16 @@ export async function GET() {
     const start = new Date()
     start.setHours(0, 0, 0, 0)
 
-    const { data, error } = await (admin as any)
+    const data = await selectAll((from, to) => admin
       .from('call_logs')
-      .select('id, outcome, duration_sec, notes, called_at, lead:leads!inner(id, first_name, last_name, email, company)')
+      .select('id, lead_id, outcome, duration_sec, notes, called_at, lead:leads!inner(id, first_name, last_name, email, company)')
       .eq('workspace_id', member.workspace_id)
       .eq('logged_by', user.id)
-      .gte('called_at', start.toISOString())
-      .order('called_at', { ascending: false })
+      .order('called_at', { ascending: false }).order('id').range(from, to))
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    const calls = ((data ?? []) as Array<{
+    const rows = ((data ?? []) as Array<{
       id: string
+      lead_id: string
       outcome: string
       duration_sec: number | null
       notes: string | null
@@ -34,7 +34,8 @@ export async function GET() {
         | Array<{ id: string; first_name: string | null; last_name: string | null; email: string; company: string | null }>
         | { id: string; first_name: string | null; last_name: string | null; email: string; company: string | null }
         | null
-    }>).map((row) => {
+    }>)
+    const calls = firstCalls(rows).filter(row => Date.parse(row.called_at) >= start.getTime()).sort((a, b) => Date.parse(b.called_at) - Date.parse(a.called_at)).map((row) => {
       const lead = Array.isArray(row.lead) ? (row.lead[0] ?? null) : row.lead
       const name = lead ? ([lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email) : 'Lead'
       return {
@@ -48,7 +49,7 @@ export async function GET() {
     })
 
     return NextResponse.json({ calls })
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'Failed to load calls' }, { status: 500 })
   }
 }

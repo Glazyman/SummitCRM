@@ -143,6 +143,7 @@ export function OverdueFollowUpsWidget({ className }: Props) {
               return (
                 <li key={f.id}>
                   <Link
+                    prefetch={false}
                     href={`/leads/${f.lead_id}`}
                     className={cn(
                       'flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors',

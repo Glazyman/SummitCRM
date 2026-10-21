@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Upload, UserPlus, Download, Table2, LayoutGrid } from 'lucide-react'
@@ -9,10 +10,8 @@ import { useIsMobile } from '@/hooks'
 import { Button } from '@/components/ui/button'
 
 import { LeadStatusBar }        from '@/components/leads/lead-status-bar'
-import { LeadFullPanel }        from '@/components/leads/lead-full-panel'
 import { FollowUpPrompt }       from '@/components/leads/detail/follow-up-prompt'
 import { LeadFiltersPanel }     from '@/components/leads/lead-filters'
-import { InterestedDayCard }    from '@/components/leads/interested-day-card'
 import { LeadTable }            from '@/components/leads/lead-table'
 import { BulkActionBar }        from '@/components/leads/bulk-action-bar'
 import { ColumnVisibilityMenu } from '@/components/leads/column-visibility-menu'
@@ -23,8 +22,14 @@ import { COLUMNS, DEFAULT_FILTERS, DEFAULT_COLUMN_ORDER } from '@/components/lea
 import type { LeadRow, LeadFilters, LeadStatus, InterestStatus, ColumnId, SortField, StatusCount } from '@/components/leads/types'
 import type { NewLeadData } from '@/components/leads/create-lead-modal'
 
+// The profile editor is needed only after a lead is opened; row hover warms its code.
+const LeadFullPanel = dynamic(() => import('@/components/leads/lead-full-panel').then(m => m.LeadFullPanel), {
+  loading: () => <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-xl border-l bg-background p-6 text-sm text-muted-foreground" role="status">Opening lead…</aside>,
+})
+
 // ── Types ──────────────────────────────────────────────────────────────────
 interface LeadsClientProps {
+  matchingInterestedIds?: string[]
   initialLeads:  LeadRow[]
   /** Total rows matching the current filter, server-computed (across all pages). */
   totalCount:    number
@@ -57,6 +62,7 @@ function tomorrowAt11LocalIso() {
 // ── Component ──────────────────────────────────────────────────────────────
 export function LeadsClient({
   initialLeads,
+  matchingInterestedIds,
   totalCount: serverTotalCount,
   statusCounts: serverStatusCounts,
   page: serverPage,
@@ -87,6 +93,8 @@ export function LeadsClient({
       assignedTo: p.get('assigned')   ?? null,
       myLeads:    p.get('my') === '1',
       coldOnly:   p.get('cold') === '1',
+      interestedStart: p.get('interested_start') ?? '',
+      interestedEnd: p.get('interested_end') ?? '',
       dateFrom:   p.get('from')       ?? '',
       dateTo:     p.get('to')         ?? '',
       sortBy:     (p.get('sort')      ?? 'last_activity_at') as LeadFilters['sortBy'],
@@ -96,7 +104,6 @@ export function LeadsClient({
     }
   // serverPage / serverPerPage are URL-derived on the server; including them
   // ensures the local filters object stays in sync with the canonical URL.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, serverPage, serverPerPage])
 
   // ── State ──────────────────────────────────────────────────────────────
@@ -218,6 +225,8 @@ export function LeadsClient({
     if (filters.assignedTo)          params.set('assigned', filters.assignedTo)
     if (filters.myLeads)             params.set('my',       '1')
     if (filters.coldOnly)            params.set('cold',     '1')
+    if (filters.interestedStart) params.set('interested_start', filters.interestedStart)
+    if (filters.interestedEnd) params.set('interested_end', filters.interestedEnd)
     if (filters.dateFrom)            params.set('from',     filters.dateFrom)
     if (filters.dateTo)              params.set('to',       filters.dateTo)
     if (filters.sortBy !== 'last_activity_at') params.set('sort', filters.sortBy)
@@ -238,11 +247,13 @@ export function LeadsClient({
   function updateFilters(patch: Partial<LeadFilters>) {
     setFilters((f) => ({ ...f, ...patch }))
     setSelectedIds(new Set())
+    setSelectAllMatching(false)
   }
 
   function clearFilters() {
     setFilters(DEFAULT_FILTERS)
     setSelectedIds(new Set())
+    setSelectAllMatching(false)
   }
 
   function handleSort(field: SortField) {
@@ -255,6 +266,8 @@ export function LeadsClient({
   }
 
   function handleStatusFilter(status: LeadStatus) {
+    setSelectAllMatching(false)
+    setSelectedIds(new Set())
     setFilters((f) => {
       const next = f.statuses.includes(status)
         ? f.statuses.filter((s) => s !== status)
@@ -394,6 +407,7 @@ export function LeadsClient({
   // we keep the legacy `{ ids, ...fields }` shape.
 
   function bulkBody(extra: Record<string, unknown>) {
+    if (selectAllMatching && matchingInterestedIds) return { ids: matchingInterestedIds, ...extra }
     if (selectAllMatching) return { scope: 'all_matching', filter: currentFilterSpec(), ...extra }
     return { ids: [...selectedIds], ...extra }
   }
@@ -475,7 +489,7 @@ export function LeadsClient({
       await fetch('/api/leads/bulk', {
         method:  'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(selectAllMatching ? { scope: 'all_matching', filter: currentFilterSpec() } : { ids }),
+        body:    JSON.stringify(bulkBody({})),
       })
     } catch (err) {
       console.error('[bulk delete]', err)
@@ -627,11 +641,6 @@ export function LeadsClient({
         )}
       </div>
 
-      {/* ── Admins: who got marked interested on a given day (default today) ── */}
-      {isAdmin && (
-        <InterestedDayCard teamMembers={teamMembers} onOpenLead={(id) => setSelectedLeadId(id)} />
-      )}
-
       {/* ── Status bar ── */}
       {/* statusCounts comes from the server and intentionally ignores the
           status filter, so summing the buckets gives "total across all
@@ -645,6 +654,7 @@ export function LeadsClient({
         onColdOnlyToggle={() => updateFilters({ coldOnly: !filters.coldOnly, page: 1 })}
       />
 
+      {isNavPending && <p role="status" className="text-xs text-muted-foreground">Updating leads…</p>}
       {/* ── Filters ── */}
       <LeadFiltersPanel
         filters={filters}

@@ -1,3 +1,5 @@
+import { selectAll } from '@/lib/supabase/select-all'
+import { firstCalls } from '@/lib/first-calls'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
@@ -79,12 +81,9 @@ export default async function CallModePage({ searchParams }: PageProps) {
         .select('settings')
         .eq('id', actor.workspaceId)
         .single(),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (admin as any).rpc('get_unique_leads_called', {
-        p_workspace_id: actor.workspaceId,
-        p_user_id:      actor.userId,
-        p_since:        startOfToday.toISOString(),
-      }),
+      selectAll<{ lead_id: string; called_at: string }>((from, to) => admin.from('call_logs')
+        .select('lead_id, called_at').eq('workspace_id', actor.workspaceId).eq('logged_by', actor.userId)
+        .order('id').range(from, to)).then(rows => ({ data: firstCalls(rows).filter(c => Date.parse(c.called_at) >= startOfToday.getTime()).length })),
       admin
         .from('workspace_members')
         .select('user_id')

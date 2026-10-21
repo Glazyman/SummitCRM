@@ -1,31 +1,28 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { getActor } from '@/lib/auth/actor'
+import { createAdminClient } from '@/lib/supabase/server'
+import { unstable_cache } from 'next/cache'
+import { getActor, getAuthenticatedUser } from '@/lib/auth/actor'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { MobileSidebar } from '@/components/layout/mobile-sidebar'
 import { ImpersonationBanner } from '@/components/layout/impersonation-banner'
 import { NotificationProviderWrapper } from '@/components/notifications/notification-provider-wrapper'
 
+// A workspace label may be a minute old; authorization is never cached here.
+const getWorkspaceName = unstable_cache(async (workspaceId: string) => {
+  const { data, error } = await createAdminClient().from('workspaces').select('name').eq('id', workspaceId).single()
+  if (error) throw error
+  return (data as { name: string } | null)?.name ?? null
+}, ['workspace-label-v1'], { revalidate: 60 })
+
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-
-  // Server-side session check (middleware is the first line of defence)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  // The effective actor — the impersonated teammate when an admin is "viewing
-  // as" someone, otherwise the real user. All nav/scoping keys off this.
-  const actor = await getActor()
+  // Shared, request-memoized authorization; layout and page reuse one lookup.
+  const [user, actor] = await Promise.all([getAuthenticatedUser(), getActor()])
+  if (!user) redirect('/login')
 
   // No active workspace membership — access has been revoked. Boot to login.
   if (!actor) {
@@ -34,13 +31,7 @@ export default async function DashboardLayout({
 
   // Workspace name for the sidebar/header (impersonation stays within the
   // admin's own workspace, so this is unchanged either way).
-  const { data: ws } = await supabase
-    .from('workspaces')
-    .select('name')
-    .eq('id', actor.workspaceId)
-    .single() as { data: { name: string } | null }
-
-  const workspaceName = ws?.name ?? null
+  const workspaceName = await getWorkspaceName(actor.workspaceId)
   // Effective role drives which nav/widgets show, so an admin viewing-as a rep
   // sees the rep's screen.
   const role = actor.role

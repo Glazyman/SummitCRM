@@ -1,3 +1,5 @@
+import { selectAll } from '@/lib/supabase/select-all'
+import { firstCalls } from '@/lib/first-calls'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
@@ -246,6 +248,8 @@ async function getDashboardMetrics(
         p_user_id:      userId,
         p_since:        new Date(0).toISOString(),
       })
+  const callHistory = selectAll<{ lead_id: string; logged_by: string; called_at: string }>((from, to) => supabase.from('call_logs')
+    .select('lead_id, logged_by, called_at').eq('workspace_id', workspaceId).order('id').range(from, to))
   const [
     leadsResult,
     contactedRes,
@@ -263,20 +267,8 @@ async function getDashboardMetrics(
       .select('settings')
       .eq('id', workspaceId)
       .single(),
-    // Leads called in the last 30 days — counted ONCE per lead (a lead called
-    // multiple times counts once). `last_contacted_at` is a per-lead field.
-    supabase
-      .from('leads')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .gte('last_contacted_at', weekAgo.toISOString())
-      .is('deleted_at', null),
-    // Unique leads called today (vs daily target).
-    supabaseAny.rpc('get_unique_leads_called', {
-      p_workspace_id: workspaceId,
-      p_user_id:      userId,
-      p_since:        startOfToday.toISOString(),
-    }),
+    callHistory.then(rows => ({ count: firstCalls(rows).filter(c => Date.parse(c.called_at) >= weekAgo.getTime()).length })),
+    callHistory.then(rows => ({ data: firstCalls(rows.filter(c => c.logged_by === userId)).filter(c => Date.parse(c.called_at) >= startOfToday.getTime()).length })),
     dealsInPipelineQuery,
   ])
 

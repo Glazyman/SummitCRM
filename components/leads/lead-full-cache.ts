@@ -24,25 +24,21 @@ export interface LeadFullBundle {
 // A warmed copy is only trusted for a short window — long enough to bridge a
 // hover→click, short enough that a cold reopen refetches.
 const TTL_MS = 45_000
+const MAX_WARM_LEADS = 40
+const MAX_PREFETCHES = 4
 
 const resolved = new Map<string, { at: number; bundle: LeadFullBundle }>()
 const inflight = new Map<string, Promise<LeadFullBundle>>()
 
 async function fetchBundle(leadId: string): Promise<LeadFullBundle> {
-  const [full, questionnaire] = await Promise.all([
-    // 403 (rep lost access) / 404 (deleted) come back as { error } with no lead;
-    // treat that as a load failure so the panel shows its error state.
-    fetch(`/api/leads/${leadId}/full`).then(async (r) => {
-      const json = await r.json().catch(() => ({}))
-      if (!r.ok || !json.lead) throw new Error(json.error ?? 'Failed to load lead')
-      return json
-    }),
-    fetch(`/api/leads/${leadId}/questionnaire`).then((r) => r.json()).catch(() => ({ questionnaire: null })),
-  ])
-  return { full, questionnaire }
+  const response = await fetch(`/api/leads/${leadId}/full`)
+  const full = await response.json().catch(() => ({}))
+  if (!response.ok || !full.lead) throw new Error(full.error ?? 'Failed to load lead')
+  return { full, questionnaire: { questionnaire: full.questionnaire ?? null } }
 }
 
 function warm(leadId: string): Promise<LeadFullBundle> {
+  for (const [id, entry] of resolved) if (Date.now() - entry.at >= TTL_MS) resolved.delete(id)
   const r = resolved.get(leadId)
   if (r && Date.now() - r.at < TTL_MS) return Promise.resolve(r.bundle)
   const existing = inflight.get(leadId)
@@ -51,7 +47,10 @@ function warm(leadId: string): Promise<LeadFullBundle> {
   inflight.set(leadId, p)
   // NOTE: this .then is registered before any consumer's .then (warm runs first),
   // so the panel's invalidate on the in-flight path reliably wins the race.
-  p.then((bundle) => { resolved.set(leadId, { at: Date.now(), bundle }) })
+  p.then((bundle) => {
+    resolved.set(leadId, { at: Date.now(), bundle })
+    while (resolved.size > MAX_WARM_LEADS) resolved.delete(resolved.keys().next().value!)
+  })
     .catch(() => {})
     .finally(() => { inflight.delete(leadId) })
   return p
@@ -59,7 +58,8 @@ function warm(leadId: string): Promise<LeadFullBundle> {
 
 /** Fire-and-forget warmer for hover/focus. Safe to call repeatedly. */
 export function prefetchLeadFull(leadId: string | null | undefined): void {
-  if (!leadId) return
+  if (!leadId || (inflight.size >= MAX_PREFETCHES && !inflight.has(leadId))) return
+  void import('./lead-full-panel').catch(() => {})
   void warm(leadId).catch(() => {})
 }
 

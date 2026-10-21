@@ -1,25 +1,29 @@
 'use client'
 
 import * as React from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ArrowUpDown, ArrowUp, ArrowDown,
-  Mail, ExternalLink, MoreHorizontal,
-  Building2, User, Clock,
+  ExternalLink, MoreHorizontal,
+  Building2, User, ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { prefetchLeadFull } from '@/components/leads/lead-full-cache'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip } from '@/components/ui/tooltip'
-import { Badge } from '@/components/ui/badge'
 
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
-import { StatusSelect, InterestSelect } from './status-select'
+import { STATUS_CONFIG, INTEREST_CONFIG } from './status-config'
 import type { LeadRow, SortField, SortDir, ColumnId, InterestStatus } from './types'
+
+const StatusSelect = dynamic(() => import('./status-select').then(m => m.StatusSelect), { loading: () => <span className="text-xs text-muted-foreground">Opening…</span> })
+const InterestSelect = dynamic(() => import('./status-select').then(m => m.InterestSelect), { loading: () => <span className="text-xs text-muted-foreground">Opening…</span> })
+const warmSelect = () => { void import('./status-select') }
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface LeadTableProps {
@@ -140,7 +144,7 @@ interface RowProps {
 
 function LeadTableRow({
   lead, selected, orderedVisible, isAdmin,
-  onSelect, onStatusChange, onInterestChange, onRowClick, onSendEmail, onDelete,
+  onSelect, onStatusChange, onInterestChange, onRowClick, onDelete,
 }: RowProps) {
   const router = useRouter()
   const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '—'
@@ -173,7 +177,7 @@ function LeadTableRow({
       <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Tooltip content="View lead">
-            <Link href={`/leads/${lead.id}`} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+            <Link prefetch={false} href={`/leads/${lead.id}`} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           </Tooltip>
@@ -337,7 +341,10 @@ function StatusDropdown({
   value:    LeadRow['status']
   onChange: (s: LeadRow['status']) => void
 }) {
-  return <StatusSelect value={value} onChange={onChange} size="sm" className="w-full min-w-[150px]" />
+  const meta = STATUS_CONFIG[value]
+  return <DeferredTableSelect label={meta.label} dot={meta.dot} width="min-w-[150px]">
+    {(setOpen) => <StatusSelect open onOpenChange={setOpen} value={value} onChange={onChange} size="sm" className="w-full min-w-[150px]" />}
+  </DeferredTableSelect>
 }
 
 // ── Inline interest dropdown ──────────────────────────────────────────────
@@ -348,7 +355,31 @@ function InterestDropdown({
   value:    InterestStatus
   onChange: (s: InterestStatus) => void
 }) {
-  return <InterestSelect value={value ?? 'pending'} onChange={onChange} size="sm" className="w-full min-w-[144px]" />
+  const meta = INTEREST_CONFIG[value ?? 'pending']
+  return <DeferredTableSelect label={meta.label} dot={meta.dot} width="min-w-[144px]">
+    {(setOpen) => <InterestSelect open onOpenChange={setOpen} value={value ?? 'pending'} onChange={onChange} size="sm" className="w-full min-w-[144px]" />}
+  </DeferredTableSelect>
+}
+
+/** Mount the full select only while it is used, rather than 100 select trees per page. */
+function DeferredTableSelect({ label, dot, width, children }: {
+  label: string; dot: string; width: string
+  children: (onOpenChange: (open: boolean) => void) => React.ReactNode
+}) {
+  const [open, setOpen] = React.useState(false)
+  const trigger = React.useRef<HTMLButtonElement>(null)
+  const wasOpened = React.useRef(false)
+  React.useEffect(() => {
+    if (!open && wasOpened.current) trigger.current?.focus()
+  }, [open])
+  const show = () => { wasOpened.current = true; setOpen(true) }
+  if (open) return children(setOpen)
+  return <button ref={trigger} type="button" aria-haspopup="listbox" aria-expanded={false}
+    onMouseEnter={warmSelect} onFocus={warmSelect} onClick={show} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); show() } }}
+    className={cn('flex h-7 w-full items-center justify-between gap-1 rounded-md border border-input bg-background px-2.5 text-xs text-foreground shadow-xs shadow-black/5 hover:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', width)}>
+    <span className="flex items-center gap-2 whitespace-nowrap"><span className={cn('h-2 w-2 shrink-0 rounded-full', dot)} />{label}</span>
+    <ChevronDown className="h-4 w-4 opacity-60" />
+  </button>
 }
 
 // ── Multi-contact hover cell ──────────────────────────────────────────────
