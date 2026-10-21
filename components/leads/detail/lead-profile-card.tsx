@@ -655,6 +655,9 @@ export function LeadProfileCard({
               className={cn(fieldInput, assigning && 'opacity-60')}
             >
               <option value="">Unassigned</option>
+              {lead.assigned_to && !teamMembers.some(m => m.id === lead.assigned_to) && (
+                <option value={lead.assigned_to} disabled>{lead.assigned_name || 'Former rep'} (inactive)</option>
+              )}
               {teamMembers.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
