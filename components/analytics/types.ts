@@ -16,6 +16,8 @@ export interface RepRow {
   leads_assigned:      number
   leads_active:        number
   leads_new:           number
+  /** Leads this rep marked interested within the period. */
+  interested_marked?:  number
 }
 
 export interface BatchRow {

@@ -14,6 +14,7 @@ import { Badge }   from '@/components/ui/badge'
 import { RefreshCw, BarChart2, Phone, Calendar, Users, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { dayRange, dayLabel, todayYmd } from '@/components/ui/day-nav'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/pie-chart'
 
 interface TabConfig { id: AnalyticsTab; label: string; minRole: string }
@@ -265,6 +266,8 @@ function AnalyticsContent({ userRole }: Props) {
   const pathname     = usePathname()
   const searchParams = useSearchParams()
   const range        = (searchParams.get('range') as DateRangePreset) ?? '30d'
+  // "Pick day" — a single local calendar day, kept in the URL so it survives refresh.
+  const day          = searchParams.get('day') ?? todayYmd()
   const tabParam     = searchParams.get('tab') as AnalyticsTab ?? 'overview'
 
   const isRep   = userRole === 'rep'
@@ -274,6 +277,7 @@ function AnalyticsContent({ userRole }: Props) {
   const activeTab   = visibleTabs.find(t => t.id === tabParam) ? tabParam : visibleTabs[0]?.id ?? 'overview'
 
   const { start, end } = React.useMemo(() => {
+    if (range === 'day') return dayRange(day)
     const now = new Date()
     const end = now.toISOString()
     let start = new Date(now)
@@ -282,7 +286,7 @@ function AnalyticsContent({ userRole }: Props) {
     else if (range === 'all'){ start = new Date('1970-01-01T00:00:00Z') }
     else                      { start.setDate(start.getDate() - 30) }
     return { start: start.toISOString(), end }
-  }, [range])
+  }, [range, day])
 
   const [overview,  setOverview]  = useState<CallOverview>(EMPTY_OVERVIEW)
   const [reps,      setReps]      = useState<RepRow[]>([])
@@ -311,6 +315,12 @@ function AnalyticsContent({ userRole }: Props) {
     p.set(key, value)
     router.replace(`${pathname}?${p.toString()}`, { scroll: false })
   }
+  const setDay = (ymd: string) => {
+    const p = new URLSearchParams(searchParams.toString())
+    p.set('range', 'day')
+    p.set('day', ymd)
+    router.replace(`${pathname}?${p.toString()}`, { scroll: false })
+  }
 
   const isLoading = loadingReps
 
@@ -327,12 +337,11 @@ function AnalyticsContent({ userRole }: Props) {
               <div>
                 <h1 className="text-lg font-semibold">{isRep ? 'My Analytics' : 'Team Analytics'}</h1>
                 <p className="text-xs text-muted-foreground">
-                  {reps.length > 0 && !isRep ? `${reps.length} reps · ` : ''}{overview.unique_leads} called · {overview.total} calls · {overview.leads_total} leads
+                  {range === 'day' ? `${dayLabel(day)} · ` : ''}{reps.length > 0 && !isRep ? `${reps.length} reps · ` : ''}{overview.unique_leads} called · {overview.total} calls · {overview.leads_total} leads
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <DateRangePicker value={range} onChange={v => setParam('range', v)} className="hidden md:flex" />
               <AnalyticsExportButton view={activeTab} start={start} end={end} />
               <Button variant="outline" size="sm" onClick={() => { void fetchReps() }}
                 disabled={isLoading} className="gap-1.5 h-9">
@@ -341,8 +350,10 @@ function AnalyticsContent({ userRole }: Props) {
               </Button>
             </div>
           </div>
-          <div className="pb-3 md:hidden">
-            <DateRangePicker value={range} onChange={v => setParam('range', v)} className="w-full" />
+          {/* Own row at every width — with "Pick day" open the controls are too
+              wide to share the title row. */}
+          <div className="pb-3">
+            <DateRangePicker value={range} onChange={v => setParam('range', v)} day={day} onDayChange={setDay} className="w-full md:w-auto" />
           </div>
 
           {/* Tab bar */}

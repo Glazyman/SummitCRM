@@ -12,6 +12,7 @@ import { LeadStatusBar }        from '@/components/leads/lead-status-bar'
 import { LeadFullPanel }        from '@/components/leads/lead-full-panel'
 import { FollowUpPrompt }       from '@/components/leads/detail/follow-up-prompt'
 import { LeadFiltersPanel }     from '@/components/leads/lead-filters'
+import { InterestedDayCard }    from '@/components/leads/interested-day-card'
 import { LeadTable }            from '@/components/leads/lead-table'
 import { BulkActionBar }        from '@/components/leads/bulk-action-bar'
 import { ColumnVisibilityMenu } from '@/components/leads/column-visibility-menu'
@@ -625,6 +626,11 @@ export function LeadsClient({
           </div>
         )}
       </div>
+
+      {/* ── Admins: who got marked interested on a given day (default today) ── */}
+      {isAdmin && (
+        <InterestedDayCard teamMembers={teamMembers} onOpenLead={(id) => setSelectedLeadId(id)} />
+      )}
 
       {/* ── Status bar ── */}
       {/* statusCounts comes from the server and intentionally ignores the

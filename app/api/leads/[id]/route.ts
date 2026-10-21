@@ -397,7 +397,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     if (logInserts.length > 0) {
-      await adminClient.from('activity_logs').insert(logInserts as never)
+      // One bad row (e.g. an enum value missing in the DB) rejects the whole
+      // batch — this went unnoticed for months, so at least surface it.
+      const { error: logErr } = await adminClient.from('activity_logs').insert(logInserts as never)
+      if (logErr) console.error('[PATCH /api/leads/[id]] activity_logs insert failed', logErr)
     }
 
     const followUpSuggestion = patch.status ? followUpSuggestionForStatus(patch.status as LeadStatus) : null

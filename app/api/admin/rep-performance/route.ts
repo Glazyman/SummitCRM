@@ -4,11 +4,13 @@
  * (Legacy fallback: ?period=today|week|month&date=YYYY-MM-DD.)
  * Admins only. Returns live data — no caching.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveDailyCallTarget } from '@/lib/call-targets'
 import { getUsersById } from '@/lib/users'
+import { selectAll } from '@/lib/supabase/select-all'
 
 /** Parse "YYYY-MM-DD" into a Date at local midnight. Falls back to today. */
 function parseAnchor(raw: string | null): Date {
@@ -128,7 +130,25 @@ export async function GET(req: NextRequest) {
         .lt('last_contacted_at', range.end)
         .is('deleted_at', null),
     ])
-    const uniqueLeads = (uniqueLeadsRes as { count: number | null }).count ?? 0
+    // last_contacted_at only answers "called since X" — for a window that ends
+    // in the past (a picked day) count distinct leads straight from call_logs.
+    const endsNow = Date.now() - Date.parse(range.end) < 5 * 60_000
+    const uniqueLeads = endsNow
+      ? (uniqueLeadsRes as { count: number | null }).count ?? 0
+      : new Set((await selectAll<{ lead_id: string }>((from, to) =>
+          (admin as any).from('call_logs').select('lead_id')
+            .eq('workspace_id', wsId).gte('called_at', range.start).lt('called_at', range.end).range(from, to)))
+          .map((c) => c.lead_id)).size
+
+    // Leads each rep MARKED interested in the window (interest-change log).
+    // Best-effort: a missing enum value or log hiccup must not take the whole
+    // panel down — the counts just read 0.
+    const marks = await selectAll<{ user_id: string | null }>((from, to) =>
+      (admin as any).from('activity_logs').select('user_id')
+        .eq('workspace_id', wsId).eq('type', 'interest_status_changed').eq('metadata->>to', 'interested')
+        .gte('created_at', range.start).lt('created_at', range.end).range(from, to)).catch((err) => { console.error('[interested marks]', err); return [] })
+    const marksByRep = new Map<string, number>()
+    for (const m of marks) if (m.user_id) marksByRep.set(m.user_id, (marksByRep.get(m.user_id) ?? 0) + 1)
 
     const leadsCalledRows = (leadsCalledInPeriodRes.data ?? []) as Array<{ user_id: string; leads_called: number }>
     const leadsCalledByUser = new Map(leadsCalledRows.map((r) => [r.user_id, Number(r.leads_called)]))
@@ -156,6 +176,8 @@ export async function GET(req: NextRequest) {
     const leads = leadCounts.flatMap(r => Array.from({ length: Number(r.cnt) }, () => ({ assigned_to: r.assigned_to, status: r.status })))
 
     const now = new Date()
+    const startMs = Date.parse(range.start)
+    const endMs   = Date.parse(range.end)
 
     // Aggregate per user
     const reps = members
@@ -171,7 +193,11 @@ export async function GET(req: NextRequest) {
         const myFUs = followUps.filter(f => f.assigned_to === uid)
         const fuPending   = myFUs.filter(f => !f.completed_at).length
         const fuOverdue   = myFUs.filter(f => !f.completed_at && new Date(f.due_at) < now).length
-        const fuCompleted = myFUs.filter(f => f.completed_at && new Date(f.completed_at) >= new Date(range.start)).length
+        const fuCompleted = myFUs.filter(f => {
+          if (!f.completed_at) return false
+          const t = Date.parse(f.completed_at)
+          return t >= startMs && t < endMs
+        }).length
 
         // Leads
         const myLeads  = leads.filter(l => l.assigned_to === uid)
@@ -194,6 +220,7 @@ export async function GET(req: NextRequest) {
           // "X / Target" (day view) or just "X" (week/month view).
           leadsCalledInPeriod: leadsCalledByUser.get(uid) ?? 0,
           dailyCallTarget:     targetForUser(uid),
+          interestedMarked:    marksByRep.get(uid) ?? 0,
         }
       })
       .sort((a, b) => b.calls - a.calls)

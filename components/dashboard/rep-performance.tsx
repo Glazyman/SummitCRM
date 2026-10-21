@@ -3,12 +3,14 @@
 import * as React from 'react'
 import { Phone, Calendar, Users, RefreshCw, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { DayNav, dayRange, todayYmd } from '@/components/ui/day-nav'
 import {
   PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 
-// Rolling date-range presets — match the analytics page exactly.
-type Preset = 'today' | '7d' | '30d' | 'all'
+// Rolling date-range presets — match the analytics page exactly. 'day' is a
+// single picked calendar day.
+type Preset = 'today' | '7d' | '30d' | 'all' | 'day'
 
 interface RepStat {
   id:                string
@@ -25,6 +27,8 @@ interface RepStat {
   leadsCalledInPeriod: number
   /** Daily target (workspace default + per-rep override). */
   dailyCallTarget:     number
+  /** Leads this rep marked interested in the period. */
+  interestedMarked?:   number
 }
 
 const PRESET_LABELS: Record<Preset, string> = {
@@ -32,6 +36,7 @@ const PRESET_LABELS: Record<Preset, string> = {
   '7d':  'Last 7 days',
   '30d': 'Last 30 days',
   all:   'All time',
+  day:   'Pick day',
 }
 
 // Rolling [start, end] for a preset — identical semantics to the analytics page.
@@ -191,15 +196,16 @@ export function RepPerformancePanel() {
   // Default to "All time" — shows the full call history by default (per user
   // request); the Today/7d/30d presets narrow it down.
   const [preset, setPreset]   = React.useState<Preset>('all')
+  const [day, setDay]         = React.useState(todayYmd)
   const [reps, setReps]       = React.useState<RepStat[]>([])
   const [uniqueLeads, setUniqueLeads] = React.useState(0)   // unique leads called in range (per person)
   const [loading, setLoading] = React.useState(true)
   const [error, setError]     = React.useState<string | null>(null)
 
-  const load = React.useCallback(async (p: Preset) => {
+  const load = React.useCallback(async (p: Preset, d: string) => {
     setLoading(true); setError(null)
     try {
-      const { start, end } = presetRange(p)
+      const { start, end } = p === 'day' ? dayRange(d) : presetRange(p)
       const res  = await fetch(`/api/admin/rep-performance?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
@@ -212,17 +218,17 @@ export function RepPerformancePanel() {
     }
   }, [])
 
-  React.useEffect(() => { load(preset) }, [preset, load])
+  React.useEffect(() => { load(preset, day) }, [preset, day, load])
 
   React.useEffect(() => {
-    const handler = () => { if (document.visibilityState === 'visible') load(preset) }
+    const handler = () => { if (document.visibilityState === 'visible') load(preset, day) }
     document.addEventListener('visibilitychange', handler)
     return () => document.removeEventListener('visibilitychange', handler)
-  }, [preset, load])
+  }, [preset, day, load])
 
-  // "Today" shows the per-rep daily-target progress bar; the rolling ranges
-  // show a plain count of unique leads called in the window.
-  const isToday = preset === 'today'
+  // Single-day views (Today or a picked day) show the per-rep daily-target
+  // progress bar; the rolling ranges show a plain count of unique leads.
+  const isToday = preset === 'today' || preset === 'day'
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
@@ -245,7 +251,9 @@ export function RepPerformancePanel() {
             ))}
           </div>
 
-          <button type="button" onClick={() => load(preset)}
+          {preset === 'day' && <DayNav value={day} onChange={setDay} />}
+
+          <button type="button" onClick={() => load(preset, day)}
             className={cn('text-muted-foreground hover:text-foreground transition-colors', loading && 'animate-spin')}>
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
@@ -288,6 +296,8 @@ export function RepPerformancePanel() {
                         title="Unique leads called in the selected period">
                       {isToday ? 'Leads / Target' : 'Leads in period'}
                     </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-400"
+                        title="Leads this rep marked interested in the selected period">Interested</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Calls</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Answered</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Voicemail</th>
@@ -339,6 +349,12 @@ export function RepPerformancePanel() {
                             {rep.leadsCalledInPeriod}
                           </span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={cn('text-sm font-semibold tabular-nums',
+                          rep.interestedMarked ? 'text-emerald-600' : 'text-muted-foreground/40')}>
+                          {rep.interestedMarked ?? 0}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={cn('inline-flex items-center justify-center h-7 w-7 rounded-full text-sm font-bold',

@@ -6,10 +6,12 @@
  * jsonb response bypasses PostgREST's 1000-row cap. Names + emails are
  * stitched in here via the users-lookup RPC.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server'
 import { cookies }      from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
 import { getUsersByIdsFull } from '@/lib/users'
+import { selectAll } from '@/lib/supabase/select-all'
 
 type RepRow = {
   user_id:              string
@@ -82,12 +84,35 @@ export async function GET(req: Request) {
     }) as { data: Array<{ user_id: string; leads_called: number }> | null }
     const uniqByRepMap = new Map((uniqByRep ?? []).map(u => [u.user_id, Number(u.leads_called)]))
 
+    // Leads each rep MARKED interested in the range (from the interest-change
+    // log) — "what did this rep do that day", unlike the current-snapshot
+    // interested count below.
+    // Best-effort: a missing enum value or log hiccup must not take the whole
+    // panel down — the counts just read 0.
+    const marks = await selectAll<{ user_id: string | null }>((from, to) =>
+      (admin as any).from('activity_logs').select('user_id')
+        .eq('workspace_id', wsId).eq('type', 'interest_status_changed').eq('metadata->>to', 'interested')
+        .gte('created_at', start).lt('created_at', end).range(from, to)).catch((err) => { console.error('[interested marks]', err); return [] })
+    const marksByRep = new Map<string, number>()
+    for (const m of marks) if (m.user_id) marksByRep.set(m.user_id, (marksByRep.get(m.user_id) ?? 0) + 1)
+
     const reps = repsRaw.map((r) => ({
       ...r,
       user_email:   nameById.get(r.user_id)?.email ?? '',
       full_name:    nameById.get(r.user_id)?.name  ?? null,
       unique_leads: uniqByRepMap.get(r.user_id) ?? 0,
+      interested_marked: marksByRep.get(r.user_id) ?? 0,
     }))
+
+    // last_contacted_at only answers "called since X" — for a window that ends
+    // in the past (Pick day) count distinct leads straight from call_logs.
+    const endsNow = Date.now() - Date.parse(end) < 5 * 60_000
+    const pastUnique = endsNow ? null : new Set(
+      (await selectAll<{ lead_id: string }>((from, to) =>
+        (admin as any).from('call_logs').select('lead_id')
+          .eq('workspace_id', wsId).gte('called_at', start).lt('called_at', end).range(from, to)))
+        .map((c) => c.lead_id),
+    ).size
 
     // unique leads = distinct leads called in the range (one per lead) via the
     // denormalized last_contacted_at — exact for the presets (all end "now").
@@ -113,7 +138,8 @@ export async function GET(req: Request) {
       reps,
       overview: {
         ...(payload.overview ?? {}),
-        unique_leads:    uniqRes.count          ?? 0,
+        unique_leads:    pastUnique ?? uniqRes.count ?? 0,
+        interested_marked: marks.length,
         interested:      interestedRes.count    ?? 0,
         not_interested:  notInterestedRes.count ?? 0,
         bad_leads:       badLeadsRes.count       ?? 0,

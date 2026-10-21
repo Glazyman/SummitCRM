@@ -4,13 +4,15 @@
  * components/admin/date-range-picker.tsx
  *
  * Preset-based date range selector that syncs state via URL params.
- * Presets: Today, 7 Days, 30 Days, All Time, Custom
+ * Presets: Today, 7 Days, 30 Days, All Time — plus "Pick day" (a single
+ * calendar day) when the caller passes `day` + `onDayChange`.
  */
 
 import React, { useState } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Button }   from '@/components/ui/button'
-import { Calendar, ChevronDown } from 'lucide-react'
+import { Calendar, CalendarSearch } from 'lucide-react'
+import { DayNav, todayYmd } from '@/components/ui/day-nav'
 import { cn } from '@/lib/utils'
 import type { DateRangePreset } from './types'
 
@@ -32,11 +34,16 @@ interface DateRangePickerProps {
   value:    DateRangePreset
   onChange: (preset: DateRangePreset) => void
   className?: string
+  /** Enables the "Pick day" option: the chosen "YYYY-MM-DD" (local day). */
+  day?:         string
+  onDayChange?: (ymd: string) => void
 }
 
-export function DateRangePicker({ value, onChange, className }: DateRangePickerProps) {
+export function DateRangePicker({ value, onChange, className, day, onDayChange }: DateRangePickerProps) {
+  const dayMode = !!onDayChange && value === 'day'
   return (
-    <div className={cn('flex items-center gap-1 rounded-lg border bg-background p-1', className)}>
+    <div className={cn('flex flex-wrap items-center gap-2', className)}>
+    <div className="flex flex-1 items-center gap-1 rounded-lg border bg-background p-1 sm:flex-none">
       {/* Calendar icon is decorative — hide it on phones to give the buttons room. */}
       <Calendar className="ml-2 hidden h-4 w-4 shrink-0 text-muted-foreground sm:block" />
       {PRESETS.map((p) => (
@@ -55,6 +62,23 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
           <span className="hidden sm:inline">{p.label}</span>
         </button>
       ))}
+      {onDayChange && (
+        <button
+          onClick={() => { onChange('day'); if (!day) onDayChange(todayYmd()) }}
+          className={cn(
+            'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition-all whitespace-nowrap sm:flex-none sm:px-3',
+            dayMode
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+          )}
+        >
+          <CalendarSearch className="hidden h-3.5 w-3.5 sm:block" />
+          <span className="sm:hidden">Day</span>
+          <span className="hidden sm:inline">Pick day</span>
+        </button>
+      )}
+    </div>
+    {dayMode && <DayNav value={day || todayYmd()} onChange={onDayChange!} />}
     </div>
   )
 }

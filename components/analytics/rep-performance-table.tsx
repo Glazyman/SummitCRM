@@ -85,7 +85,7 @@ function RepCard({ rep, rank, callView, onOpen }: { rep: RepRow; rank: number; c
       </div>
 
       {/* KPI strip */}
-      <div className="grid grid-cols-3 gap-2 px-4 py-3 border-b border-border bg-background">
+      <div className="grid grid-cols-2 gap-2 px-4 py-3 border-b border-border bg-background">
         <div className="rounded-lg border border-border px-2.5 py-2">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{callView === 'unique' ? 'Leads Called' : 'Calls'}</p>
           <p className="text-base font-bold tabular-nums">{callView === 'unique' ? rep.unique_leads : rep.calls}</p>
@@ -97,6 +97,10 @@ function RepCard({ rep, rank, callView, onOpen }: { rep: RepRow; rank: number; c
         <div className="rounded-lg border border-border px-2.5 py-2">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Follow-up Done</p>
           <p className="text-base font-bold tabular-nums">{fuPct}%</p>
+        </div>
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 px-2.5 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+          <p className="text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Marked Interested</p>
+          <p className="text-base font-bold tabular-nums">{rep.interested_marked ?? 0}</p>
         </div>
       </div>
 
