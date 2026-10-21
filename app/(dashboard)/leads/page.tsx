@@ -110,9 +110,8 @@ export default async function LeadsPage({ searchParams }: PageProps) {
           .order('created_at', { ascending: false }),
         supabase
           .from('workspace_members')
-          .select('user_id')
-          .eq('workspace_id', workspaceId)
-          .eq('is_active', true),
+          .select('user_id, is_active')
+          .eq('workspace_id', workspaceId),
       ])
 
       if ('matchingIds' in pageResult) matchingInterestedIds = pageResult.matchingIds
@@ -125,9 +124,10 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       batches = (batchesResult.data ?? []) as { id: string; name: string }[]
       const batchNames = new Map(batches.map((b) => [b.id, b.name]))
 
-      const memberIds = ((membersResult.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)
+      const memberRows = (membersResult.data ?? []) as Array<{ user_id: string; is_active: boolean }>
+      const memberIds = memberRows.filter(m => m.is_active).map(m => m.user_id)
       const adminClient = createAdminClient()
-      const usersById = await getUsersById(adminClient, workspaceId, memberIds)
+      const usersById = await getUsersById(adminClient, workspaceId, memberRows.map(m => m.user_id))
       teamMembers = memberIds.map((id) => ({ id, name: usersById.get(id) ?? id }))
 
       type RawLead = {

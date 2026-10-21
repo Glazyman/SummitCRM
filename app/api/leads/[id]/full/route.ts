@@ -37,7 +37,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       supabase.from('emails').select('id, subject, body_html, sent_by, status, sent_at, opened_at, clicked_at, replied_at, bounced_at, created_at').eq('lead_id', id).order('created_at', { ascending: false }),
       supabase.from('follow_ups').select('id, title, notes, due_at, completed_at, assigned_to').eq('lead_id', id).order('due_at', { ascending: true }),
       supabase.from('call_logs').select('id, outcome, duration_sec, notes, called_at, logged_by').eq('lead_id', id).order('called_at', { ascending: false }),
-      supabase.from('workspace_members').select('user_id, role').eq('workspace_id', workspaceId).eq('is_active', true),
+      supabase.from('workspace_members').select('user_id, role, is_active').eq('workspace_id', workspaceId),
       supabase.from('lead_tags').select('tags(id, name, color)').eq('lead_id', id),
       supabase.from('tags').select('id, name, color').eq('workspace_id', workspaceId).order('name'),
     ])
@@ -51,11 +51,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
     }
 
     // Resolve user names via workspace-scoped SQL RPC.
-    const memberRows = (membersRes.data ?? []) as Array<{ user_id: string; role: string }>
-    const memberIds  = memberRows.map((m) => m.user_id)
+    const memberRows = (membersRes.data ?? []) as Array<{ user_id: string; role: string; is_active: boolean }>
+    const memberIds  = memberRows.filter(m => m.is_active).map(m => m.user_id)
     const roleById   = new Map(memberRows.map((m) => [m.user_id, m.role]))
     const adminClient = createAdminClient()
-    const usersById = await getUsersById(adminClient, workspaceId, memberIds)
+    const usersById = await getUsersById(adminClient, workspaceId, memberRows.map(m => m.user_id))
 
     const batchNames = new Map(
       ((batchesRes.data ?? []) as Array<{ id: string; name: string }>).map((b) => [b.id, b.name])
