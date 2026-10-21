@@ -41,6 +41,7 @@ interface LeadsClientProps {
   perPage:       number
   batches:       { id: string; name: string }[]
   teamMembers:   { id: string; name: string }[]
+  repFilterOptions: { id: string; name: string }[]
   isAdmin:       boolean
   currentUserId: string
   role?:         string
@@ -69,6 +70,7 @@ export function LeadsClient({
   perPage: serverPerPage,
   batches,
   teamMembers,
+  repFilterOptions,
   isAdmin,
   currentUserId,
   role,
@@ -659,7 +661,7 @@ export function LeadsClient({
       <LeadFiltersPanel
         filters={filters}
         batches={batches}
-        teamMembers={teamMembers}
+        teamMembers={repFilterOptions}
         isAdmin={isAdmin}
         isRep={isRep}
         onChange={updateFilters}

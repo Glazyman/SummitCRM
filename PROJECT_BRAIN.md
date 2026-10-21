@@ -697,6 +697,8 @@ Workspace-scoped, reusable labels on leads — primary use is **buyer type** (PE
 
 ### Leads — quick filters (revised 2026-10-21)
 
+- Rep filter includes inactive historical workspace members, labeled `(inactive)`, to browse their existing lead assignments. Server supplies a separate `repFilterOptions` list; assignment controls keep active-only `teamMembers`.
+
 - Removed the separate top-of-page interested card at the user's request. **Interested today** now filters the existing table by recorded `interest_status_changed` events within the viewer's local midnight-to-midnight window (`interested_start/end` URL params).
 - Compact search + quick buttons: Interested today, All interested, New leads, Try again (No Answer / Voicemail), My leads, Unassigned. Searchable rep/batch menus, interest menu, visible Added from/through pickers and Today/7/30-day added shortcuts. Status bar stays above.
 - `lib/leads-interested-filter.ts` resolves the event cohort, deduplicates lead IDs, applies workspace/effective-rep scope and all table filters before sorting/pagination. It pages activity logs beyond 1000, loads leads in bounded chunks, and returns matching IDs so Select All cannot affect leads outside the cohort. Normal filtering continues to use the existing SQL RPC. No migration needed.

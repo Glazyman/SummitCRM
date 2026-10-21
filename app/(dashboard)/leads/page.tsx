@@ -44,6 +44,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   let statusCounts: StatusCount[] = []
   let batches:      { id: string; name: string }[] = []
   let teamMembers:  { id: string; name: string }[] = []
+  let repFilterOptions: { id: string; name: string }[] = []
   let perPage       = DEFAULT_PER_PAGE
   let page          = 1
 
@@ -129,6 +130,9 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       const adminClient = createAdminClient()
       const usersById = await getUsersById(adminClient, workspaceId, memberRows.map(m => m.user_id))
       teamMembers = memberIds.map((id) => ({ id, name: usersById.get(id) ?? id }))
+      repFilterOptions = [...teamMembers, ...memberRows.filter(m => !m.is_active).map(m => ({
+        id: m.user_id, name: `${usersById.get(m.user_id) ?? m.user_id} (inactive)`,
+      }))]
 
       type RawLead = {
         id: string; workspace_id: string; first_name: string | null; last_name: string | null
@@ -190,6 +194,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         perPage={perPage}
         batches={batches}
         teamMembers={teamMembers}
+        repFilterOptions={repFilterOptions}
         isAdmin={isAdmin}
         currentUserId={currentUserId}
         role={role}
