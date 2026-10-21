@@ -22,11 +22,11 @@ export async function GET(req: Request) {
   let rows: Record<string, unknown>[]
   let headers: string[]
   if (view === 'reps') {
-    headers = ['name', 'role', 'active_days', 'last_call_at', 'leads_called', 'answered', 'answer_rate_percent', 'voicemail', 'no_answer', 'wrong_number', 'callbacks', 'marked_interested', 'follow_ups_completed', 'current_pending', 'current_overdue', 'current_assigned']
+    headers = ['name', 'role', 'active_days', 'last_call_at', 'leads_called', 'answered', 'answer_rate_percent', 'voicemail', 'no_answer', 'wrong_number', 'callbacks', 'current_interested', 'marked_interested', 'follow_ups_completed', 'current_pending', 'current_overdue', 'current_assigned']
     rows = data.reps.map(r => ({ name: r.full_name || r.user_email, role: r.role, active_days: r.active_days ?? 0, last_call_at: r.last_call_at ?? '', leads_called: r.unique_leads,
       answered: r.calls_answered, answer_rate_percent: r.calls ? Math.round(r.calls_answered / r.calls * 100) : '',
       voicemail: r.calls_voicemail, no_answer: r.calls_no_answer, wrong_number: r.calls_wrong_number, callbacks: r.calls_callback ?? 0,
-      marked_interested: r.interested_marked ?? 0, follow_ups_completed: r.follow_ups_completed,
+      current_interested: r.interested_current ?? 0, marked_interested: r.interested_marked ?? 0, follow_ups_completed: r.follow_ups_completed,
       current_pending: r.role === 'historical' ? '' : r.follow_ups_pending, current_overdue: r.role === 'historical' ? '' : r.follow_ups_overdue, current_assigned: r.role === 'historical' ? '' : r.leads_assigned }))
   } else {
     headers = ['metric', 'value', 'scope']

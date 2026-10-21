@@ -20,6 +20,8 @@ export interface RepRow {
   leads_assigned:      number
   leads_active:        number
   leads_new:           number
+  /** Interested leads currently assigned to this rep, independent of dates. */
+  interested_current?: number
   /** Leads this rep marked interested within the period. */
   interested_marked?:  number
 }

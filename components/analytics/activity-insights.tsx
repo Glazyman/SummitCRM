@@ -9,7 +9,7 @@ export function ActivityInsights({ overview, reps, daily, loading }: { overview:
   const summary = [
     { label: 'Leads called', value: overview.unique_leads, detail: 'First call only · each lead counts once' },
     { label: 'Answer rate', value: overview.total ? `${Math.round(overview.answered / overview.total * 100)}%` : '—', detail: 'Outcome of each lead’s first call' },
-    { label: 'Marked interested', value: overview.interested_marked ?? 0, detail: 'Distinct leads · recorded changes only' },
+    { label: 'Interested now', value: overview.interested, detail: 'Current interested leads · all dates' },
     { label: 'Follow-ups completed', value: overview.follow_ups_completed ?? 0, detail: 'Completed within the selected period' },
   ]
   return <div className="space-y-5">
@@ -31,22 +31,22 @@ export function ActivityInsights({ overview, reps, daily, loading }: { overview:
           <Tooltip labelFormatter={v => new Date(`${v}T12:00`).toLocaleDateString()} contentStyle={{ borderRadius: 10, fontSize: 12, background: 'var(--card)', borderColor: 'var(--border)' }} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           <Bar dataKey="unique_leads" name="Leads called" fill="#4b8f7a" radius={[3, 3, 0, 0]} />
-          <Bar dataKey="interested" name="Marked interested" fill="#d09b45" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="interested" name="Recorded interest changes" fill="#d09b45" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>}
     </div>
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="px-4 py-4"><h2 className="text-sm font-semibold">Rep comparison</h2><p className="mt-1 text-xs text-muted-foreground">Selected period · sorted by unique leads called. Full details are in Rep Performance.</p></div>
       <div className="overflow-x-auto"><table className="w-full whitespace-nowrap text-sm">
-        <thead className="border-y bg-muted/40 text-xs text-muted-foreground"><tr>{['Rep', 'Leads called', 'Answered', 'Answer rate', 'Marked interested', 'Follow-ups done'].map(h => <th key={h} scope="col" className="px-4 py-3 text-right font-medium first:text-left">{h}</th>)}</tr></thead>
+        <thead className="border-y bg-muted/40 text-xs text-muted-foreground"><tr>{['Rep', 'Leads called', 'Answered', 'Answer rate', 'Interested now', 'Follow-ups done'].map(h => <th key={h} scope="col" className="px-4 py-3 text-right font-medium first:text-left">{h}</th>)}</tr></thead>
         <tbody className="divide-y divide-border">{!loading && [...reps].sort((a, b) => b.unique_leads - a.unique_leads).map(r => <tr key={r.user_id} className="hover:bg-muted/30">
           <th scope="row" className="px-4 py-3 text-left font-medium">{r.full_name || r.user_email}</th>
-          {[r.unique_leads, r.calls_answered, r.calls ? `${Math.round(r.calls_answered / r.calls * 100)}%` : '—', r.interested_marked ?? 0, r.follow_ups_completed].map((v, i) => <td key={i} className="px-4 py-3 text-right tabular-nums">{v}</td>)}
+          {[r.unique_leads, r.calls_answered, r.calls ? `${Math.round(r.calls_answered / r.calls * 100)}%` : '—', r.interested_current ?? 0, r.follow_ups_completed].map((v, i) => <td key={i} className="px-4 py-3 text-right tabular-nums">{v}</td>)}
         </tr>)}</tbody>
       </table></div>
       {loading && <p className="p-4 text-sm text-muted-foreground">Loading performance…</p>}
       {!loading && !reps.length && <p className="p-4 text-sm text-muted-foreground">No rep data available.</p>}
-      <p className="border-t px-4 py-3 text-xs text-muted-foreground">Each lead counts once, on its first call date. Answer rate uses first-call outcomes. Interested history is available only from October 21, 2026; repeat markings of the same lead count once per period.</p>
+      <p className="border-t px-4 py-3 text-xs text-muted-foreground">Each lead counts once, on its first call date. Answer rate uses first-call outcomes. Interested now shows currently assigned interested leads, independent of dates. Interest-change history is available only from October 21, 2026; repeat markings of the same lead count once per period.</p>
     </div>
   </div>
 }

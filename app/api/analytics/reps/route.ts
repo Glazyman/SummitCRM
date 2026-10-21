@@ -50,7 +50,7 @@ export async function GET(req: Request) {
     catch { return NextResponse.json({ error: 'Invalid timezone' }, { status: 400 }) }
 
     // All independent database reads start together instead of four network waves.
-    const [aggregate, callHistory, marks, completions, interestedRes, notInterestedRes, badLeadsRes, contactedRes] = await Promise.all([
+    const [aggregate, callHistory, marks, completions, interestedLeads, notInterestedRes, badLeadsRes, contactedRes] = await Promise.all([
       admin.rpc('get_reps_analytics', { p_workspace_id: wsId, p_start: start, p_end: end }),
       selectAll<{ id: string; lead_id: string; logged_by: string; outcome: string; called_at: string }>((from, to) =>
         (admin as any).from('call_logs').select('id, lead_id, logged_by, outcome, called_at')
@@ -62,8 +62,9 @@ export async function GET(req: Request) {
       selectAll<{ assigned_to: string }>((from, to) =>
         (admin as any).from('follow_ups').select('assigned_to')
           .eq('workspace_id', wsId).gte('completed_at', start).lt('completed_at', end).order('id').range(from, to)),
-      admin.from('leads').select('id', { count: 'exact', head: true })
-        .eq('workspace_id', wsId).eq('interest_status', 'interested').is('deleted_at', null),
+      selectAll<{ id: string; assigned_to: string | null }>((from, to) =>
+        admin.from('leads').select('id, assigned_to').eq('workspace_id', wsId)
+          .eq('interest_status', 'interested').is('deleted_at', null).order('id').range(from, to)),
       admin.from('leads').select('id', { count: 'exact', head: true })
         .eq('workspace_id', wsId).eq('interest_status', 'not_interested').is('deleted_at', null),
       admin.from('leads').select('id', { count: 'exact', head: true })
@@ -84,6 +85,7 @@ export async function GET(req: Request) {
       ...repFirstCalls.map(call => call.logged_by || 'unattributed'),
       ...marks.map(mark => mark.user_id || 'unattributed'),
       ...completions.map(task => task.assigned_to || 'unattributed'),
+      ...interestedLeads.flatMap(lead => lead.assigned_to ? [lead.assigned_to] : []),
     ])
     for (const id of contributors) if (!currentIds.has(id)) repsRaw.push({
       user_id: id, role: 'historical', calls: 0, calls_answered: 0, calls_voicemail: 0,
@@ -98,6 +100,8 @@ export async function GET(req: Request) {
       if (!byRep.has(id)) byRep.set(id, [])
       byRep.get(id)!.push(call)
     }
+    const interestedByRep = new Map<string, number>()
+    for (const lead of interestedLeads) if (lead.assigned_to) interestedByRep.set(lead.assigned_to, (interestedByRep.get(lead.assigned_to) ?? 0) + 1)
     const markedByRep = new Map<string, Set<string>>()
     for (const mark of marks) if (mark.lead_id) {
       const id = mark.user_id || 'unattributed'
@@ -118,6 +122,7 @@ export async function GET(req: Request) {
         calls_no_answer: repCalls.filter(c => c.outcome === 'no_answer').length,
         calls_wrong_number: repCalls.filter(c => c.outcome === 'wrong_number').length,
         calls_callback: repCalls.filter(c => c.outcome === 'callback_requested').length,
+        interested_current: interestedByRep.get(r.user_id) ?? 0,
         interested_marked: markedByRep.get(r.user_id)?.size ?? 0,
         follow_ups_completed: completedByRep.get(r.user_id) ?? 0,
       }
@@ -135,7 +140,7 @@ export async function GET(req: Request) {
 
     // Current workspace state is separate from activity in the selected period.
 
-    if ([interestedRes, notInterestedRes, badLeadsRes, contactedRes].some(r => 'error' in r && r.error)) throw new Error('Could not load lead totals')
+    if ([notInterestedRes, badLeadsRes, contactedRes].some(r => 'error' in r && r.error)) throw new Error('Could not load lead totals')
     return NextResponse.json({
       reps,
       historyStart: calls.reduce<string | undefined>((first, call) => !first || call.called_at < first ? call.called_at : first, undefined),
@@ -151,7 +156,7 @@ export async function GET(req: Request) {
         unique_leads: new Set(calls.map(c => c.lead_id).filter(Boolean)).size,
         interested_marked: new Set(marks.map(m => m.lead_id).filter(Boolean)).size,
         follow_ups_completed: completions.length,
-        interested:      interestedRes.count    ?? 0,
+        interested:      interestedLeads.length,
         not_interested:  notInterestedRes.count ?? 0,
         bad_leads:       badLeadsRes.count       ?? 0,
         contacted_total: contactedRes.count      ?? 0,
