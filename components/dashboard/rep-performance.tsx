@@ -33,6 +33,8 @@ interface RepStat {
   interestedMarked?:   number
   /** Earliest call this rep logged in the period (ISO), any call. */
   firstCallAt?:        string | null
+  /** Latest call this rep logged in the period (ISO), any call. */
+  lastCallAt?:         string | null
 }
 
 const OUTCOME_META: Record<string, { label: string; color: string }> = {
@@ -171,6 +173,12 @@ function CallsByRepPanel({ reps }: { reps: RepStat[] }) {
   )
 }
 
+/** Clock time of a call in the viewer's local zone, or a dash. */
+function CallTime({ at }: { at?: string | null }) {
+  if (!at) return <span className="text-muted-foreground/40">—</span>
+  return <>{new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</>
+}
+
 // ── Main component ────────────────────────────────────────────────────────
 export function RepPerformancePanel() {
   // Open the dashboard on today; other ranges remain available.
@@ -283,6 +291,10 @@ export function RepPerformancePanel() {
                       <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground"
                           title="Time of the rep's first call that day">First call</th>
                     )}
+                    {isToday && (
+                      <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground"
+                          title="Time of the rep's last call that day">Last call</th>
+                    )}
                     <th className="px-4 py-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-400"
                         title="Leads this rep marked interested in the selected period">Interested</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Answered</th>
@@ -338,9 +350,12 @@ export function RepPerformancePanel() {
                       </td>
                       {isToday && (
                         <td className="px-4 py-3 text-center text-sm tabular-nums whitespace-nowrap">
-                          {rep.firstCallAt
-                            ? new Date(rep.firstCallAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                            : <span className="text-muted-foreground/40">—</span>}
+                          <CallTime at={rep.firstCallAt} />
+                        </td>
+                      )}
+                      {isToday && (
+                        <td className="px-4 py-3 text-center text-sm tabular-nums whitespace-nowrap">
+                          <CallTime at={rep.lastCallAt} />
                         </td>
                       )}
                       <td className="px-4 py-3 text-center">

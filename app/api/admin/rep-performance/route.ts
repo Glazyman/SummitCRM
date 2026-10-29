@@ -110,11 +110,15 @@ export async function GET(req: NextRequest) {
     ])
     const uniqueLeads = inCallPeriod(firstCalls(callLeadRows), range.start, range.end).length
     const firstByRep = inCallPeriod(firstCalls(callLeadRows, true), range.start, range.end)
-    // Earliest call each rep logged in the window — any call, repeats included.
+    // Earliest and latest call each rep logged in the window — any call, repeats included.
     const firstCallAtByRep = new Map<string, string>()
+    const lastCallAtByRep  = new Map<string, string>()
     for (const call of inCallPeriod(callLeadRows, range.start, range.end)) {
-      const prev = firstCallAtByRep.get(call.logged_by)
-      if (!prev || Date.parse(call.called_at) < Date.parse(prev)) firstCallAtByRep.set(call.logged_by, call.called_at)
+      const t = Date.parse(call.called_at)
+      const first = firstCallAtByRep.get(call.logged_by)
+      if (!first || t < Date.parse(first)) firstCallAtByRep.set(call.logged_by, call.called_at)
+      const last = lastCallAtByRep.get(call.logged_by)
+      if (!last || t > Date.parse(last)) lastCallAtByRep.set(call.logged_by, call.called_at)
     }
 
     // Leads each rep MARKED interested in the window (interest-change log).
@@ -190,6 +194,7 @@ export async function GET(req: NextRequest) {
           dailyCallTarget:     targetForUser(uid),
           interestedMarked:    marksByRep.get(uid) ?? 0,
           firstCallAt:         firstCallAtByRep.get(uid) ?? null,
+          lastCallAt:          lastCallAtByRep.get(uid) ?? null,
         }
       })
       .sort((a, b) => b.leadsCalledInPeriod - a.leadsCalledInPeriod)
