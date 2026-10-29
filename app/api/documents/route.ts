@@ -9,6 +9,7 @@
  *
  * Auth: admin+ only (the documents library is an admin feature).
  */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest } from 'next/server'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@/lib/supabase/server'
@@ -22,7 +23,7 @@ const BUCKET = 'documents'
 /** Resolve the caller's active workspace + role, gating on admin+. */
 async function requireAdmin() {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await getVerifiedUser(supabase)
   if (authError || !user) return { error: apiUnauthorized() }
 
   const admin = createAdminClient()

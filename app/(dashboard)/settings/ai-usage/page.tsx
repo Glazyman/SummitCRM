@@ -1,3 +1,4 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -8,7 +9,7 @@ export const metadata = { title: 'AI Usage — Settings' }
 
 export default async function AiUsagePage() {
   const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getVerifiedUser(supabase)
   if (!user) redirect('/login')
 
   const { data: member } = await supabase

@@ -1,3 +1,4 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { Database } from '@/types/database'
@@ -35,7 +36,7 @@ export async function updateSession(request: NextRequest) {
   // getUser() triggers a token refresh if the access token is expired.
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await getVerifiedUser(supabase)
 
   return { supabase, user, response: supabaseResponse }
 }

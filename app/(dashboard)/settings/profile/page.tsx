@@ -1,3 +1,4 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -10,7 +11,7 @@ export const metadata: Metadata = { title: 'Profile — Settings' }
 
 export default async function ProfilePage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getVerifiedUser(supabase)
   if (!user) redirect('/login')
 
   const fullName = (user.user_metadata?.full_name as string | undefined) ?? ''

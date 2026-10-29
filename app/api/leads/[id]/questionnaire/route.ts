@@ -1,3 +1,4 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
@@ -10,7 +11,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params
     const cookieStore = await cookies()
     const supabase    = await createServerClient(cookieStore)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getVerifiedUser(supabase)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient() as any
@@ -36,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { id } = await params
     const cookieStore = await cookies()
     const supabase    = await createServerClient(cookieStore)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getVerifiedUser(supabase)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await req.json()

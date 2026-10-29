@@ -3,6 +3,7 @@
  * Hard-deletes a single activity_log entry for the workspace.
  * Only the entry's owner OR an admin/manager can delete it.
  */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
@@ -15,7 +16,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const cookieStore = await cookies()
     const supabase = (await createServerClient(cookieStore)) as unknown as ReturnType<typeof createAdminClient>
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await getVerifiedUser(supabase)
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()

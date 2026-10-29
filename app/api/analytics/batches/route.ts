@@ -2,6 +2,7 @@
  * GET /api/analytics/batches
  * Per-batch lead counts. manager+
  */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextResponse } from 'next/server'
 import { cookies }      from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
@@ -10,7 +11,7 @@ export async function GET(req: Request) {
   try {
     const cookieStore = await cookies()
     const supabase    = await createServerClient(cookieStore)
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    const { data: { user }, error: authErr } = await getVerifiedUser(supabase)
     if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const adminClient = createAdminClient()

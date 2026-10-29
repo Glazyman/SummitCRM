@@ -1,3 +1,4 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiServerError } from '@/lib/utils/api'
@@ -10,7 +11,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
   try {
     const { id: batchId } = await params
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await getVerifiedUser(supabase)
     if (authError || !user) return apiUnauthorized()
 
     const { data: memberRow } = await supabase

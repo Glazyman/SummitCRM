@@ -1,3 +1,4 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { z } from 'zod'
@@ -20,7 +21,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const cookieStore = await cookies()
     const supabase = (await createServerClient(cookieStore)) as unknown as ReturnType<typeof createAdminClient>
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await getVerifiedUser(supabase)
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { data: member } = await supabase
@@ -109,7 +110,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const cookieStore = await cookies()
     const supabase = (await createServerClient(cookieStore)) as unknown as ReturnType<typeof createAdminClient>
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await getVerifiedUser(supabase)
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { data: member } = await supabase

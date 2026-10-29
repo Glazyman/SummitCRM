@@ -2,6 +2,7 @@
  * PATCH /api/batches/[id] — rename a batch (updates `lead_batches.name` for all leads in that batch)
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -18,7 +19,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id: batchId } = await params
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await getVerifiedUser(supabase)
     if (authError || !user) return apiUnauthorized()
 
     const admin = createAdminClient()
@@ -75,7 +76,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
     const { id: batchId } = await params
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await getVerifiedUser(supabase)
     if (authError || !user) return apiUnauthorized()
 
     const admin = createAdminClient()

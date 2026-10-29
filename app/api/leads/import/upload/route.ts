@@ -10,6 +10,7 @@
  *
  * Auth: rep+
  */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient }      from '@/lib/supabase/server'
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
   try {
     // ── Auth ───────────────────────────────────────────────────────────
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await getVerifiedUser(supabase)
     if (authError || !user) return apiUnauthorized()
 
     const admin = createAdminClient()

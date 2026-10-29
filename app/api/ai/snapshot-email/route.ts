@@ -7,6 +7,7 @@
  * The deterministic builder in `lib/intake-snapshot.ts` is the client-side
  * fallback if this endpoint fails — both produce the same structural format.
  */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { z } from 'zod'
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     const cookieStore = await cookies()
     const supabase    = await createServerClient(cookieStore)
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    const { data: { user }, error: authErr } = await getVerifiedUser(supabase)
     if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Admin-only — matches the UI gate on the Email Snapshot button.

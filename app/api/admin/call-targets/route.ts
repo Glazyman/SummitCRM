@@ -1,3 +1,4 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient, createAdminClient } from '@/lib/supabase/server'
@@ -15,7 +16,7 @@ function parsePositiveInt(value: unknown): number | null {
 async function getAdminContext() {
   const cookieStore = await cookies()
   const supabase = await createServerClient(cookieStore)
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const { data: { user }, error } = await getVerifiedUser(supabase)
   if (error || !user) return null
 
   const admin = createAdminClient()

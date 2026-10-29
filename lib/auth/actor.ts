@@ -1,3 +1,4 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import 'server-only'
 import { cache } from 'react'
 import { cookies } from 'next/headers'
@@ -50,7 +51,7 @@ export interface Actor {
  */
 export const getAuthenticatedUser = cache(async () => {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getVerifiedUser(supabase)
   return user
 })
 

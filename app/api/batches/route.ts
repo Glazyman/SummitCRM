@@ -3,6 +3,7 @@
  * POST /api/batches — create a new batch
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -11,7 +12,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiServerError } from '@/lib/uti
 
 async function getWorkspaceMember() {
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const { data: { user }, error } = await getVerifiedUser(supabase)
   if (error || !user) return null
 
   const admin = createAdminClient()

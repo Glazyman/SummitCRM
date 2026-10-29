@@ -11,6 +11,7 @@
 export const maxDuration = 60 // seconds (Vercel Pro allows up to 300s)
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient }         from '@/lib/supabase/server'
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
   try {
     // ── Auth ───────────────────────────────────────────────────────────
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await getVerifiedUser(supabase)
 
     if (authError || !user) return apiUnauthorized()
 

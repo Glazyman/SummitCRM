@@ -7,6 +7,7 @@
  *
  * Auth: rep+, must belong to same workspace
  */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   // ── Auth ─────────────────────────────────────────────────────────────
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await getVerifiedUser(supabase)
   if (authError || !user) return apiUnauthorized()
 
   const admin = createAdminClient()

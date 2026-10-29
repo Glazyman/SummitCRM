@@ -1,10 +1,11 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 // GET /api/tags — list all tags for workspace
 export async function GET() {
   const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getVerifiedUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: member } = await supabase
@@ -29,7 +30,7 @@ export async function GET() {
 // POST /api/tags — create a new tag
 export async function POST(req: NextRequest) {
   const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getVerifiedUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: member } = await supabase

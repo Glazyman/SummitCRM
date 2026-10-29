@@ -4,6 +4,7 @@
  * resolves the caller's active workspace and requires admin+.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiUnauthorized, apiForbidden } from '@/lib/utils/api'
@@ -23,7 +24,7 @@ export type DocRecord = {
 
 export async function requireDocumentAdmin() {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await getVerifiedUser(supabase)
   if (authError || !user) return { error: apiUnauthorized() }
 
   const admin = createAdminClient()

@@ -1,3 +1,4 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -9,7 +10,7 @@ export const metadata = { title: 'Notifications — Settings' }
 
 export default async function NotificationSettingsPage() {
   const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getVerifiedUser(supabase)
   if (!user) redirect('/login')
 
   // Reps can view their own notifications + preferences too. No admin gate.

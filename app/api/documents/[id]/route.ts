@@ -9,6 +9,7 @@
  *
  * Auth: admin+ only.
  */
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest } from 'next/server'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@/lib/supabase/server'
@@ -20,7 +21,7 @@ type Params = { params: Promise<{ id: string }> }
 
 async function requireAdmin() {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await getVerifiedUser(supabase)
   if (authError || !user) return { error: apiUnauthorized() }
 
   const admin = createAdminClient()

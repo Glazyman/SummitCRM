@@ -1,9 +1,10 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 
 export async function GET() {
   const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getVerifiedUser(supabase)
   if (!user) return NextResponse.json({ count: 0 })
 
   const { count } = await supabase

@@ -1,3 +1,4 @@
+import { getVerifiedUser } from '@/lib/supabase/verified-user'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -21,7 +22,7 @@ export async function POST(
 ) {
   const { id: leadId } = await params
   const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getVerifiedUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isWorkspaceAdmin(supabase, user.id))) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
@@ -50,7 +51,7 @@ export async function DELETE(
 ) {
   const { id: leadId } = await params
   const supabase = await createClient() as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getVerifiedUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isWorkspaceAdmin(supabase, user.id))) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
