@@ -31,6 +31,8 @@ interface RepStat {
   dailyCallTarget:     number
   /** Leads this rep marked interested in the period. */
   interestedMarked?:   number
+  /** Earliest call this rep logged in the period (ISO), any call. */
+  firstCallAt?:        string | null
 }
 
 const OUTCOME_META: Record<string, { label: string; color: string }> = {
@@ -277,6 +279,10 @@ export function RepPerformancePanel() {
                         title="Unique leads called in the selected period">
                       {isToday ? 'Calls / Target' : 'Leads called'}
                     </th>
+                    {isToday && (
+                      <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground"
+                          title="Time of the rep's first call that day">First call</th>
+                    )}
                     <th className="px-4 py-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-400"
                         title="Leads this rep marked interested in the selected period">Interested</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Answered</th>
@@ -330,6 +336,13 @@ export function RepPerformancePanel() {
                           </span>
                         )}
                       </td>
+                      {isToday && (
+                        <td className="px-4 py-3 text-center text-sm tabular-nums whitespace-nowrap">
+                          {rep.firstCallAt
+                            ? new Date(rep.firstCallAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                            : <span className="text-muted-foreground/40">—</span>}
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-center">
                         <span className={cn('text-sm font-semibold tabular-nums',
                           rep.interestedMarked ? 'text-emerald-600' : 'text-muted-foreground/40')}>
