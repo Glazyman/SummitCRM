@@ -1,5 +1,3 @@
-import { selectAll } from '@/lib/supabase/select-all'
-import { firstCalls } from '@/lib/first-calls'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
@@ -248,15 +246,20 @@ async function getDashboardMetrics(
         p_user_id:      userId,
         p_since:        new Date(0).toISOString(),
       })
-  const callHistory = selectAll<{ lead_id: string; logged_by: string; called_at: string }>((from, to) => supabase.from('call_logs')
-    .select('lead_id, logged_by, called_at').eq('workspace_id', workspaceId).order('id').range(from, to))
+  // First-call counts run in Postgres (RLS-scoped) instead of paging every
+  // call_logs row here and deduping in JS.
+  const firstCallsQuery = supabaseAny.rpc('get_dashboard_first_calls', {
+    p_workspace_id: workspaceId,
+    p_user_id:      userId,
+    p_since:        weekAgo.toISOString(),
+    p_today:        startOfToday.toISOString(),
+  })
   const [
     leadsResult,
     contactedRes,
     followUpsDueResult,
     workspaceResult,
-    callsRes,
-    uniqueLeadsRes,
+    firstCallsRes,
     dealsRes,
   ] = await Promise.all([
     totalLeadsQuery,
@@ -267,21 +270,14 @@ async function getDashboardMetrics(
       .select('settings')
       .eq('id', workspaceId)
       .single(),
-    callHistory.then(rows => ({ count: firstCalls(rows).filter(c => Date.parse(c.called_at) >= weekAgo.getTime()).length })),
-    callHistory.then(rows => ({ data: firstCalls(rows.filter(c => c.logged_by === userId)).filter(c => Date.parse(c.called_at) >= startOfToday.getTime()).length })),
+    firstCallsQuery,
     dealsInPipelineQuery,
   ])
 
   // Leads called in the last 30 days (unique — one per lead).
-  let leadsCalled = 0
-  let callsToday  = 0
-  try {
-    leadsCalled = (callsRes as unknown as { count: number | null }).count ?? 0
-  } catch {}
-
-  try {
-    callsToday = Number((uniqueLeadsRes as { data: number | null }).data ?? 0)
-  } catch {}
+  const firstCallsRow = (firstCallsRes.data as Array<{ leads_called: number; calls_today: number }> | null)?.[0]
+  const leadsCalled = Number(firstCallsRow?.leads_called ?? 0)
+  const callsToday  = Number(firstCallsRow?.calls_today ?? 0)
 
   const dailyCallTarget = resolveDailyCallTarget(
     (workspaceResult.data as { settings?: Record<string, unknown> } | null)?.settings,
