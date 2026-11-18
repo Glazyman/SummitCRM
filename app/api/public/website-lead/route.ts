@@ -50,7 +50,8 @@ const s = (max: number) => z.string().trim().max(max).optional().default('')
 const Body = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().trim().toLowerCase().email().max(320),
-  phone: z.string().trim().max(40).refine((p) => p.replace(/\D/g, '').length >= 10, 'phone'),
+  // optional: homepage/deals forms don't require a phone (the HVAC funnel validates 10 digits client-side)
+  phone: z.string().trim().max(40).optional().default(''),
   company: s(200),
   form: s(60),               // which page sent it, e.g. "hvac funnel"
   page: s(300),
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
       await admin
         .from('leads')
         .update({
-          phone: existing.phone || parsed.phone,
+          phone: existing.phone || parsed.phone || null,
           first_name: existing.first_name || first || null,
           last_name: existing.last_name || rest.join(' ') || null,
           company: existing.company || parsed.company || null,
@@ -207,7 +208,7 @@ export async function POST(req: NextRequest) {
           first_name: first || null,
           last_name: rest.join(' ') || null,
           email: parsed.email,
-          phone: parsed.phone,
+          phone: parsed.phone || null,
           company: parsed.company || null,
           batch_id: batchId,
           assigned_to: null,
