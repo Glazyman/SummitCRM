@@ -68,6 +68,7 @@ const Body = z.object({
   ebitda: s(40),
   owner_plans: s(120),
   timeline: s(80),
+  selling_reason: s(120),   // hero 'what's got you thinking about selling?' answer
   priorities: s(400),
   message: s(4000),
   _gotcha: s(200),           // honeypot — must be empty
@@ -90,6 +91,7 @@ function intakeAnswers(b: z.infer<typeof Body>): Record<string, string> {
   const breakdown = [b.industry && `Industry: ${b.industry}`, b.customer_type && `Customers: ${b.customer_type}`].filter(Boolean)
   if (breakdown.length) a.service_breakdown = breakdown.join('\n')
   const plans = [
+    b.selling_reason && `Why selling: ${b.selling_reason}`,
     b.owner_plans && `After the sale: ${dash(b.owner_plans)}`,
     b.timeline && `Timeline: ${dash(b.timeline)}`,
     b.priorities && `Priorities: ${b.priorities}`,

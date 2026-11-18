@@ -29,6 +29,7 @@ export interface WebsiteLeadRow {
   employees: string
   timeline: string
   serviceArea: string
+  reason: string
 }
 
 const FORM_LABELS: Record<string, string> = {
@@ -93,7 +94,7 @@ export function WebsiteLeadsClient({
     if (source === 'organic' && r.utmSource) return false
     if (form && r.form !== form) return false
     if (q) {
-      const hay = `${r.name} ${r.email} ${r.phone} ${r.company} ${r.serviceArea} ${r.utmCampaign}`.toLowerCase()
+      const hay = `${r.name} ${r.email} ${r.phone} ${r.company} ${r.serviceArea} ${r.utmCampaign} ${r.reason}`.toLowerCase()
       if (!q.toLowerCase().split(/\s+/).every((t) => hay.includes(t))) return false
     }
     return true
@@ -184,6 +185,7 @@ export function WebsiteLeadsClient({
                     {(r.company || r.serviceArea) && (
                       <div className="text-[12px] text-muted-foreground">{r.company || r.serviceArea}</div>
                     )}
+                    {r.reason && <div className="mt-0.5 text-[12px] font-medium text-red-700">{r.reason}</div>}
                   </TableCell>
                   <TableCell className="text-[13px]">
                     <div>{r.email}</div>

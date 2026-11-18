@@ -69,6 +69,7 @@ export default async function WebsiteLeadsPage() {
       employees: String(last.employees || first.employees || ''),
       timeline: String(last.timeline || first.timeline || ''),
       serviceArea: String(last.service_area || first.service_area || ''),
+      reason: String(last.selling_reason || first.selling_reason || ''),
     }
   })
 
