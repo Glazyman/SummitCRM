@@ -17,8 +17,7 @@ import {
   PanelLeftOpen,
   LogOut,
   UserCog,
-  FileText,
-} from 'lucide-react'
+  FileText, Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -188,6 +187,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName, hideCollapse
           <div className="mt-7">
             <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Admin</p>
             <div className="flex flex-col gap-1">
+              <NavLink item={{ label: 'Website Leads', href: '/website-leads', icon: Globe }}    active={isActive('/website-leads')} />
               <NavLink item={{ label: 'Import',       href: '/leads/import',  icon: PlusCircle }} active={isActive('/leads/import')} />
               <NavLink item={{ label: 'Analytics',    href: '/analytics',     icon: BarChart2 }}  active={isActive('/analytics')} />
               <NavLink item={{ label: 'Documents',    href: '/documents',     icon: FileText }}   active={isActive('/documents')} />
@@ -197,6 +197,7 @@ export function Sidebar({ workspaceName, role, userEmail, userName, hideCollapse
         )}
         {isAdmin && collapsed && (
           <div className="mt-4 flex flex-col gap-1">
+            <NavLink item={{ label: 'Website Leads', href: '/website-leads', icon: Globe }}    active={isActive('/website-leads')} collapsed />
             <NavLink item={{ label: 'Import',       href: '/leads/import',  icon: PlusCircle }} active={isActive('/leads/import')} collapsed />
             <NavLink item={{ label: 'Analytics',    href: '/analytics',     icon: BarChart2 }}  active={isActive('/analytics')} collapsed />
             <NavLink item={{ label: 'Documents',    href: '/documents',     icon: FileText }}   active={isActive('/documents')} collapsed />

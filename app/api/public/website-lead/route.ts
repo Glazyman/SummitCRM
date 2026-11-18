@@ -11,8 +11,8 @@ import { createAdminClient } from '@/lib/supabase/server'
  * of the email notification, so a failure here never loses a lead.
  *
  * - Creates a lead in the Summit Mergers workspace (source = 'api' — the DB
- *   check constraint has no 'website' value; origin is tracked via the batch,
- *   status = 'new', unassigned) in the "Website Leads" batch.
+ *   check constraint has no 'website' value; origin = custom_fields.website_submissions),
+ *   status = 'new', unassigned, NO batch. Admins see them on /website-leads.
  * - Maps form answers into custom_fields._questionnaire.answers using the
  *   SAME ids as components/leads/detail/questionnaire.tsx (employees, union,
  *   years_in_business, service_area, avg_job_size, revenue, ebitda,
@@ -23,7 +23,6 @@ import { createAdminClient } from '@/lib/supabase/server'
  */
 
 const WORKSPACE_ID = process.env.WEBSITE_LEADS_WORKSPACE_ID || '0f69bfc5-fe68-4c0f-98d2-b17e3a08cbb6'
-const BATCH_NAME = 'Website Leads'
 const RANGE_TAG = '(range from website form)'
 const ALLOWED_ORIGINS = new Set([
   'https://summitmergers.com',
@@ -130,7 +129,7 @@ export async function POST(req: NextRequest) {
     delete clean._gotcha
     const submission = { ...clean, submitted_at: now }
 
-    // Active admins: batch creator + notification recipients
+    // Active admins: notification recipients
     const { data: admins } = await admin
       .from('workspace_members')
       .select('user_id')
@@ -186,21 +185,6 @@ export async function POST(req: NextRequest) {
         type: 'lead_imported', metadata: { source: 'website', form: parsed.form || null, resubmission: true },
       })
     } else {
-      // Find or create the "Website Leads" batch
-      let batchId: string | null = null
-      const { data: batch } = await admin
-        .from('lead_batches').select('id')
-        .eq('workspace_id', WORKSPACE_ID).eq('name', BATCH_NAME)
-        .limit(1).maybeSingle()
-      if (batch) batchId = batch.id
-      else if (adminIds[0]) {
-        const { data: nb } = await admin
-          .from('lead_batches')
-          .insert({ workspace_id: WORKSPACE_ID, name: BATCH_NAME, description: 'Seller inquiries from summitmergers.com forms', created_by: adminIds[0] })
-          .select('id').single()
-        batchId = nb?.id ?? null
-      }
-
       const { data: lead, error } = await admin
         .from('leads')
         .insert({
@@ -210,7 +194,7 @@ export async function POST(req: NextRequest) {
           email: parsed.email,
           phone: parsed.phone || null,
           company: parsed.company || null,
-          batch_id: batchId,
+          batch_id: null, // website leads live on the admin /website-leads page, not in a batch
           assigned_to: null,
           status: 'new',
           source: 'api', // leads_source_check allows manual|csv_import|api|invite; website origin = batch + custom_fields.website_submissions

@@ -7,6 +7,7 @@ import { updateSession } from './lib/supabase/middleware'
 const PROTECTED_PATHS = [
   '/dashboard', '/leads', '/call-mode', '/pipeline', '/tasks', '/batches',
   '/documents', '/campaigns', '/analytics', '/settings', '/admin', '/notifications',
+  '/website-leads',
 ]
 
 /**
