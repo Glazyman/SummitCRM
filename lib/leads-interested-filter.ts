@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { selectAll } from '@/lib/supabase/select-all'
+import { ownerPhones, companyPhones } from '@/components/leads/owner-phone'
 
 /** Resolve a small event-based cohort first, then apply the table filters before pagination. */
 export async function interestedLeadsPage(
@@ -35,6 +36,7 @@ export async function interestedLeadsPage(
     if (param('from') && Date.parse(l.created_at) < Date.parse(param('from')!)) return false
     if (param('to') && Date.parse(l.created_at) >= Date.parse(param('to')!) + 86400000) return false
     if (param('cold') === '1' && !(l.interest_status === 'pending' && Date.parse(l.created_at) < Date.now() - 7 * 86400000 && (!l.last_contacted_at || ['voicemail', 'no_answer'].includes(l.last_call_outcome)))) return false
+    if (!extraMatch(l, param('contact'), param('activity'))) return false
     const text = [l.first_name, l.last_name, l.email, l.company, l.title].join(' ').toLowerCase()
     return tokens.every(t => text.includes(t))
   })
@@ -51,4 +53,33 @@ export async function interestedLeadsPage(
     return av.localeCompare(bv) * direction || a.id.localeCompare(b.id)
   })
   return { data: { rows: matching.slice(offset, offset + limit), total_count: matching.length, status_counts }, matchingIds: matching.map(l => l.id) }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Row = Record<string, any>
+/** JS mirror of SQL lead_extra_match — keep the two in step. */
+function extraMatch(l: Row, contact?: string, activity?: string) {
+  if (contact) {
+    const owner = ownerPhones({ phone: l.phone, custom_fields: l.custom_fields ?? {} }).length > 0
+    const company = companyPhones({ custom_fields: l.custom_fields ?? {} }).length > 0
+    const email = !!(l.email ?? '').trim()
+    const ok = {
+      owner_phone: owner, email, owner_phone_email: owner && email,
+      company_phone_only: !owner && company, no_phone: !owner && !company, no_email: !email,
+    }[contact]
+    if (ok === false) return false
+  }
+  if (activity) {
+    const contacted = l.last_contacted_at ? Date.parse(l.last_contacted_at) : null
+    const day = 86400000
+    const never = contacted === null && !l.last_activity_at && l.status === 'new' && l.interest_status === 'pending'
+    const ok = {
+      never_touched: never, touched: !never, never_called: contacted === null,
+      called_7d: contacted !== null && contacted >= Date.now() - 7 * day,
+      stale_30d: contacted !== null && contacted < Date.now() - 30 * day,
+      stale_90d: contacted !== null && contacted < Date.now() - 90 * day,
+    }[activity]
+    if (ok === false) return false
+  }
+  return true
 }

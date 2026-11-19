@@ -103,6 +103,8 @@ export default async function LeadsPage({ searchParams }: PageProps) {
           // workspace can't blow up the response, and skip offset.
           p_limit:               perPage === 0 ? ALL_PAGE_HARD_CAP : perPage,
           p_offset:              perPage === 0 ? 0 : (page - 1) * perPage,
+          p_contact:             sParam('contact')  || null,
+          p_activity:            sParam('activity') || null,
         }),
         supabase
           .from('lead_batches')

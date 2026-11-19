@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Globe, Megaphone, Search, UserX, CalendarDays } from 'lucide-react'
+import { Globe, Megaphone, Search, UserX, CalendarDays, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { SelectMenu } from '@/components/ui/select-menu'
 import { Badge } from '@/components/ui/badge'
@@ -81,6 +81,28 @@ export function WebsiteLeadsClient({
   const [source, setSource] = React.useState('')
   const [form, setForm] = React.useState('')
   const [selected, setSelected] = React.useState<string | null>(null)
+  const [confirmId, setConfirmId] = React.useState<string | null>(null)
+  const [deleting, setDeleting] = React.useState<string | null>(null)
+  const [error, setError] = React.useState('')
+
+  async function deleteLead(id: string) {
+    setDeleting(id)
+    setError('')
+    try {
+      const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? `Delete failed (${res.status})`)
+      }
+      setRows((prev) => prev.filter((r) => r.id !== id))
+      if (selected === id) setSelected(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
+    } finally {
+      setDeleting(null)
+      setConfirmId(null)
+    }
+  }
 
   const memberName = React.useMemo(() => new Map(teamMembers.map((m) => [m.id, m.name])), [teamMembers])
 
@@ -149,6 +171,8 @@ export function WebsiteLeadsClient({
         />
       </div>
 
+      {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</p>}
+
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
           {rows.length === 0
@@ -169,6 +193,7 @@ export function WebsiteLeadsClient({
               <TableHead className="hidden xl:table-cell">Timeline</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="hidden md:table-cell">Assigned</TableHead>
+              <TableHead className="w-0"><span className="sr-only">Delete</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -204,6 +229,33 @@ export function WebsiteLeadsClient({
                   <TableCell><Badge variant="secondary">{titleCase(r.status)}</Badge></TableCell>
                   <TableCell className="hidden text-[13px] md:table-cell">
                     {r.assignedTo ? memberName.get(r.assignedTo) ?? '—' : <span className="text-amber-600">Unassigned</span>}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                    {confirmId === r.id ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={deleting === r.id}
+                          onClick={() => deleteLead(r.id)}
+                          className="rounded-md bg-red-600 px-2 py-1 text-[12px] font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                        >
+                          {deleting === r.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                        <button type="button" onClick={() => setConfirmId(null)} className="px-1 text-[12px] text-muted-foreground hover:text-foreground">
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-label={`Delete ${r.name}`}
+                        title="Delete lead"
+                        onClick={() => setConfirmId(r.id)}
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </TableCell>
                 </TableRow>
               )

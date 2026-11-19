@@ -336,11 +336,12 @@ export function LeadProfileCard({
         >
           {editing ? (
             <div className="space-y-2.5">
+              <p className="-mb-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">Owner phone</p>
               <RepeatableInputs
                 values={phones}
                 onChange={setPhones}
                 type="tel"
-                placeholder="Add phone…"
+                placeholder="Owner phone…"
                 max={MAX_PHONES}
                 addLabel="Add phone"
               />
@@ -359,11 +360,15 @@ export function LeadProfileCard({
             </div>
           ) : (
             <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Owner</p>
+              {!lead.phone && !PHONE_KEYS.some((k) => lead.custom_fields?.[k]) && (
+                <p className="text-sm text-muted-foreground/60">No owner phone on file</p>
+              )}
               {lead.phone && (
                 <CopyableContact
                   value={lead.phone}
                   href={`tel:${lead.phone}`}
-                  className="text-sm hover:underline"
+                  className="text-sm font-medium hover:underline"
                 />
               )}
               {PHONE_KEYS.map((k) =>

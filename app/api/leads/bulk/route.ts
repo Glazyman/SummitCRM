@@ -23,6 +23,8 @@ interface FilterSpec {
   cold_only?:           boolean
   date_from?:           string | null
   date_to?:             string | null
+  contact?:             string | null
+  activity?:            string | null
 }
 
 async function getContext() {
@@ -81,6 +83,8 @@ export async function PATCH(req: NextRequest) {
       p_cold_only:           !!f.cold_only,
       p_date_from:           f.date_from ?? null,
       p_date_to:             f.date_to ?? null,
+      p_contact:             f.contact ?? null,
+      p_activity:            f.activity ?? null,
       p_new_status:          status ?? null,
       p_new_assigned_to:     assigned_to ?? null,
       p_new_batch_id:        batch_id ?? null,
@@ -209,6 +213,8 @@ export async function DELETE(req: NextRequest) {
       p_cold_only:           !!f.cold_only,
       p_date_from:           f.date_from ?? null,
       p_date_to:             f.date_to ?? null,
+      p_contact:             f.contact ?? null,
+      p_activity:            f.activity ?? null,
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ deleted: Number(result?.count ?? 0) })

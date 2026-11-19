@@ -19,6 +19,7 @@ import {
   DropdownMenuItem, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { STATUS_CONFIG, INTEREST_CONFIG } from './status-config'
+import { ownerPhones, companyPhones } from './owner-phone'
 import type { LeadRow, SortField, SortDir, ColumnId, InterestStatus } from './types'
 
 const StatusSelect = dynamic(() => import('./status-select').then(m => m.StatusSelect), { loading: () => <span className="text-xs text-muted-foreground">Opening…</span> })
@@ -214,7 +215,7 @@ function ColumnHeader({ colId, sortBy, sortDir, onSort, isAdmin }: {
     case 'status':        return <SortHeader field="status"          current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[130px]">Status</SortHeader>
     case 'last_activity': return <SortHeader field="last_activity_at" current={sortBy} dir={sortDir} onSort={onSort} className="min-w-[120px]">Last Activity</SortHeader>
     case 'interest':      return plain('Interest')
-    case 'phone':         return plain('Phone')
+    case 'phone':         return plain('Owner Phone')
     case 'company_phone': return plain('Company Phone')
     case 'title':         return plain('Job Title')
     case 'website':       return plain('Website')
@@ -222,6 +223,21 @@ function ColumnHeader({ colId, sortBy, sortDir, onSort, isAdmin }: {
     case 'assigned':      return isAdmin ? plain('Assigned To') : null
     default:              return null
   }
+}
+
+// Owner number first. With none on file, show the company line — muted and
+// labelled so nobody mistakes it for the owner's cell.
+function OwnerPhoneCell({ lead }: { lead: LeadRow }) {
+  const owner = ownerPhones(lead)
+  if (owner.length) return <MultiContactCell primary={owner[0]} extras={owner.slice(1)} type="phone" />
+  const company = companyPhones(lead)[0]
+  if (!company) return <span className="text-muted-foreground/40">—</span>
+  return (
+    <span className="whitespace-nowrap text-muted-foreground" title="No owner phone on file — this is the company line">
+      <a href={`tel:${company}`} className="hover:underline">{company}</a>
+      <span className="ml-1.5 rounded border border-border px-1 py-px text-[9px] font-semibold uppercase tracking-wide">Co.</span>
+    </span>
+  )
 }
 
 // ── Dynamic cell renderer ─────────────────────────────────────────────────
@@ -254,7 +270,7 @@ function LeadCell({ colId, lead, isAdmin, onStatusChange, onInterestChange }: {
     case 'phone':
       return (
         <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
-          <MultiContactCell primary={lead.phone ?? null} extras={[lead.custom_fields?.phone_2, lead.custom_fields?.phone_3].filter(Boolean) as string[]} type="phone" />
+          <OwnerPhoneCell lead={lead} />
         </td>
       )
     case 'company_phone':

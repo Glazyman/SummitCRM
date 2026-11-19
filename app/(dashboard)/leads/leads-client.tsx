@@ -17,6 +17,7 @@ import { BulkActionBar }        from '@/components/leads/bulk-action-bar'
 import { ColumnVisibilityMenu } from '@/components/leads/column-visibility-menu'
 import { CreateLeadModal }      from '@/components/leads/create-lead-modal'
 import { STATUS_CONFIG, INTEREST_CONFIG } from '@/components/leads/status-config'
+import { ownerPhones, companyPhones } from '@/components/leads/owner-phone'
 
 import { COLUMNS, DEFAULT_FILTERS, DEFAULT_COLUMN_ORDER } from '@/components/leads/types'
 import type { LeadRow, LeadFilters, LeadStatus, InterestStatus, ColumnId, SortField, StatusCount } from '@/components/leads/types'
@@ -95,6 +96,8 @@ export function LeadsClient({
       assignedTo: p.get('assigned')   ?? null,
       myLeads:    p.get('my') === '1',
       coldOnly:   p.get('cold') === '1',
+      contact:    p.get('contact')    ?? '',
+      activity:   p.get('activity')   ?? '',
       interestedStart: p.get('interested_start') ?? '',
       interestedEnd: p.get('interested_end') ?? '',
       dateFrom:   p.get('from')       ?? '',
@@ -227,6 +230,8 @@ export function LeadsClient({
     if (filters.assignedTo)          params.set('assigned', filters.assignedTo)
     if (filters.myLeads)             params.set('my',       '1')
     if (filters.coldOnly)            params.set('cold',     '1')
+    if (filters.contact)             params.set('contact',  filters.contact)
+    if (filters.activity)            params.set('activity', filters.activity)
     if (filters.interestedStart) params.set('interested_start', filters.interestedStart)
     if (filters.interestedEnd) params.set('interested_end', filters.interestedEnd)
     if (filters.dateFrom)            params.set('from',     filters.dateFrom)
@@ -328,6 +333,8 @@ export function LeadsClient({
       cold_only:           filters.coldOnly,
       date_from:           filters.dateFrom || null,
       date_to:             filters.dateTo   || null,
+      contact:             filters.contact  || null,
+      activity:            filters.activity || null,
     }
   }
 
@@ -970,7 +977,7 @@ function LeadsCardsView({
           >
             <p className="truncate font-semibold">{name}</p>
             <p className="mt-0.5 truncate text-sm text-muted-foreground">{lead.company ?? 'No company'}</p>
-            <p className="mt-2 truncate text-sm">{lead.email}</p>
+            <CardContact lead={lead} />
             <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <span className={cn('inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold', statusMeta.badge)}>
@@ -985,6 +992,22 @@ function LeadsCardsView({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+/** Owner phone first; the company line only as a labelled fallback. */
+function CardContact({ lead }: { lead: LeadRow }) {
+  const owner = ownerPhones(lead)[0]
+  const company = companyPhones(lead)[0]
+  return (
+    <div className="mt-2 space-y-0.5 text-sm">
+      {owner
+        ? <p className="truncate">{owner}</p>
+        : company
+          ? <p className="truncate text-muted-foreground">{company} <span className="text-[10px] uppercase tracking-wide">company</span></p>
+          : <p className="text-muted-foreground/60">No phone</p>}
+      {lead.email && <p className="truncate text-muted-foreground">{lead.email}</p>}
     </div>
   )
 }

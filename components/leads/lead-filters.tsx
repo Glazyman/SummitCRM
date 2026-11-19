@@ -7,7 +7,7 @@ import { SelectMenu } from '@/components/ui/select-menu'
 import { CalendarPicker } from '@/components/ui/calendar-picker'
 import { todayYmd, dayRange, shiftYmd } from '@/components/ui/day-nav'
 import { INTEREST_CONFIG, ALL_INTEREST_STATUSES } from './status-config'
-import type { LeadFilters } from './types'
+import { CONTACT_FILTERS, ACTIVITY_FILTERS, type LeadFilters } from './types'
 
 interface Props {
   filters: LeadFilters
@@ -29,7 +29,7 @@ export function LeadFiltersPanel({ filters: f, batches, teamMembers, isAdmin, is
   const today = dayRange(todayYmd())
   const interestedToday = f.interestedStart === today.start && f.interestedEnd === today.end
   const pill = (active: boolean) => cn('h-8 shrink-0 rounded-md border px-3 text-xs font-medium transition-colors', active ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground')
-  const active = !!(f.search || f.statuses.length || f.interests.length || f.batchId || f.assignedTo || f.myLeads || f.coldOnly || f.dateFrom || f.dateTo || f.interestedStart)
+  const active = !!(f.search || f.statuses.length || f.interests.length || f.batchId || f.assignedTo || f.myLeads || f.coldOnly || f.contact || f.activity || f.dateFrom || f.dateTo || f.interestedStart)
   const field = 'space-y-1.5 min-w-0'
   const label = 'block text-[11px] font-medium text-muted-foreground'
   return (
@@ -50,12 +50,20 @@ export function LeadFiltersPanel({ filters: f, batches, teamMembers, isAdmin, is
         <button type="button" aria-pressed={f.interests.length === 1 && f.interests[0] === 'interested' && !f.interestedStart} className={pill(f.interests.length === 1 && f.interests[0] === 'interested' && !f.interestedStart)} onClick={() => change({ interests: f.interests.length === 1 && f.interests[0] === 'interested' && !f.interestedStart ? [] : ['interested'], interestedStart: '', interestedEnd: '', coldOnly: false })}>All interested</button>
         <button type="button" aria-pressed={f.statuses.length === 1 && f.statuses[0] === 'new'} className={pill(f.statuses.length === 1 && f.statuses[0] === 'new')} onClick={() => change({ statuses: f.statuses.length === 1 && f.statuses[0] === 'new' ? [] : ['new'], interestedStart: '', interestedEnd: '', coldOnly: false })}>New leads</button>
         <button type="button" aria-pressed={f.statuses.length === 2 && f.statuses.includes('no_answer') && f.statuses.includes('voicemail')} className={pill(f.statuses.length === 2 && f.statuses.includes('no_answer') && f.statuses.includes('voicemail'))} onClick={() => change({ statuses: f.statuses.length === 2 && f.statuses.includes('no_answer') && f.statuses.includes('voicemail') ? [] : ['no_answer', 'voicemail'], interestedStart: '', interestedEnd: '', coldOnly: false })}>Try again</button>
+        <button type="button" aria-pressed={f.activity === 'never_touched'} className={pill(f.activity === 'never_touched')} title="No calls, notes, or status changes yet" onClick={() => change({ activity: f.activity === 'never_touched' ? '' : 'never_touched' })}>Never touched</button>
+        <button type="button" aria-pressed={f.contact === 'owner_phone'} className={pill(f.contact === 'owner_phone')} title="The owner's own number is on file (not just the company line)" onClick={() => change({ contact: f.contact === 'owner_phone' ? '' : 'owner_phone' })}>Has owner phone</button>
         {!isRep && <button type="button" aria-pressed={f.myLeads} className={pill(f.myLeads)} onClick={() => change({ myLeads: !f.myLeads, assignedTo: null })}>My leads</button>}
         {isAdmin && <button type="button" aria-pressed={f.assignedTo === 'unassigned'} className={pill(f.assignedTo === 'unassigned')} onClick={() => change({ assignedTo: f.assignedTo === 'unassigned' ? null : 'unassigned', myLeads: false })}>Unassigned</button>}
       </div>
-      <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-3 xl:grid-cols-7">
         <div className={field}><span className={label}>Interest</span>
           <SelectMenu value={f.interests.length === 1 ? f.interests[0] : ''} nullable nullLabel={f.interests.length > 1 ? `${f.interests.length} selected` : 'Any interest'} size="sm" options={ALL_INTEREST_STATUSES.map(v => ({ value: v, label: INTEREST_CONFIG[v].label }))} onChange={v => change({ interests: v ? [v as LeadFilters['interests'][number]] : [] })} className="w-full" />
+        </div>
+        <div className={field}><span className={label}>Contact info</span>
+          <SelectMenu value={f.contact} nullable nullLabel="Any contact info" size="sm" options={CONTACT_FILTERS.map(o => ({ value: o.value, label: o.label }))} onChange={v => change({ contact: v || '' })} className="w-full" />
+        </div>
+        <div className={field}><span className={label}>Activity</span>
+          <SelectMenu value={f.activity} nullable nullLabel="Any activity" size="sm" options={ACTIVITY_FILTERS.map(o => ({ value: o.value, label: o.label }))} onChange={v => change({ activity: v || '' })} className="w-full" />
         </div>
         {isAdmin && <div className={field}><span className={label}>Assigned to</span><SelectMenu value={f.assignedTo ?? ''} nullable nullLabel="All reps" size="sm" searchable options={[{ value: 'unassigned', label: 'Unassigned' }, ...teamMembers.map(m => ({ value: m.id, label: m.name }))]} onChange={v => change({ assignedTo: v || null, myLeads: false })} className="w-full" /></div>}
         {batches.length > 0 && <div className={field}><span className={label}>Batch</span><SelectMenu value={f.batchId ?? ''} nullable nullLabel="All batches" size="sm" searchable options={batches.map(b => ({ value: b.id, label: b.name }))} onChange={v => change({ batchId: v || null })} className="w-full" /></div>}

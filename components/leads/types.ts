@@ -57,6 +57,10 @@ export interface LeadFilters {
   interestedStart: string
   interestedEnd: string
   coldOnly:   boolean
+  /** Contact-info filter — see CONTACT_FILTERS (lead_extra_match in SQL). '' = any */
+  contact:    string
+  /** Activity filter — see ACTIVITY_FILTERS. '' = any */
+  activity:   string
   dateFrom:   string          // ISO date string or ''
   dateTo:     string          // ISO date string or ''
   sortBy:     SortField
@@ -75,6 +79,8 @@ export const DEFAULT_FILTERS: LeadFilters = {
   interestedStart: '',
   interestedEnd: '',
   coldOnly:   false,
+  contact:    '',
+  activity:   '',
   dateFrom:   '',
   dateTo:     '',
   sortBy:     'last_activity_at',
@@ -111,7 +117,7 @@ export interface ColumnDef {
 export const COLUMNS: ColumnDef[] = [
   { id: 'name',          label: 'Name',          sortField: 'name',            optional: false, defaultOn: true  },
   { id: 'company',       label: 'Company',        sortField: 'company',         optional: true,  defaultOn: true  },
-  { id: 'phone',         label: 'Phone',                                        optional: true,  defaultOn: true  },
+  { id: 'phone',         label: 'Owner Phone',                                      optional: true,  defaultOn: true  },
   { id: 'email',         label: 'Email',          sortField: 'email',           optional: true,  defaultOn: true  },
   { id: 'status',        label: 'Status',         sortField: 'status',          optional: true,  defaultOn: true  },
   { id: 'interest',      label: 'Interest',                                     optional: true,  defaultOn: true  },
@@ -131,3 +137,22 @@ export interface StatusCount {
   status: LeadStatus
   count:  number
 }
+
+// ── Contact / activity filters (values must match lead_extra_match in SQL) ─
+export const CONTACT_FILTERS = [
+  { value: 'owner_phone',        label: 'Has owner phone' },
+  { value: 'email',              label: 'Has email' },
+  { value: 'owner_phone_email',  label: 'Has owner phone + email' },
+  { value: 'company_phone_only', label: 'Company phone only' },
+  { value: 'no_phone',           label: 'No phone at all' },
+  { value: 'no_email',           label: 'No email' },
+] as const
+
+export const ACTIVITY_FILTERS = [
+  { value: 'never_touched', label: 'Never touched' },
+  { value: 'touched',       label: 'Worked at least once' },
+  { value: 'never_called',  label: 'Never called' },
+  { value: 'called_7d',     label: 'Called in last 7 days' },
+  { value: 'stale_30d',     label: 'No call in 30+ days' },
+  { value: 'stale_90d',     label: 'No call in 90+ days' },
+] as const
